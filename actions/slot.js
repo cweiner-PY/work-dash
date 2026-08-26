@@ -1,0 +1,37 @@
+// actions/slot.js
+export function branchFor(item) {
+  return item.prs[0]?.headRefName ?? item.slot?.branch ?? null
+}
+
+export function resolveSlot(item, slots, config, { staleBranches = new Set() } = {}) {
+  const branch = branchFor(item)
+  if (!item.repo || !branch) {
+    return { needsPicker: true, candidates: [], message: 'No branch is known for this item — nothing to check out.' }
+  }
+  const pool = (config.repos[item.repo]?.slots ?? [])
+  const mine = slots.filter((s) => pool.includes(s.dir))
+
+  const already = mine.find((s) => s.branch === branch)
+  if (already) return { slot: already, alreadyOnBranch: true }
+
+  const candidates = mine.map((s) => {
+    let eligible = true
+    let why = 'free'
+    if (s.dirty) { eligible = false; why = `${s.dirtyCount} uncommitted change(s)` }
+    else if (s.branch === 'master' || s.branch === 'main') why = `on ${s.branch}`
+    else if (staleBranches.has(s.branch)) why = 'holding a finished or reassigned ticket'
+    else { eligible = false; why = `busy with ${s.branch}` }
+    return { dir: s.dir, branch: s.branch, dirty: s.dirty, dirtyCount: s.dirtyCount, eligible, why, slot: s }
+  })
+
+  // Prefer master/main, then stale, then anything else eligible.
+  const rank = (c) => (c.branch === 'master' || c.branch === 'main' ? 0 : 1)
+  const free = candidates.filter((c) => c.eligible).sort((a, b) => rank(a) - rank(b))
+  if (free.length) return { slot: free[0].slot, alreadyOnBranch: false }
+
+  return {
+    needsPicker: true,
+    candidates: candidates.map(({ slot, ...c }) => c),
+    message: 'No free checkout — pick a slot to use.',
+  }
+}
