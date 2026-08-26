@@ -55,20 +55,30 @@ export function assignLanes(items, config) {
 
     // --- lane 1: needs you ---
     // Collect EVERY applicable reason, not just the first: a single item can be
-    // both "ticket Done but PR open" and "required check failing".
+    // both "ticket Done but PR open" and "required check failing". The reason
+    // TEXT and the lane-PROMOTION decision are kept separate: a draft is by
+    // definition not ready for review, so its failing checks and its conflicts
+    // with master are the expected state of work in progress, not something
+    // actionable — they still explain the card via `reasons`, they just don't
+    // pull the item into needs-you.
     let lane = null
     const failing = pr?.requiredChecks?.failing ?? []
     const needs = []
-    if (reviewPrs.length) needs.push(`review requested of you (#${reviewPrs[0].number})`)
-    if (pr && stale) needs.push(`ticket is Done but PR #${pr.number} is still open`)
-    if (failing.length) needs.push(`required check failing: ${failing.join(', ')}`)
-    if (pr?.reviewDecision === 'CHANGES_REQUESTED') needs.push('changes requested')
-    if (pr && pr.mergeable === 'CONFLICTING') needs.push('conflicts with master')
-    if (gate.allowed) needs.push('approved and mergeable — merge it')
-    if (needs.length) {
-      lane = 'needs-you'
-      reasons.push(...needs)
+    let promote = false
+    if (reviewPrs.length) { needs.push(`review requested of you (#${reviewPrs[0].number})`); promote = true }
+    if (pr && stale) { needs.push(`ticket is Done but PR #${pr.number} is still open`); promote = true }
+    if (failing.length) {
+      needs.push(`required check failing: ${failing.join(', ')}`)
+      if (!pr.isDraft) promote = true
     }
+    if (pr?.reviewDecision === 'CHANGES_REQUESTED') { needs.push('changes requested'); promote = true }
+    if (pr && pr.mergeable === 'CONFLICTING') {
+      needs.push('conflicts with master')
+      if (!pr.isDraft) promote = true
+    }
+    if (gate.allowed) { needs.push('approved and mergeable — merge it'); promote = true }
+    if (needs.length) reasons.push(...needs)
+    if (promote) lane = 'needs-you'
 
     // --- lane 2: waiting on others ---
     if (!lane && pr && !pr.isDraft && pr.reviewDecision === 'REVIEW_REQUIRED' && failing.length === 0) {

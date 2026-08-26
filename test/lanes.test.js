@@ -144,6 +144,47 @@ test('To Do with a plan is ready-to-start; without one it is backlog', () => {
   assert.equal(without.lane, 'backlog')
 })
 
+// --- lane 1 draft gating: a draft's failing checks / conflicts are expected,
+// not actionable — they must not promote to needs-you, but must still show ---
+test('a draft with failing required checks is not needs-you, but the reason still shows', () => {
+  const it = lane(item({ jira: jira(), prs: [pr({ isDraft: true, requiredChecks: { total: 3, failing: ['Linting'], known: true } })] }))
+  assert.equal(it.lane, 'in-flight')
+  assert.ok(it.reasons.some((r) => r.includes('Linting')))
+})
+test('the same failing-check PR promotes to needs-you once it is not a draft', () => {
+  const it = lane(item({ jira: jira(), prs: [pr({ isDraft: false, requiredChecks: { total: 3, failing: ['Linting'], known: true } })] }))
+  assert.equal(it.lane, 'needs-you')
+  assert.ok(it.reasons.some((r) => r.includes('Linting')))
+})
+test('a draft that conflicts with master is not needs-you, but the reason still shows', () => {
+  const it = lane(item({ jira: jira(), prs: [pr({ isDraft: true, mergeable: 'CONFLICTING' })] }))
+  assert.equal(it.lane, 'in-flight')
+  assert.ok(it.reasons.some((r) => /conflicts with master/.test(r)))
+})
+test('the same conflicting PR promotes to needs-you once it is not a draft', () => {
+  const it = lane(item({ jira: jira(), prs: [pr({ isDraft: false, mergeable: 'CONFLICTING' })] }))
+  assert.equal(it.lane, 'needs-you')
+  assert.ok(it.reasons.some((r) => /conflicts with master/.test(r)))
+})
+test('a draft with changes requested is still needs-you', () => {
+  const it = lane(item({ jira: jira(), prs: [pr({ isDraft: true, reviewDecision: 'CHANGES_REQUESTED' })] }))
+  assert.equal(it.lane, 'needs-you')
+})
+test('a draft on a Jira-Done ticket is still needs-you', () => {
+  const it = lane(item({ jira: jira({ status: 'Done', statusCategory: 'Done' }), prs: [pr({ isDraft: true })] }))
+  assert.equal(it.lane, 'needs-you')
+})
+test('a draft carrying a review-requested PR of someone else\'s is still needs-you', () => {
+  const it = lane(item({ jira: jira(), prs: [pr({ isDraft: true }), pr({ number: 2, isMine: false })] }))
+  assert.equal(it.lane, 'needs-you')
+  assert.ok(it.reasons.some((r) => /review requested/i.test(r)))
+})
+test('mergeGateFor still blocks a draft PR even when approved and mergeable', () => {
+  const g = mergeGateFor(pr({ reviewDecision: 'APPROVED', isDraft: true }))
+  assert.equal(g.allowed, false)
+  assert.ok(g.blockers.includes('draft'))
+})
+
 // --- signals ---
 test('foreign, stale and reclaimable', () => {
   const foreign = lane(item({ jira: jira({ status: 'Ready To Test', isMine: false, assignee: 'Bruce Pereira' }), slot: { dir: '/s', branch: 'b', dirty: true, behind: 13, ahead: 6 } }))

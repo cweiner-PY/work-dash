@@ -150,11 +150,14 @@ test('the whole fixture set produces the expected board', () => {
   )
   const byLane = (l) => laned.filter((i) => i.lane === l).map((i) => i.id).sort()
 
-  assert.deepEqual(byLane('needs-you'), ['PY-12275', 'PY-12746', 'PY-13751'])
+  // PY-12746 is a draft: its failing checks and conflict with master are
+  // expected work-in-progress state, not something needing you — it lives
+  // in-flight instead of needs-you (PY-13751 is not a draft, so it stays).
+  assert.deepEqual(byLane('needs-you'), ['PY-12275', 'PY-13751'])
   assert.deepEqual(byLane('waiting'),
     ['PerformYard/Logan:feat/salesforce-implementation-date-source-of-truth'])
   assert.deepEqual(byLane('in-flight'),
-    ['PY-13044', 'PY-13888', 'PY-13925', 'PerformYard/Logan:update-churn-agent-prompt'])
+    ['PY-12746', 'PY-13044', 'PY-13888', 'PY-13925', 'PerformYard/Logan:update-churn-agent-prompt'])
   // Only PY-13247 is both To Do and has a plan folder on disk.
   assert.deepEqual(byLane('ready-to-start'), ['PY-13247'])
   assert.deepEqual(byLane('backlog'),
