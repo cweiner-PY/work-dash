@@ -55,9 +55,14 @@ export function loadConfig({ local, shared } = {}) {
     docsDir: sharedCfg.docsDir,
     cloudId: sharedCfg.cloudId ?? null,
   }
-  cfg.toSafeJSON = () => {
-    const { jiraToken, toSafeJSON, ...rest } = cfg
+
+  const getSafeConfig = () => {
+    const { jiraToken, toJSON, toSafeJSON, ...rest } = cfg
     return rest
   }
+
+  cfg.toJSON = getSafeConfig
+  cfg.toSafeJSON = getSafeConfig
+
   return cfg
 }

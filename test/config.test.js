@@ -45,3 +45,28 @@ test('never exposes the token via toSafeJSON', () => {
   assert.equal(safe.jiraEmail, 'a@b.com')
   assert.equal(safe.port, 4200)
 })
+
+test('JSON.stringify does not leak token via toJSON', () => {
+  const c = loadConfig({ local: base, shared: { docsDir: '/d', cloudId: 'c' } })
+  const serialized = JSON.stringify(c)
+  assert.ok(!serialized.includes(SENTINEL), 'token must not survive JSON.stringify')
+})
+
+test('serialized config still contains non-secret keys', () => {
+  const c = loadConfig({ local: base, shared: { docsDir: '/d', cloudId: 'c' } })
+  const serialized = JSON.stringify(c)
+  assert.ok(serialized.includes('a@b.com'), 'jiraEmail should be in serialized output')
+  assert.ok(serialized.includes('4200'), 'port should be in serialized output')
+})
+
+test('jiraToken is still readable directly', () => {
+  const c = loadConfig({ local: base, shared: { docsDir: '/d', cloudId: 'c' } })
+  assert.equal(c.jiraToken, SENTINEL)
+})
+
+test('toJSON and toSafeJSON do not leak as keys in serialized output', () => {
+  const c = loadConfig({ local: base, shared: { docsDir: '/d', cloudId: 'c' } })
+  const serialized = JSON.stringify(c)
+  assert.ok(!serialized.includes('toJSON'), 'toJSON must not appear as a key')
+  assert.ok(!serialized.includes('toSafeJSON'), 'toSafeJSON must not appear as a key')
+})
