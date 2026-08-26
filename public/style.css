@@ -64,3 +64,28 @@ html, body { max-width: 100%; overflow-x: hidden; }
 .action-msg { font-size: 12px; margin-top: 6px; }
 .action-msg.bad { color: var(--bad); }
 .action-msg.ok { color: var(--ok); }
+
+/* Subtasks nested under a card's own <details> — collapsed by default (no [open]
+   attribute set), native disclosure triangle. */
+.subtasks { margin-top: 8px; font-size: 12px; }
+.subtasks summary { cursor: pointer; color: var(--ink); }
+.subtasks summary:hover { color: var(--ink); }
+.subtask { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap;
+  margin-top: 6px; padding-left: 14px; color: var(--muted); }
+.subtask > * { min-width: 0; }
+.subtask-key { font-weight: 600; text-decoration: none; color: var(--ink); }
+/* Real subtask summaries run long. overflow-wrap is inherited from .card's own rule
+   in the nested case, but stated explicitly here too since .subtask-summary is reused
+   verbatim by nothing else that guarantees it — cheap insurance against the class
+   someday being used outside a .card. */
+.subtask-summary { flex: 1 1 240px; overflow-wrap: anywhere; }
+.subtask-divider { margin: 6px 0 2px 14px; color: var(--muted); font-size: 11px; }
+.subtask-done { opacity: .7; }
+.subtask-done .subtask-key { color: var(--muted); }
+
+/* The "My subtasks elsewhere" group — not a lane, rendered once after the lanes. */
+.orphan-subtask { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap;
+  padding: 6px 2px; border-bottom: 1px solid var(--line); font-size: 12px;
+  overflow-wrap: anywhere; }
+.orphan-subtask > * { min-width: 0; }
+.subtask-parent { color: var(--muted); flex: 1 1 240px; overflow-wrap: anywhere; }

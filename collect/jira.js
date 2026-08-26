@@ -14,10 +14,30 @@ export function normalizeIssue(raw, jiraSite) {
   }
 }
 
+function normalizeSubtask(raw, jiraSite) {
+  const f = raw.fields ?? {}
+  return {
+    key: raw.key,
+    summary: f.summary ?? null,
+    status: f.status?.name ?? null,
+    statusCategory: f.status?.statusCategory?.name ?? null,
+    issuetype: f.issuetype?.name ?? null,
+    assignee: f.assignee?.displayName ?? null,
+    parentKey: f.parent?.key ?? null,
+    parentSummary: f.parent?.fields?.summary ?? null,
+    url: `${jiraSite}/browse/${raw.key}`,
+  }
+}
+
 const FIELDS = ['summary', 'status', 'issuetype', 'priority', 'assignee']
+const SUBTASK_FIELDS = ['summary', 'status', 'issuetype', 'assignee', 'parent']
 const MAX_RESULTS = 100
 
-async function search(config, jql, { fetchImpl = fetch } = {}) {
+// `fields` and `normalize` are overridable so fetchSubtasks can reuse this same request/
+// pagination-warning/redaction machinery with a different field list and a different
+// shape (parentKey/parentSummary instead of priority) — normalizeIssue stays the default
+// so fetchPrimary/fetchByKeys are untouched.
+async function search(config, jql, { fetchImpl = fetch, fields = FIELDS, normalize = normalizeIssue } = {}) {
   const res = await fetchImpl(`${config.jiraSite}/rest/api/3/search/jql`, {
     method: 'POST',
     headers: {
@@ -25,7 +45,7 @@ async function search(config, jql, { fetchImpl = fetch } = {}) {
       'Content-Type': 'application/json',
       Accept: 'application/json',
     },
-    body: JSON.stringify({ jql, fields: FIELDS, maxResults: MAX_RESULTS }),
+    body: JSON.stringify({ jql, fields, maxResults: MAX_RESULTS }),
   })
   if (!res.ok) {
     let body = await res.text()
@@ -44,7 +64,7 @@ async function search(config, jql, { fetchImpl = fetch } = {}) {
       `may have more. Only the first ${MAX_RESULTS} are shown. Narrow the JQL filter.`
     )
   }
-  return issues.map((raw) => normalizeIssue(raw, config.jiraSite))
+  return issues.map((raw) => normalize(raw, config.jiraSite))
 }
 
 // Jira's /search/jql returns HTTP 200 with an EMPTY issue list when the credentials are
@@ -90,4 +110,26 @@ export async function fetchPrimary(config, opts) {
 export async function fetchByKeys(config, keys, opts) {
   if (!keys?.length) return []
   return search(config, `key in (${keys.join(',')})`, opts)
+}
+
+// subTaskIssueTypes() over hardcoding "UI/UX Sub-Task", "Bug Sub-task", "Verification
+// Sub-Task": verified against the live instance, and those literal names will drift —
+// a rename would silently empty this view rather than error.
+export async function fetchSubtasks(config, parentKeys, opts) {
+  const subOpts = { ...opts, fields: SUBTASK_FIELDS, normalize: normalizeSubtask }
+  // Mirror fetchByKeys's guard: an unguarded `parent in ()` is a malformed query on
+  // every refresh, so skip this half entirely when there is nothing to ask about.
+  const subtasks = parentKeys?.length
+    ? await search(config, `parent in (${parentKeys.join(',')})`, subOpts)
+    : []
+  const mine = await search(
+    config,
+    'assignee = currentUser() AND issuetype in subTaskIssueTypes() AND statusCategory != Done',
+    subOpts
+  )
+  const onBoard = new Set(parentKeys ?? [])
+  // Subtasks already nested under their parent (above) must not also appear as
+  // "orphans" — showing them twice would be worse than not showing them.
+  const orphans = mine.filter((s) => !onBoard.has(s.parentKey))
+  return { subtasks, orphans }
 }

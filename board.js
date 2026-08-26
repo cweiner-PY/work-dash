@@ -2,7 +2,7 @@
 import { join as joinItems } from './join.js'
 import { assignLanes, myPrOf } from './lanes.js'
 import { extractKey } from './util/key.js'
-import { fetchPrimary as jiraPrimary, fetchByKeys as jiraByKeys } from './collect/jira.js'
+import { fetchPrimary as jiraPrimary, fetchByKeys as jiraByKeys, fetchSubtasks as jiraSubtasks } from './collect/jira.js'
 import { fetchGithub as ghFetch } from './collect/github.js'
 import { collectSlots as slotsFetch } from './collect/slots.js'
 import { collectPlans as plansFetch } from './collect/plans.js'
@@ -56,6 +56,7 @@ export async function buildBoard(config, deps = {}) {
     now = () => new Date(),
     fetchPrimary = jiraPrimary,
     fetchByKeys = jiraByKeys,
+    fetchSubtasks = jiraSubtasks,
     fetchGithub = ghFetch,
     collectSlots = slotsFetch,
     collectPlans = plansFetch,
@@ -95,8 +96,22 @@ export async function buildBoard(config, deps = {}) {
     ? await guarded(() => fetchByKeys(config, [...discovered]), [])
     : { value: [], ok: false, error: jiraR.error }
 
+  // Subtasks: every item that has a Jira key — the primary query's keys plus every key
+  // discovered above via a PR or slot branch — is checked for subtasks. Same credential
+  // and endpoint as the rest of Jira, so a failure here is guarded the same way and
+  // folded into the jira source's error rather than getting its own source.
+  //
+  // Orphan subtasks (the user's own, whose parent is not one of parentKeys) deliberately
+  // contribute NOTHING to enrichment/discovery here — same reasoning as plan folders
+  // above: pulling an orphan's parent onto the board would fill it with colleagues'
+  // stories the user does not own.
+  const parentKeys = [...known, ...discovered]
+  const subtaskR = jiraR.ok
+    ? await guarded(() => fetchSubtasks(config, parentKeys), { subtasks: [], orphans: [] })
+    : { value: { subtasks: [], orphans: [] }, ok: false, error: jiraR.error }
+
   const items = assignLanes(
-    joinItems({ jira, enrichment: enrichR.value, prs, slots, plans, config }),
+    joinItems({ jira, enrichment: enrichR.value, prs, slots, plans, subtasks: subtaskR.value.subtasks, config }),
     config
   ).map((i) => ({ ...i, skills: skillsForItem(i, config) }))
 
@@ -104,9 +119,12 @@ export async function buildBoard(config, deps = {}) {
     generatedAt: now().toISOString(),
     items,
     slots,
+    orphanSubtasks: subtaskR.value.orphans,
     sources: {
-      jira: source({ ok: jiraR.ok && enrichR.ok, error: jiraR.error ?? enrichR.error },
-                   jira.length + enrichR.value.length),
+      jira: source({
+        ok: jiraR.ok && enrichR.ok && subtaskR.ok,
+        error: jiraR.error ?? enrichR.error ?? subtaskR.error,
+      }, jira.length + enrichR.value.length),
       github: source(ghR, prs.length, ghErrors),
       slots: source(slotR, slots.length, slotErrors),
       plans: source(planR, plans.length, planErrors),

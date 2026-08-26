@@ -1,7 +1,7 @@
 // test/render.test.js
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { groupForDisplay, sourceChip, prChecksChip } from '../public/app.js'
+import { groupForDisplay, sourceChip, prChecksChip, summarizeSubtasks } from '../public/app.js'
 
 const it = (o) => ({ id: o.id, lane: o.lane, statusGroup: o.statusGroup ?? 'no ticket',
   sortIndex: o.sortIndex ?? Infinity, signals: { foreign: false, stale: false, reclaimable: false, ...o.signals },
@@ -132,4 +132,38 @@ test('prChecksChip: a pending check with nothing failing is "running", not a fai
   const { cls, text } = prChecksChip({ total: 1, failing: [], pending: ['Unit Tests'], known: true })
   assert.equal(cls, 'warn')
   assert.equal(text, 'required 1 running')
+})
+
+// --- summarizeSubtasks ---
+
+const st = (key, statusCategory) => ({ key, summary: key, status: statusCategory, statusCategory, issuetype: 'UI/UX Sub-Task', assignee: 'Colt Weiner' })
+
+test('summarizeSubtasks: counts open vs done and total, regardless of input order', () => {
+  const subtasks = [st('A', 'Done'), st('B', 'In Progress'), st('C', 'To Do'), st('D', 'Done')]
+  const s = summarizeSubtasks(subtasks)
+  assert.equal(s.total, 4)
+  assert.equal(s.open, 2)
+  assert.equal(s.done, 2)
+})
+
+test('summarizeSubtasks: openList holds only the non-Done ones, doneList only the Done ones', () => {
+  const subtasks = [st('A', 'Done'), st('B', 'In Progress'), st('C', 'To Do'), st('D', 'Done')]
+  const s = summarizeSubtasks(subtasks)
+  assert.deepEqual(s.openList.map((x) => x.key), ['B', 'C'])
+  assert.deepEqual(s.doneList.map((x) => x.key), ['A', 'D'])
+})
+
+test('summarizeSubtasks: an all-done set', () => {
+  const subtasks = [st('A', 'Done'), st('B', 'Done')]
+  const s = summarizeSubtasks(subtasks)
+  assert.equal(s.open, 0)
+  assert.equal(s.done, 2)
+  assert.equal(s.total, 2)
+  assert.deepEqual(s.openList, [])
+  assert.equal(s.doneList.length, 2)
+})
+
+test('summarizeSubtasks: an empty set', () => {
+  const s = summarizeSubtasks([])
+  assert.deepEqual(s, { open: 0, done: 0, total: 0, openList: [], doneList: [] })
 })

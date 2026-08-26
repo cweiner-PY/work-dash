@@ -1,0 +1,6 @@
+[
+ {"key":"PY-12746-1","summary":"Build catalog UI table","status":"In Progress","statusCategory":"In Progress","issuetype":"UI/UX Sub-Task","assignee":"Colt Weiner","parentKey":"PY-12746","parentSummary":"Post Competency MVP Release - Prototype: Competency Catalog","url":"https://performyard.atlassian.net/browse/PY-12746-1"},
+ {"key":"PY-12746-2","summary":"Fix broken catalog filter","status":"Done","statusCategory":"Done","issuetype":"Bug Sub-task","assignee":"Bruce Pereira","parentKey":"PY-12746","parentSummary":"Post Competency MVP Release - Prototype: Competency Catalog","url":"https://performyard.atlassian.net/browse/PY-12746-2"},
+ {"key":"PY-12746-3","summary":"Verify catalog import","status":"To Do","statusCategory":"To Do","issuetype":"Verification Sub-Task","assignee":"Colt Weiner","parentKey":"PY-12746","parentSummary":"Post Competency MVP Release - Prototype: Competency Catalog","url":"https://performyard.atlassian.net/browse/PY-12746-3"},
+ {"key":"PY-99999-1","summary":"Orphan subtask whose parent is not on the board","status":"In Progress","statusCategory":"In Progress","issuetype":"UI/UX Sub-Task","assignee":"Colt Weiner","parentKey":"PY-99999","parentSummary":"Some ticket not on the board","url":"https://performyard.atlassian.net/browse/PY-99999-1"}
+]

@@ -1,7 +1,7 @@
 // test/collect-jira.test.js
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { normalizeIssue, fetchPrimary, fetchByKeys } from '../collect/jira.js'
+import { normalizeIssue, fetchPrimary, fetchByKeys, fetchSubtasks } from '../collect/jira.js'
 
 const config = {
   jiraSite: 'https://performyard.atlassian.net',
@@ -210,4 +210,105 @@ test('with a real token, existing redaction still works', async () => {
     () => fetchPrimary(config, { fetchImpl }),
     (e) => !e.message.includes('tok') && e.message.includes('[redacted]')
   )
+})
+
+// --- fetchSubtasks ---
+
+const subtaskRaw = {
+  key: 'PY-12746-1',
+  fields: {
+    summary: 'Build catalog UI table',
+    status: { name: 'In Progress', statusCategory: { name: 'In Progress' } },
+    issuetype: { name: 'UI/UX Sub-Task' },
+    assignee: { displayName: 'Colt Weiner' },
+    parent: { key: 'PY-12746', fields: { summary: 'Post Competency MVP Release - Prototype: Competency Catalog' } },
+  },
+}
+
+test('fetchSubtasks: empty parentKeys makes NO by-parent request', async () => {
+  const calls = []
+  const fetchImpl = async (_url, opts) => {
+    calls.push(JSON.parse(opts.body).jql)
+    return { ok: true, status: 200, json: async () => ({ issues: [] }) }
+  }
+  const { subtasks, orphans } = await fetchSubtasks(config, [], { fetchImpl })
+  assert.deepEqual(subtasks, [])
+  assert.deepEqual(orphans, [])
+  assert.equal(calls.length, 1, 'only the mine-elsewhere query should run')
+  assert.ok(!calls[0].startsWith('parent in'), 'must not send an unguarded parent in ()')
+})
+
+test('fetchSubtasks: by-parent query uses parent in (...) with the given keys', async () => {
+  const calls = []
+  const fetchImpl = async (_url, opts) => {
+    calls.push(JSON.parse(opts.body).jql)
+    return { ok: true, status: 200, json: async () => ({ issues: [] }) }
+  }
+  await fetchSubtasks(config, ['PY-1', 'PY-2'], { fetchImpl })
+  assert.ok(calls.includes('parent in (PY-1,PY-2)'))
+  assert.equal(calls.length, 2, 'both the by-parent and mine-elsewhere queries should run')
+})
+
+test('fetchSubtasks: the mine-elsewhere query uses subTaskIssueTypes()', async () => {
+  const calls = []
+  const fetchImpl = async (_url, opts) => {
+    calls.push(JSON.parse(opts.body).jql)
+    return { ok: true, status: 200, json: async () => ({ issues: [] }) }
+  }
+  await fetchSubtasks(config, ['PY-1'], { fetchImpl })
+  const mineQuery = calls.find((q) => q.includes('currentUser()'))
+  assert.ok(mineQuery, 'expected a mine-elsewhere query')
+  assert.match(mineQuery, /assignee = currentUser\(\)/)
+  assert.match(mineQuery, /issuetype in subTaskIssueTypes\(\)/)
+  assert.match(mineQuery, /statusCategory != Done/)
+})
+
+test('fetchSubtasks: requests fields summary, status, issuetype, assignee, parent', async () => {
+  let seenFields
+  const fetchImpl = async (_url, opts) => {
+    seenFields = JSON.parse(opts.body).fields
+    return { ok: true, status: 200, json: async () => ({ issues: [] }) }
+  }
+  await fetchSubtasks(config, ['PY-1'], { fetchImpl })
+  assert.deepEqual(seenFields, ['summary', 'status', 'issuetype', 'assignee', 'parent'])
+})
+
+test('fetchSubtasks: an orphan whose parent IS in parentKeys is excluded from orphans', async () => {
+  const mineOrphan = { key: 'PY-99999-1', fields: { ...subtaskRaw.fields, parent: { key: 'PY-99999', fields: { summary: 'Not on board' } } } }
+  const mineNotOrphan = { key: 'PY-12746-9', fields: { ...subtaskRaw.fields, parent: { key: 'PY-12746', fields: { summary: 'On board' } } } }
+  const fetchImpl = async (_url, opts) => {
+    const { jql } = JSON.parse(opts.body)
+    if (jql.startsWith('parent in')) return { ok: true, status: 200, json: async () => ({ issues: [subtaskRaw] }) }
+    return { ok: true, status: 200, json: async () => ({ issues: [mineOrphan, mineNotOrphan] }) }
+  }
+  const { subtasks, orphans } = await fetchSubtasks(config, ['PY-12746'], { fetchImpl })
+  assert.equal(subtasks.length, 1)
+  assert.equal(subtasks[0].key, 'PY-12746-1')
+  assert.equal(orphans.length, 1)
+  assert.equal(orphans[0].key, 'PY-99999-1')
+})
+
+test('fetchSubtasks: normalization maps every field, tolerating a missing parent', async () => {
+  const noParent = { key: 'PY-1-1', fields: { ...subtaskRaw.fields, parent: undefined } }
+  const fetchImpl = async (_url, opts) => {
+    const { jql } = JSON.parse(opts.body)
+    if (jql.startsWith('parent in')) return { ok: true, status: 200, json: async () => ({ issues: [subtaskRaw] }) }
+    return { ok: true, status: 200, json: async () => ({ issues: [noParent] }) }
+  }
+  const { subtasks, orphans } = await fetchSubtasks(config, ['PY-12746'], { fetchImpl })
+  assert.deepEqual(subtasks[0], {
+    key: 'PY-12746-1',
+    summary: 'Build catalog UI table',
+    status: 'In Progress',
+    statusCategory: 'In Progress',
+    issuetype: 'UI/UX Sub-Task',
+    assignee: 'Colt Weiner',
+    parentKey: 'PY-12746',
+    parentSummary: 'Post Competency MVP Release - Prototype: Competency Catalog',
+    url: 'https://performyard.atlassian.net/browse/PY-12746-1',
+  })
+  assert.equal(orphans.length, 1)
+  assert.equal(orphans[0].key, 'PY-1-1')
+  assert.equal(orphans[0].parentKey, null)
+  assert.equal(orphans[0].parentSummary, null)
 })

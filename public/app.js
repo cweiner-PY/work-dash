@@ -75,6 +75,15 @@ export function prChecksChip(rc) {
   return { cls: 'ok', text: `required ${rc.total}/${rc.total}` }
 }
 
+// Pure bucketing, not a sort within either bucket: openList holds every subtask whose
+// statusCategory isn't 'Done' (rendered first in the card), doneList holds the rest
+// (rendered after, dimmed) — regardless of the order they arrived in.
+export function summarizeSubtasks(subtasks) {
+  const openList = subtasks.filter((s) => s.statusCategory !== 'Done')
+  const doneList = subtasks.filter((s) => s.statusCategory === 'Done')
+  return { open: openList.length, done: doneList.length, total: subtasks.length, openList, doneList }
+}
+
 // --- appended to public/app.js ---
 // Guarded so the module stays importable by node --test (no document there).
 if (typeof document !== 'undefined') {
@@ -139,6 +148,51 @@ if (typeof document !== 'undefined') {
       .map((cb) => ({ dir: cb.dataset.dir, file: cb.dataset.file }))
   }
 
+  function subtaskRow(s, { done = false } = {}) {
+    const row = el('div', `subtask${done ? ' subtask-done' : ''}`)
+    const a = el('a', 'subtask-key', s.key)
+    a.href = s.url ?? '#'; a.target = '_blank'
+    row.append(a)
+    row.append(el('span', 'subtask-summary', s.summary ?? ''))
+    row.append(el('span', 'chip', s.issuetype ?? ''))
+    row.append(el('span', 'chip', s.status ?? ''))
+    row.append(el('span', 'subtask-assignee', s.assignee ?? 'unassigned'))
+    return row
+  }
+
+  // Native <details>/<summary> rather than a JS toggle: no state to manage, and
+  // keyboard accessibility comes for free.
+  function subtasksDetails(item) {
+    const { open, done, openList, doneList } = summarizeSubtasks(item.subtasks)
+    const details = el('details', 'subtasks')
+    details.append(el('summary', null, `subtasks — ${open} open · ${done} done`))
+    for (const s of openList) details.append(subtaskRow(s))
+    if (doneList.length) {
+      details.append(el('div', 'subtask-divider', '── done ──'))
+      for (const s of doneList) details.append(subtaskRow(s, { done: true }))
+    }
+    return details
+  }
+
+  // Not a lane: the user's own open subtasks whose parent is NOT on the board. Rendered
+  // as one group after the lanes, outside groupForDisplay entirely, so it never affects
+  // LANES, the lane list, or the hidden counts.
+  function orphanSubtasksSection(orphans) {
+    const sec = el('section', 'lane')
+    sec.append(el('h2', null, `My subtasks elsewhere (${orphans.length})`))
+    for (const s of orphans) {
+      const row = el('div', 'orphan-subtask')
+      const a = el('a', 'key', s.key)
+      a.href = s.url ?? '#'; a.target = '_blank'
+      row.append(a)
+      row.append(el('span', 'chip', s.issuetype ?? ''))
+      row.append(el('span', 'chip', s.status ?? ''))
+      row.append(el('span', 'subtask-parent', `↳ parent ${s.parentKey ?? '?'} · ${s.parentSummary ?? ''}`))
+      sec.append(row)
+    }
+    return sec
+  }
+
   function card(item) {
     const c = el('article', `card lane-${item.lane}`)
     const head = el('header')
@@ -179,6 +233,9 @@ if (typeof document !== 'undefined') {
     }
 
     if (item.plans.length) c.append(planPicker(item))
+
+    // Empty is rendered as nothing at all — no empty <details>, no zero-count line.
+    if (item.subtasks.length > 0) c.append(subtasksDetails(item))
 
     const actions = el('div', 'actions')
     const msg = el('p', 'action-msg')
@@ -257,6 +314,7 @@ if (typeof document !== 'undefined') {
       }
       root.append(sec)
     }
+    if (b.orphanSubtasks?.length) root.append(orphanSubtasksSection(b.orphanSubtasks))
     $('#hidden').textContent = hidden.total
       ? `${hidden.backlog} backlog · ${hidden.stale} stale — use the toggles above`
       : ''

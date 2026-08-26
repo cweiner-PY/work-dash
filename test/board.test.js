@@ -20,6 +20,7 @@ const okDeps = () => ({
   now: () => new Date('2026-08-26T12:00:00Z'),
   fetchPrimary: async () => fx('jira-primary.json'),
   fetchByKeys: async (_c, keys) => fx('jira-enrichment.json').filter((i) => keys.includes(i.key)),
+  fetchSubtasks: async () => ({ subtasks: [], orphans: [] }),
   fetchGithub: async () => ({ prs: [], errors: [] }),
   collectSlots: async () => ({
     slots: fx('git-slots.json').map((s) => ({
@@ -98,4 +99,55 @@ test('every item carries a lane and a reasons array', async () => {
     assert.ok(Array.isArray(i.reasons))
     assert.ok(i.mergeGate && typeof i.mergeGate.allowed === 'boolean')
   }
+})
+
+test('subtasks are fetched for every item that has a key, and attach to the right item', async () => {
+  let askedKeys = null
+  const deps = {
+    ...okDeps(),
+    fetchSubtasks: async (_c, keys) => {
+      askedKeys = keys.slice().sort()
+      return { subtasks: fx('jira-subtasks.json').filter((s) => s.key !== 'PY-99999-1'), orphans: [] }
+    },
+  }
+  const b = await buildBoard(config, deps)
+  // PY-12746 comes from the primary query; PY-13888 is discovered via a slot branch —
+  // both must be asked about.
+  assert.ok(askedKeys.includes('PY-12746'))
+  assert.ok(askedKeys.includes('PY-13888'))
+  const item = b.items.find((i) => i.id === 'PY-12746')
+  assert.equal(item.subtasks.length, 3)
+})
+
+test('an orphan subtask parent is never pulled onto the board as an item', async () => {
+  const orphan = {
+    key: 'PY-99999-1', summary: 'x', status: 'In Progress', statusCategory: 'In Progress',
+    issuetype: 'UI/UX Sub-Task', assignee: 'Colt Weiner',
+    parentKey: 'PY-99999', parentSummary: 'Not on board',
+    url: 'https://performyard.atlassian.net/browse/PY-99999-1',
+  }
+  const deps = { ...okDeps(), fetchSubtasks: async () => ({ subtasks: [], orphans: [orphan] }) }
+  const b = await buildBoard(config, deps)
+  assert.deepEqual(b.orphanSubtasks, [orphan])
+  assert.ok(!b.items.some((i) => i.id === 'PY-99999'), 'the orphan parent must not become a board item')
+})
+
+test('a subtask-fetch failure folds into the jira source error without breaking the board', async () => {
+  const deps = { ...okDeps(), fetchSubtasks: async () => { throw new Error('subtask query failed') } }
+  const b = await buildBoard(config, deps)
+  assert.equal(b.sources.jira.ok, false)
+  assert.match(b.sources.jira.error, /subtask query failed/)
+  assert.ok(b.items.length > 0)
+})
+
+test('when the Jira source itself fails, fetchSubtasks is never called', async () => {
+  let called = false
+  const deps = {
+    ...okDeps(),
+    fetchPrimary: async () => { throw new Error('401 Unauthorized') },
+    fetchSubtasks: async () => { called = true; return { subtasks: [], orphans: [] } },
+  }
+  const b = await buildBoard(config, deps)
+  assert.equal(called, false)
+  assert.deepEqual(b.orphanSubtasks, [])
 })

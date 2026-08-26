@@ -2,14 +2,14 @@
 import { extractKey } from './util/key.js'
 
 function blank(id, key) {
-  return { id, key, title: null, repo: null, jira: null, prs: [], slot: null, plans: [] }
+  return { id, key, title: null, repo: null, jira: null, prs: [], slot: null, plans: [], subtasks: [] }
 }
 
 // Keyless artifacts are identified by repo + branch so that a PR and a slot
 // sitting on the SAME branch become one item rather than two cards.
 const keylessId = (repo, branch) => `${repo}:${branch}`
 
-export function join({ jira = [], enrichment = [], prs = [], slots = [], plans = [], config }) {
+export function join({ jira = [], enrichment = [], prs = [], slots = [], plans = [], subtasks = [], config }) {
   const byId = new Map()
   const get = (id, key = null) => {
     let it = byId.get(id)
@@ -51,6 +51,19 @@ export function join({ jira = [], enrichment = [], prs = [], slots = [], plans =
   }
   for (const it of byId.values()) {
     if (it.key && plansByKey.has(it.key)) it.plans = plansByKey.get(it.key)
+  }
+
+  // 5. Subtasks, by parentKey. A subtask whose parent key matches no item on the
+  // board simply has nowhere to attach — it does not create one (see board.js:
+  // orphan subtasks must never pull their parent onto the board as an item).
+  const subtasksByParent = new Map()
+  for (const s of subtasks) {
+    if (!s.parentKey) continue
+    if (!subtasksByParent.has(s.parentKey)) subtasksByParent.set(s.parentKey, [])
+    subtasksByParent.get(s.parentKey).push(s)
+  }
+  for (const it of byId.values()) {
+    if (it.key && subtasksByParent.has(it.key)) it.subtasks = subtasksByParent.get(it.key)
   }
 
   return [...byId.values()]
