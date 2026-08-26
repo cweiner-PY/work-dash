@@ -1,7 +1,7 @@
 // collect/github.js
 import { run as defaultRun } from '../util/run.js'
 
-const PR_FIELDS = 'number,title,headRefName,reviewDecision,mergeable,isDraft,statusCheckRollup,updatedAt,url'
+const PR_FIELDS = 'number,title,headRefName,reviewDecision,mergeable,isDraft,statusCheckRollup,updatedAt,url,reviews'
 
 export function summarizeChecks(rollup) {
   const out = { pass: 0, fail: 0, pending: 0 }
@@ -19,7 +19,19 @@ export function parseRequiredChecks(arr) {
   return { total: list.length, failing: list.filter((c) => c.state !== 'SUCCESS').map((c) => c.name) }
 }
 
-export function normalizePr(raw, repo, { mine }) {
+// A PR has review comments worth acting on only when a HUMAN TEAMMATE left
+// feedback. Bots (aws-amplify-us-east-1, cursor, codex connectors) comment
+// constantly and would otherwise light up the resolve-code-review action on
+// every PR; the user's own replies are not feedback for them to resolve either.
+export function hasHumanReviewFeedback(reviews, myLogin) {
+  const ASSOC = new Set(['MEMBER', 'OWNER', 'COLLABORATOR'])
+  return (reviews ?? []).some((r) =>
+    (r.state === 'COMMENTED' || r.state === 'CHANGES_REQUESTED') &&
+    r.author?.login !== myLogin &&
+    ASSOC.has(r.authorAssociation))
+}
+
+export function normalizePr(raw, repo, { mine, myLogin }) {
   return {
     repo,
     number: raw.number,
@@ -30,7 +42,7 @@ export function normalizePr(raw, repo, { mine }) {
     isDraft: Boolean(raw.isDraft),
     checks: summarizeChecks(raw.statusCheckRollup),
     requiredChecks: { total: 0, failing: [] }, // filled by fetchGithub
-    hasReviewComments: false,                  // filled by fetchGithub
+    hasReviewComments: hasHumanReviewFeedback(raw.reviews, myLogin),
     isMine: mine,
     url: raw.url ?? null,
     updatedAt: raw.updatedAt ?? null,
@@ -52,8 +64,9 @@ export async function fetchGithub(config, { run = defaultRun } = {}) {
     try {
       const mineRaw = await listPrs(repo, ['--author', '@me'], { run })
       const reviewRaw = await listPrs(repo, ['--search', 'review-requested:@me'], { run })
-      for (const raw of mineRaw) prs.push(normalizePr(raw, repo, { mine: true }))
-      for (const raw of reviewRaw) prs.push(normalizePr(raw, repo, { mine: false }))
+      const myLogin = config.githubLogin
+      for (const raw of mineRaw) prs.push(normalizePr(raw, repo, { mine: true, myLogin }))
+      for (const raw of reviewRaw) prs.push(normalizePr(raw, repo, { mine: false, myLogin }))
     } catch (e) {
       errors.push(e.message)
     }

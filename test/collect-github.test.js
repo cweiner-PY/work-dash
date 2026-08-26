@@ -2,7 +2,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { summarizeChecks, parseRequiredChecks, normalizePr, fetchGithub } from '../collect/github.js'
+import { summarizeChecks, parseRequiredChecks, normalizePr, fetchGithub, hasHumanReviewFeedback } from '../collect/github.js'
 
 const fx = (n) => JSON.parse(readFileSync(new URL(`./fixtures/${n}`, import.meta.url), 'utf8'))
 
@@ -45,7 +45,7 @@ test('parseRequiredChecks on an EMPTY list means zero total and nothing failing'
 
 test('normalizePr maps the fields the board needs', () => {
   const raw = fx('gh-prs-PerformYard_PerformYard.json').find((p) => p.number === 7110)
-  const pr = normalizePr(raw, 'PerformYard/PerformYard', { mine: true })
+  const pr = normalizePr(raw, 'PerformYard/PerformYard', { mine: true, myLogin: 'cweiner-PY' })
   assert.equal(pr.number, 7110)
   assert.equal(pr.repo, 'PerformYard/PerformYard')
   assert.equal(pr.headRefName, 'PY-12746-competency-management-prototype-competency-catalog')
@@ -54,6 +54,33 @@ test('normalizePr maps the fields the board needs', () => {
   assert.equal(pr.isDraft, true)
   assert.equal(pr.isMine, true)
   assert.deepEqual(pr.requiredChecks, { total: 0, failing: [] }) // filled in later by fetchGithub
+})
+
+test('hasReviewComments is true only for human teammate feedback', () => {
+  const fx7230 = fx('gh-prs-PerformYard_PerformYard.json').find((p) => p.number === 7230)
+  const fx7110 = fx('gh-prs-PerformYard_PerformYard.json').find((p) => p.number === 7110)
+  const ME = 'cweiner-PY'
+  // #7230 carries real COMMENTED reviews from teammate jleo-py (MEMBER)
+  assert.equal(normalizePr(fx7230, 'r', { mine: true, myLogin: ME }).hasReviewComments, true)
+  // #7110 has no reviews at all (only bot issue-comments, which are not reviews)
+  assert.equal(normalizePr(fx7110, 'r', { mine: true, myLogin: ME }).hasReviewComments, false)
+})
+
+test('hasHumanReviewFeedback ignores bots and the user themselves', () => {
+  const ME = 'cweiner-PY'
+  const bot = { author: { login: 'cursor' }, authorAssociation: 'NONE', state: 'COMMENTED' }
+  const mine = { author: { login: ME }, authorAssociation: 'MEMBER', state: 'COMMENTED' }
+  const mate = { author: { login: 'jleo-py' }, authorAssociation: 'MEMBER', state: 'COMMENTED' }
+  const approve = { author: { login: 'jleo-py' }, authorAssociation: 'MEMBER', state: 'APPROVED' }
+  const changes = { author: { login: 'jleo-py' }, authorAssociation: 'MEMBER', state: 'CHANGES_REQUESTED' }
+  assert.equal(hasHumanReviewFeedback([bot], ME), false, 'a bot is not feedback')
+  assert.equal(hasHumanReviewFeedback([mine], ME), false, 'your own comment is not feedback for you')
+  assert.equal(hasHumanReviewFeedback([approve], ME), false, 'a bare approval is not feedback to resolve')
+  assert.equal(hasHumanReviewFeedback([mate], ME), true)
+  assert.equal(hasHumanReviewFeedback([changes], ME), true)
+  assert.equal(hasHumanReviewFeedback([bot, mine, approve, mate], ME), true, 'one real comment among noise counts')
+  assert.equal(hasHumanReviewFeedback([], ME), false)
+  assert.equal(hasHumanReviewFeedback(undefined, ME), false)
 })
 
 test('fetchGithub calls gh per repo and attaches required checks', async () => {
@@ -70,7 +97,7 @@ test('fetchGithub calls gh per repo and attaches required checks', async () => {
     const file = 'gh-prs-' + repo.replace('/', '_') + '.json'
     return { code: 0, stdout: JSON.stringify(fx(file)), stderr: '' }
   }
-  const config = { repos: { 'PerformYard/PerformYard': {}, 'PerformYard/Logan': {} } }
+  const config = { githubLogin: 'cweiner-PY', repos: { 'PerformYard/PerformYard': {}, 'PerformYard/Logan': {} } }
   const { prs, errors } = await fetchGithub(config, { run })
 
   assert.deepEqual(errors, [])
@@ -90,7 +117,7 @@ test('a failing gh call for one repo is reported but does not lose the other rep
     if (args.some((a) => String(a).includes('review-requested'))) return { code: 0, stdout: '[]', stderr: '' }
     return { code: 0, stdout: JSON.stringify(fx('gh-prs-PerformYard_PerformYard.json')), stderr: '' }
   }
-  const config = { repos: { 'PerformYard/PerformYard': {}, 'PerformYard/Logan': {} } }
+  const config = { githubLogin: 'cweiner-PY', repos: { 'PerformYard/PerformYard': {}, 'PerformYard/Logan': {} } }
   const { prs, errors } = await fetchGithub(config, { run })
   assert.equal(prs.length, 3)
   assert.equal(errors.length, 1)
