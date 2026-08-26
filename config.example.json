@@ -1,7 +1,7 @@
 {
   "port": 4200,
   "jiraSite": "https://performyard.atlassian.net",
-  "jiraEmail": "cweiner@performyard.com",
+  "jiraEmail": "colt@performyard.com",
   "jiraToken": "PASTE_TOKEN_FROM_id.atlassian.com",
   "jiraProject": "PY",
   "myAccountId": "62b43cb267dff38e0988a3bc",
