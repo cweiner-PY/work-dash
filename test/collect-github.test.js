@@ -40,7 +40,7 @@ test('parseRequiredChecks on #7110 finds two failures', () => {
 
 test('parseRequiredChecks on an EMPTY list means zero total and nothing failing', () => {
   const r = parseRequiredChecks(fx('gh-checks-required-704.json'))
-  assert.deepEqual(r, { total: 0, failing: [] })
+  assert.deepEqual(r, { total: 0, failing: [], known: true })
 })
 
 test('normalizePr maps the fields the board needs', () => {
@@ -53,7 +53,7 @@ test('normalizePr maps the fields the board needs', () => {
   assert.equal(pr.mergeable, 'CONFLICTING')
   assert.equal(pr.isDraft, true)
   assert.equal(pr.isMine, true)
-  assert.deepEqual(pr.requiredChecks, { total: 0, failing: [] }) // filled in later by fetchGithub
+  assert.deepEqual(pr.requiredChecks, { total: 0, failing: [], known: false }) // filled in later by fetchGithub
 })
 
 test('hasReviewComments is true only for human teammate feedback', () => {

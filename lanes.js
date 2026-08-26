@@ -6,7 +6,11 @@ export function mergeGateFor(pr) {
   if (pr.reviewDecision !== 'APPROVED') blockers.push(`not approved (${pr.reviewDecision ?? 'no review'})`)
   if (pr.mergeable !== 'MERGEABLE') blockers.push(`not mergeable (${pr.mergeable})`)
   if (pr.isDraft) blockers.push('draft')
-  // An empty required-check list passes vacuously — some repos configure none.
+  // known:true means we actually read the required-check list. known:false — or the
+  // field being absent entirely — means the read never succeeded, so the gate refuses
+  // rather than mistaking silence for a clean bill of health.
+  if (pr.requiredChecks?.known !== true) blockers.push('required check status unknown (could not read checks)')
+  // An empty required-check list, once known, passes vacuously — some repos configure none.
   const failing = pr.requiredChecks?.failing ?? []
   if (failing.length) blockers.push(`required check failing: ${failing.join(', ')}`)
   return { allowed: blockers.length === 0, blockers }
