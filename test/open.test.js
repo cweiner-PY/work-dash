@@ -83,3 +83,16 @@ test('refuses to emit a checkout into a dirty slot even when explicitly chosen',
   assert.equal(r.ok, false)
   assert.match(r.message, /uncommitted/i)
 })
+
+test('refuses a chosenSlotDir belonging to a different repo', async () => {
+  // The reviewer flagged that open.js shares update-branch.js's cross-repo hazard: a raw
+  // API call could hand this item a slotDir from an unrelated repo, and a checkout would
+  // be emitted into it. The slot's own `repo` field is the guard, same as update-branch.js.
+  const foreign = { ...slotA, dir: '/w/OTHER', repo: 'X/Y' }
+  let ran = 0
+  const r = await openItem({ item, slots: [foreign], plans, skill: null, config, chosenSlotDir: '/w/OTHER' },
+    { run: async () => { ran++; return { code: 0, stdout: '', stderr: '' } }, writeFile: async () => {}, dry: true })
+  assert.equal(ran, 0, 'must not emit or run anything for a cross-repo slot')
+  assert.equal(r.ok, false)
+  assert.match(r.message, /belongs to X\/Y/)
+})

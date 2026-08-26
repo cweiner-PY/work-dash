@@ -54,8 +54,10 @@ export function registerRoutes(routes, { getBoard, config, deps = {} }) {
   routes.set('POST /api/merge', async (body, ctx) => {
     const { item } = await find(body.id)
     if (!item) return { ok: false, message: `Unknown item: ${body.id}` }
+    // Pass the value through UNCOERCED. Boolean("false") is true, so coercing here would
+    // reintroduce exactly the bypass the strict check in mergePr exists to close.
     const result = await mergePr(
-      { item, prNumber: body.prNumber, confirmed: Boolean(body.confirmed) }, deps)
+      { item, prNumber: body.prNumber, confirmed: body.confirmed === true }, deps)
     if (result.ok) ctx.invalidate()
     return result
   })

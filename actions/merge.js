@@ -6,8 +6,18 @@ export async function mergePr({ item, prNumber, confirmed = false }, { run = def
   const pr = item.prs.find((p) => p.number === Number(prNumber))
   if (!pr) return { ok: false, message: `No PR #${prNumber} on this item.` }
 
-  if (!confirmed) {
+  // STRICT identity check, not truthiness. `confirmed: "false"`, `"no"`, `1`, `{}` are
+  // all truthy in JS, and this action is irreversible and public — the one place in this
+  // codebase where a permissive coercion could land code in master by accident.
+  if (confirmed !== true) {
     return { ok: false, message: `Confirm the squash merge of #${pr.number} "${pr.title}" first.`, needsConfirm: true }
+  }
+
+  // Never merge a PR that is not the user's own. Review-requested PRs appear on this board
+  // so they can be reviewed, not merged on someone else's behalf. The UI only offers the
+  // button for the user's own PRs, but the UI is a convenience and this is the authority.
+  if (pr.isMine === false) {
+    return { ok: false, message: `#${pr.number} was authored by someone else — merge it from GitHub, not here.` }
   }
 
   // The UI's disabled button is a convenience. This is the authority.

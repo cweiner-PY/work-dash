@@ -7,11 +7,21 @@ export async function updateBranch(
 ) {
   const slot = chosenSlotDir ? slots.find((s) => s.dir === chosenSlotDir) : item.slot
   if (!slot) return { ok: false, message: 'This item has no checkout to update.' }
+
+  // A caller-supplied slotDir is resolved against the whole board, so confirm the slot
+  // actually belongs to this item's repository. Otherwise a raw API call could merge one
+  // repo's default branch into a checkout of a different repo.
+  if (item.repo && slot.repo && slot.repo !== item.repo) {
+    return { ok: false, message: `${slot.dir} belongs to ${slot.repo}, not ${item.repo}.` }
+  }
   // Same base collect/slots.js measures "N behind" against — see the interface note.
   const base = `origin/${defaultBranch}`
 
-  // Refuse before touching git at all.
-  if (slot.dirty) {
+  // Refuse before touching git at all. Fail CLOSED on ambiguous state: treat a missing or
+  // non-boolean `dirty` as dirty rather than clean. This module is the last line of defence
+  // before mutating a directory that may hold the user's only copy of uncommitted work, so
+  // it must not depend on an upstream invariant holding forever.
+  if (slot.dirty !== false || (slot.dirtyCount ?? 0) > 0) {
     return { ok: false, message: `${slot.dir} has ${slot.dirtyCount} uncommitted change(s) — commit or stash first.` }
   }
   if (dry) {

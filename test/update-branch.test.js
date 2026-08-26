@@ -37,6 +37,32 @@ test('refuses when the working tree is dirty', async () => {
   assert.equal(ran, false, 'must not run any git command')
 })
 
+test('fails CLOSED on ambiguous dirty state', async () => {
+  // A slot object whose `dirty` is missing or non-boolean must be treated as dirty.
+  // Omit dirty/dirtyCount from the base first: spreading `bad` after the full `clean`
+  // fixture could never make `{}` mean "missing" since clean already sets dirty: false.
+  const { dirty, dirtyCount, ...base } = clean
+  for (const bad of [{}, { dirty: undefined }, { dirty: null }, { dirty: 0 }, { dirty: false, dirtyCount: 3 }]) {
+    let ran = 0
+    const slot = { ...base, ...bad }
+    const r = await updateBranch({ item: { ...item, slot }, slots: [slot] },
+      { run: async () => { ran++; return { code: 0, stdout: '', stderr: '' } } })
+    assert.equal(ran, 0, `slot ${JSON.stringify(bad)} must not run git`)
+    assert.equal(r.ok, false)
+  }
+})
+
+test('refuses a slot belonging to a different repo', async () => {
+  let ran = 0
+  const foreign = { ...clean, dir: '/w/OTHER', repo: 'X/Y' }
+  const r = await updateBranch(
+    { item: { ...item, slot: clean }, slots: [clean, foreign], chosenSlotDir: '/w/OTHER' },
+    { run: async () => { ran++; return { code: 0, stdout: '', stderr: '' } } })
+  assert.equal(ran, 0)
+  assert.equal(r.ok, false)
+  assert.match(r.message, /belongs to X\/Y/)
+})
+
 test('reports a conflict without aborting', async () => {
   const calls = []
   const run = async (cmd, args) => {

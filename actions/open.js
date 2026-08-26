@@ -47,6 +47,11 @@ export async function openItem(
   if (chosenSlotDir) {
     slot = slots.find((s) => s.dir === chosenSlotDir)
     if (!slot) return { ok: false, message: `Unknown slot: ${chosenSlotDir}` }
+    // Resolved against the whole board, so confirm it belongs to this item's repo —
+    // otherwise a raw API call could check a branch out in an unrelated repository.
+    if (item.repo && slot.repo && slot.repo !== item.repo) {
+      return { ok: false, message: `${slot.dir} belongs to ${slot.repo}, not ${item.repo}.` }
+    }
     // Explicit choice never overrides the dirty-tree rule.
     if (slot.dirty && slot.branch !== branchFor(item)) {
       return { ok: false, message: `${slot.dir} has ${slot.dirtyCount} uncommitted change(s) — commit or stash first.` }

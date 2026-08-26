@@ -20,6 +20,33 @@ test('merges when the gate passes and the action is confirmed', async () => {
   assert.match(calls[0], /^gh pr merge 7230 --repo O\/R --squash/)
 })
 
+test('ONLY boolean true confirms — no truthy coercion', async () => {
+  // confirmed:"false" / "no" / 1 / {} are all truthy in JS. An irreversible public action
+  // must not accept any of them.
+  for (const bad of ['true', 'false', 'no', 1, '0', {}, [], 'yes']) {
+    let ran = 0
+    const r = await mergePr({ item: item(pr()), prNumber: 7230, confirmed: bad },
+      { run: async () => { ran++; return { code: 0, stdout: 'merged', stderr: '' } } })
+    assert.equal(ran, 0, `confirmed=${JSON.stringify(bad)} must NOT merge`)
+    assert.equal(r.ok, false)
+  }
+  // and the real thing still works
+  let ok = 0
+  const good = await mergePr({ item: item(pr()), prNumber: 7230, confirmed: true },
+    { run: async () => { ok++; return { code: 0, stdout: 'merged', stderr: '' } } })
+  assert.equal(ok, 1)
+  assert.equal(good.ok, true)
+})
+
+test("refuses to merge someone else's PR", async () => {
+  let ran = 0
+  const r = await mergePr({ item: item(pr({ isMine: false })), prNumber: 7230, confirmed: true },
+    { run: async () => { ran++; return { code: 0, stdout: 'merged', stderr: '' } } })
+  assert.equal(ran, 0, 'must not merge a review-requested PR')
+  assert.equal(r.ok, false)
+  assert.match(r.message, /authored by someone else/)
+})
+
 test('refuses without confirmation', async () => {
   let ran = false
   const r = await mergePr({ item: item(pr()), prNumber: 7230, confirmed: false },
