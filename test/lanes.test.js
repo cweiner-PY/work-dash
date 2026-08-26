@@ -13,7 +13,7 @@ const pr = (o = {}) => ({
   repo: 'O/R', number: 1, title: 't', headRefName: 'b',
   reviewDecision: 'REVIEW_REQUIRED', mergeable: 'MERGEABLE', isDraft: false,
   checks: { pass: 1, fail: 0, pending: 0 },
-  requiredChecks: { total: 3, failing: [] },
+  requiredChecks: { total: 3, failing: [], known: true },
   hasReviewComments: false, isMine: true, url: 'u', ...o,
 })
 const jira = (o = {}) => ({ key: 'PY-1', summary: 's', status: 'In Progress', statusCategory: 'In Progress', assignee: 'Colt Weiner', isMine: true, ...o })
@@ -23,9 +23,19 @@ const item = (o = {}) => ({ id: 'PY-1', key: 'PY-1', title: 's', repo: 'O/R', ji
 test('merge gate passes on approved, mergeable, non-draft, required checks green', () => {
   assert.deepEqual(mergeGateFor(pr({ reviewDecision: 'APPROVED' })), { allowed: true, blockers: [] })
 })
-test('ZERO required checks passes vacuously (Logan has none configured)', () => {
-  const g = mergeGateFor(pr({ reviewDecision: 'APPROVED', requiredChecks: { total: 0, failing: [] } }))
+test('ZERO required checks passes vacuously when KNOWN (Logan has none configured)', () => {
+  const g = mergeGateFor(pr({ reviewDecision: 'APPROVED', requiredChecks: { total: 0, failing: [], known: true } }))
   assert.equal(g.allowed, true)
+})
+test('merge gate blocks when required-check status is unknown (gh read failed)', () => {
+  const g = mergeGateFor(pr({ reviewDecision: 'APPROVED', requiredChecks: { total: 0, failing: [], known: false } }))
+  assert.equal(g.allowed, false)
+  assert.ok(g.blockers.some((b) => b.includes('unknown')))
+})
+test('a requiredChecks object missing the known field entirely is also treated as unknown', () => {
+  const g = mergeGateFor(pr({ reviewDecision: 'APPROVED', requiredChecks: { total: 0, failing: [] } }))
+  assert.equal(g.allowed, false)
+  assert.ok(g.blockers.some((b) => b.includes('unknown')))
 })
 test('merge gate blocks and names each failing required check', () => {
   const g = mergeGateFor(pr({ reviewDecision: 'APPROVED', requiredChecks: { total: 6, failing: ['QA Code Review'] } }))

@@ -105,9 +105,45 @@ test('fetchGithub calls gh per repo and attaches required checks', async () => {
   const p7230 = prs.find((p) => p.number === 7230)
   assert.deepEqual(p7230.requiredChecks.failing, ['QA Code Review'])
   const p704 = prs.find((p) => p.number === 704)
-  assert.deepEqual(p704.requiredChecks, { total: 0, failing: [] })
+  assert.deepEqual(p704.requiredChecks, { total: 0, failing: [], known: true })
   assert.ok(calls.some((c) => c.includes('--author @me')))
   assert.ok(calls.some((c) => c.includes('review-requested:@me')))
+})
+
+test('a genuine gh-checks failure is RECORDED and leaves the gate unknown', async () => {
+  // The dangerous case: gh itself fails (expired auth, offline, gh missing). Empty
+  // stdout must NOT be read as "no required checks are failing".
+  const run = async (cmd, args) => {
+    if (args.includes('checks')) return { code: 1, stdout: '', stderr: 'gh: could not authenticate' }
+    if (args.some((a) => String(a).includes('review-requested'))) return { code: 0, stdout: '[]', stderr: '' }
+    const repo = args[args.indexOf('--repo') + 1]
+    return { code: 0, stdout: JSON.stringify(fx('gh-prs-' + repo.replace('/', '_') + '.json')), stderr: '' }
+  }
+  const config = { githubLogin: 'cweiner-PY', repos: { 'PerformYard/Logan': {} } }
+  const { prs, errors } = await fetchGithub(config, { run })
+  assert.equal(prs.length, 1)
+  assert.equal(prs[0].requiredChecks.known, false, 'gate must remain unknown')
+  assert.equal(errors.length, 1, 'the failure must be surfaced, not swallowed')
+  assert.match(errors[0], /could not fetch required checks/)
+  assert.match(errors[0], /could not authenticate/)
+})
+
+test('a checks call that exits non-zero BUT returns valid json is still parsed', async () => {
+  // The exit-code trap: gh exits 1 precisely because a check is failing. That data
+  // is the most important data we collect, so it must not be discarded.
+  const run = async (cmd, args) => {
+    if (args.includes('checks')) {
+      return { code: 1, stdout: JSON.stringify(fx('gh-checks-required-7230.json')), stderr: '' }
+    }
+    if (args.some((a) => String(a).includes('review-requested'))) return { code: 0, stdout: '[]', stderr: '' }
+    const repo = args[args.indexOf('--repo') + 1]
+    return { code: 0, stdout: JSON.stringify(fx('gh-prs-' + repo.replace('/', '_') + '.json')), stderr: '' }
+  }
+  const config = { githubLogin: 'cweiner-PY', repos: { 'PerformYard/Logan': {} } }
+  const { prs, errors } = await fetchGithub(config, { run })
+  assert.equal(prs[0].requiredChecks.known, true)
+  assert.deepEqual(prs[0].requiredChecks.failing, ['QA Code Review'])
+  assert.deepEqual(errors, [])
 })
 
 test('a failing gh call for one repo is reported but does not lose the other repo', async () => {
