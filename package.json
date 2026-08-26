@@ -1,0 +1,8 @@
+{
+  "name": "work-dash",
+  "version": "1.0.0",
+  "type": "module",
+  "bin": { "work-dash": "./bin/work-dash" },
+  "scripts": { "test": "node --test", "start": "node server.js" },
+  "engines": { "node": ">=20.11" }
+}

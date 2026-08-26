@@ -1,0 +1,29 @@
+{
+  "port": 4200,
+  "jiraSite": "https://performyard.atlassian.net",
+  "jiraEmail": "cweiner@performyard.com",
+  "jiraToken": "PASTE_TOKEN_FROM_id.atlassian.com",
+  "jiraProject": "PY",
+  "myAccountId": "62b43cb267dff38e0988a3bc",
+  "repos": {
+    "PerformYard/PerformYard": {
+      "docsSubdir": "PY",
+      "slots": ["/Users/cweiner/Work/PY-1", "/Users/cweiner/Work/PY-2", "/Users/cweiner/Work/PY-3"]
+    },
+    "PerformYard/Logan": {
+      "docsSubdir": "Logan",
+      "slots": ["/Users/cweiner/Work/Logan", "/Users/cweiner/Work/Logan2", "/Users/cweiner/Work/Logan3"]
+    }
+  },
+  "inFlightStatusOrder": ["In Progress", "In Code Review", "Ready To Test", "In Testing", "Ready To Merge"],
+  "skills": [
+    { "name": "ticket-planner",          "when": "!branch && !pr" },
+    { "name": "engineering-subtasking",  "when": "!branch && !pr" },
+    { "name": "critical-review",         "when": "slot" },
+    { "name": "react-doctor",            "when": "slot" },
+    { "name": "resolve-code-review",     "when": "pr.hasReviewComments || pr.changesRequested" },
+    { "name": "pr-description",          "when": "pr" },
+    { "name": "ticket-finisher",         "when": "pr" },
+    { "name": "toggle-logan-env",        "when": "repo == 'PerformYard/Logan'" }
+  ]
+}
