@@ -1,0 +1,8 @@
+[
+  {"dir":"/Users/cweiner/Work/PY-1","branch":"PY-13888-fix-share-report-basic-admin","dirtyCount":2,"behind":13,"ahead":6},
+  {"dir":"/Users/cweiner/Work/PY-2","branch":"PY-12746-competency-management-prototype-competency-catalog","dirtyCount":0,"behind":0,"ahead":12},
+  {"dir":"/Users/cweiner/Work/PY-3","branch":"PY-13044-current-pulse-survey-scheduled-reminders-are-after-the-close-date","dirtyCount":0,"behind":0,"ahead":12},
+  {"dir":"/Users/cweiner/Work/Logan","branch":"feat/salesforce-implementation-date-source-of-truth","dirtyCount":0,"behind":0,"ahead":7},
+  {"dir":"/Users/cweiner/Work/Logan2","branch":"PY-13925-Sometimes-in-Logan-all-my-menu-options-don-t-populate-and-I-have-to-log-out-and-back-in","dirtyCount":0,"behind":2,"ahead":1},
+  {"dir":"/Users/cweiner/Work/Logan3","branch":"update-churn-agent-prompt","dirtyCount":0,"behind":0,"ahead":1}
+]

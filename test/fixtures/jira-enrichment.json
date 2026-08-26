@@ -1,0 +1,6 @@
+[
+ {"key":"PY-13888","summary":"Share Report option missing from Employee Reports \"...\" menu for basic admin / contributor-tier report viewers","status":"Ready To Test","statusCategory":"In Progress","issuetype":"Bug","priority":null,"assignee":"Bruce Pereira","assigneeAccountId":"712020:8cbfc591-17e0-46e2-8406-3d0c09d46f28","url":"https://performyard.atlassian.net/browse/PY-13888"},
+ {"key":"PY-13044","summary":"Current Pulse Survey scheduled reminders are after the close date","status":"Done","statusCategory":"Done","issuetype":"Bug","priority":null,"assignee":"Colt Weiner","assigneeAccountId":"62b43cb267dff38e0988a3bc","url":"https://performyard.atlassian.net/browse/PY-13044"},
+ {"key":"PY-13925","summary":"Sometimes in Logan, all my menu options don't populate and I have to log out and back in","status":"Done","statusCategory":"Done","issuetype":"Bug","priority":null,"assignee":"Lucy Murphy","assigneeAccountId":"712020:7b2d789c-c203-4248-a7d7-94662dda862c","url":"https://performyard.atlassian.net/browse/PY-13925"},
+ {"key":"PY-12275","summary":"Competency Management - AI Competency Importer (MVP)","status":"Done","statusCategory":"Done","issuetype":"Story","priority":null,"assignee":"Colt Weiner","assigneeAccountId":"62b43cb267dff38e0988a3bc","url":"https://performyard.atlassian.net/browse/PY-12275"}
+]

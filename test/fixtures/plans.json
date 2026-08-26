@@ -1,0 +1,297 @@
+[
+ {
+  "docsSubdir": "PY",
+  "folder": "PY-10080:Company-Info-Feedback-Component-Usage-And-Page-Consistency",
+  "dir": "/Users/cweiner/Work/docs/PY/PY-10080:Company-Info-Feedback-Component-Usage-And-Page-Consistency",
+  "key": "PY-10080",
+  "files": [
+   "decisions.md",
+   "notes.md",
+   "plan.md",
+   "self-code-review.md"
+  ]
+ },
+ {
+  "docsSubdir": "PY",
+  "folder": "PY-10347:Engagement-Survey-Logo-Configuration",
+  "dir": "/Users/cweiner/Work/docs/PY/PY-10347:Engagement-Survey-Logo-Configuration",
+  "key": "PY-10347",
+  "files": [
+   "code-review.md",
+   "decisions.md",
+   "notes.md",
+   "plan.md"
+  ]
+ },
+ {
+  "docsSubdir": "PY",
+  "folder": "PY-11560:Remove-Ephemeral-FF-Group-Admin-Reporting-Analytics",
+  "dir": "/Users/cweiner/Work/docs/PY/PY-11560:Remove-Ephemeral-FF-Group-Admin-Reporting-Analytics",
+  "key": "PY-11560",
+  "files": [
+   "decisions.md",
+   "notes.md",
+   "plan.md"
+  ]
+ },
+ {
+  "docsSubdir": "PY",
+  "folder": "PY-11847:Survey-Module-All-Employee-Access",
+  "dir": "/Users/cweiner/Work/docs/PY/PY-11847:Survey-Module-All-Employee-Access",
+  "key": "PY-11847",
+  "files": [
+   "decisions.md",
+   "notes.md"
+  ]
+ },
+ {
+  "docsSubdir": "PY",
+  "folder": "PY-12265:Prototype-AI-Competency-Interviewer",
+  "dir": "/Users/cweiner/Work/docs/PY/PY-12265:Prototype-AI-Competency-Interviewer",
+  "key": "PY-12265",
+  "files": [
+   "01-overview.md",
+   "02-refactor.md",
+   "03-new-harness-guide.md",
+   "code-review.md",
+   "decisions.md",
+   "notes.md",
+   "py-12265-competency-ai-interviewer.md"
+  ]
+ },
+ {
+  "docsSubdir": "PY",
+  "folder": "PY-12275-competency-management-ai-competency-importer-mvp-pr3",
+  "dir": "/Users/cweiner/Work/docs/PY/PY-12275-competency-management-ai-competency-importer-mvp-pr3",
+  "key": "PY-12275",
+  "files": [
+   "single-competency-self-review.md"
+  ]
+ },
+ {
+  "docsSubdir": "PY",
+  "folder": "PY-12275:Competency-Management-AI-Competency-Importer-MVP",
+  "dir": "/Users/cweiner/Work/docs/PY/PY-12275:Competency-Management-AI-Competency-Importer-MVP",
+  "key": "PY-12275",
+  "files": [
+   "INDEX.md",
+   "decisions.md",
+   "notes.md",
+   "ui-ux-feedback.md"
+  ]
+ },
+ {
+  "docsSubdir": "PY",
+  "folder": "PY-12286:Update-Employee-Selection-Pagination",
+  "dir": "/Users/cweiner/Work/docs/PY/PY-12286:Update-Employee-Selection-Pagination",
+  "key": "PY-12286",
+  "files": [
+   "code-review.md",
+   "plan.md"
+  ]
+ },
+ {
+  "docsSubdir": "PY",
+  "folder": "PY-12344:Support-Ability-To-View-Expired-Requests-In-The-Incoming-Outgoing-Feedback-Requests-Tab",
+  "dir": "/Users/cweiner/Work/docs/PY/PY-12344:Support-Ability-To-View-Expired-Requests-In-The-Incoming-Outgoing-Feedback-Requests-Tab",
+  "key": "PY-12344",
+  "files": [
+   "code-review.md",
+   "decisions.md",
+   "notes.md",
+   "plan.md",
+   "review.md"
+  ]
+ },
+ {
+  "docsSubdir": "PY",
+  "folder": "PY-12558:Support-New-Permission-To-Allow-Manager-Access-To-Company-Feedback-Page",
+  "dir": "/Users/cweiner/Work/docs/PY/PY-12558:Support-New-Permission-To-Allow-Manager-Access-To-Company-Feedback-Page",
+  "key": "PY-12558",
+  "files": [
+   "code-review.md",
+   "decisions.md",
+   "notes.md",
+   "plan.md",
+   "review.md"
+  ]
+ },
+ {
+  "docsSubdir": "PY",
+  "folder": "PY-12680:Able-To-Create-Survey-With-No-Questions",
+  "dir": "/Users/cweiner/Work/docs/PY/PY-12680:Able-To-Create-Survey-With-No-Questions",
+  "key": "PY-12680",
+  "files": [
+   "code-review.md",
+   "plan.md"
+  ]
+ },
+ {
+  "docsSubdir": "PY",
+  "folder": "PY-12746:Competency-Catalog",
+  "dir": "/Users/cweiner/Work/docs/PY/PY-12746:Competency-Catalog",
+  "key": "PY-12746",
+  "files": [
+   "engineering-notes.md"
+  ]
+ },
+ {
+  "docsSubdir": "PY",
+  "folder": "PY-12746:Prototype-Competency-Catalog",
+  "dir": "/Users/cweiner/Work/docs/PY/PY-12746:Prototype-Competency-Catalog",
+  "key": "PY-12746",
+  "files": [
+   "decisions.md",
+   "implementation-plan.md",
+   "notes.md",
+   "plan.md"
+  ]
+ },
+ {
+  "docsSubdir": "PY",
+  "folder": "PY-12856-PY-12866:Manager-Contributor-Group-Admin-Report-Creation",
+  "dir": "/Users/cweiner/Work/docs/PY/PY-12856-PY-12866:Manager-Contributor-Group-Admin-Report-Creation",
+  "key": "PY-12856",
+  "files": [
+   "2026-06-30-saved-queries-visibility-design.md",
+   "code-review.md",
+   "decisions.md",
+   "notes.md",
+   "plan.md",
+   "pre-pr-review-findings.md",
+   "updateReport-permission-proposal.md"
+  ]
+ },
+ {
+  "docsSubdir": "PY",
+  "folder": "PY-12898:Feedback-Page-Subject-Name-Truncation-Not-Working",
+  "dir": "/Users/cweiner/Work/docs/PY/PY-12898:Feedback-Page-Subject-Name-Truncation-Not-Working",
+  "key": "PY-12898",
+  "files": [
+   "plan.md"
+  ]
+ },
+ {
+  "docsSubdir": "PY",
+  "folder": "PY-13044:Current-Pulse-Survey-Scheduled-Reminders-After-Close-Date",
+  "dir": "/Users/cweiner/Work/docs/PY/PY-13044:Current-Pulse-Survey-Scheduled-Reminders-After-Close-Date",
+  "key": "PY-13044",
+  "files": [
+   "plan.md"
+  ]
+ },
+ {
+  "docsSubdir": "PY",
+  "folder": "PY-13089:Refreshing-eNps-Page-Causes-404-Error",
+  "dir": "/Users/cweiner/Work/docs/PY/PY-13089:Refreshing-eNps-Page-Causes-404-Error",
+  "key": "PY-13089",
+  "files": [
+   "plan.md"
+  ]
+ },
+ {
+  "docsSubdir": "PY",
+  "folder": "PY-13746:CustomField-ETL-Does-Not-Rewrite-Saved-Query-Sorts-When-An-Employee-Custom-Field-Is-Renamed",
+  "dir": "/Users/cweiner/Work/docs/PY/PY-13746:CustomField-ETL-Does-Not-Rewrite-Saved-Query-Sorts-When-An-Employee-Custom-Field-Is-Renamed",
+  "key": "PY-13746",
+  "files": [
+   "code-review.md",
+   "plan.md"
+  ]
+ },
+ {
+  "docsSubdir": "PY",
+  "folder": "PY-13751:Report-Subject-Scoping-Check-Never-Runs",
+  "dir": "/Users/cweiner/Work/docs/PY/PY-13751:Report-Subject-Scoping-Check-Never-Runs",
+  "key": "PY-13751",
+  "files": [
+   "code-review.md",
+   "plan.md"
+  ]
+ },
+ {
+  "docsSubdir": "Logan",
+  "folder": "PY-12323:CSM-Notifications-Page",
+  "dir": "/Users/cweiner/Work/docs/Logan/PY-12323:CSM-Notifications-Page",
+  "key": "PY-12323",
+  "files": [
+   "plan.md"
+  ]
+ },
+ {
+  "docsSubdir": "Logan",
+  "folder": "PY-12579:Download-Call-Transcripts-Product-Metrics",
+  "dir": "/Users/cweiner/Work/docs/Logan/PY-12579:Download-Call-Transcripts-Product-Metrics",
+  "key": "PY-12579",
+  "files": [
+   "code-review.md",
+   "plan.md"
+  ]
+ },
+ {
+  "docsSubdir": "Logan",
+  "folder": "PY-12594:Reduce-CSM-Notification-Volume",
+  "dir": "/Users/cweiner/Work/docs/Logan/PY-12594:Reduce-CSM-Notification-Volume",
+  "key": "PY-12594",
+  "files": [
+   "code-review.md",
+   "plan.md"
+  ]
+ },
+ {
+  "docsSubdir": "Logan",
+  "folder": "PY-12941:Research-Download-Month-Of-Zoom-Transcripts",
+  "dir": "/Users/cweiner/Work/docs/Logan/PY-12941:Research-Download-Month-Of-Zoom-Transcripts",
+  "key": "PY-12941",
+  "files": [
+   "findings.md",
+   "plan.md"
+  ]
+ },
+ {
+  "docsSubdir": "Logan",
+  "folder": "PY-13103:Add-Heal-Jira-Releases-Script",
+  "dir": "/Users/cweiner/Work/docs/Logan/PY-13103:Add-Heal-Jira-Releases-Script",
+  "key": "PY-13103",
+  "files": [
+   "code-review.md"
+  ]
+ },
+ {
+  "docsSubdir": "Logan",
+  "folder": "PY-13106:Modifications-To-Risk-Notifications",
+  "dir": "/Users/cweiner/Work/docs/Logan/PY-13106:Modifications-To-Risk-Notifications",
+  "key": "PY-13106",
+  "files": [
+   "code-review.md",
+   "plan.md"
+  ]
+ },
+ {
+  "docsSubdir": "Logan",
+  "folder": "PY-13147:CSM-Zoom-Transcript-Download-Folder-Bug",
+  "dir": "/Users/cweiner/Work/docs/Logan/PY-13147:CSM-Zoom-Transcript-Download-Folder-Bug",
+  "key": "PY-13147",
+  "files": [
+   "plan.md"
+  ]
+ },
+ {
+  "docsSubdir": "Logan",
+  "folder": "PY-13247:Use-The-Same-Package-Manager-Everywhere-In-Logan",
+  "dir": "/Users/cweiner/Work/docs/Logan/PY-13247:Use-The-Same-Package-Manager-Everywhere-In-Logan",
+  "key": "PY-13247",
+  "files": [
+   "plan.md"
+  ]
+ },
+ {
+  "docsSubdir": "Logan",
+  "folder": "Separate-salesforce-push-pull",
+  "dir": "/Users/cweiner/Work/docs/Logan/Separate-salesforce-push-pull",
+  "key": null,
+  "files": [
+   "README.md"
+  ]
+ }
+]
