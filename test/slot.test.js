@@ -37,6 +37,25 @@ test('NEVER auto-selects a dirty slot, even a stale one', () => {
   assert.match(c.why, /uncommitted/i)
 })
 
+test('fails CLOSED on ambiguous dirty state during automatic selection', () => {
+  // dirty=undefined/null/0/'' are all ambiguous, not clean. Confirmed by probe against the
+  // pre-fix code: each of these values was AUTO-SELECTED despite a nonzero dirtyCount.
+  for (const dirty of [undefined, null, 0, '']) {
+    const slots = [slot('/w/A', { branch: 'master', dirty, dirtyCount: 5 })]
+    const r = resolveSlot(item({ prs: [{ headRefName: 'PY-1-x' }] }), slots, config, { staleBranches: new Set() })
+    assert.equal(r.needsPicker, true, `dirty=${JSON.stringify(dirty)} must not be auto-selected`)
+  }
+})
+
+test('an explicitly clean slot (dirty: false, dirtyCount: 0) is still auto-selected', () => {
+  // Positive control: without this, a fix that simply refuses to ever auto-select anything
+  // would also pass the ambiguous-state test above.
+  const slots = [slot('/w/A', { branch: 'master', dirty: false, dirtyCount: 0 })]
+  const r = resolveSlot(item({ prs: [{ headRefName: 'PY-1-x' }] }), slots, config, { staleBranches: new Set() })
+  assert.equal(r.needsPicker, undefined)
+  assert.equal(r.slot.dir, '/w/A')
+})
+
 test('returns a picker with a reason per slot when none are eligible', () => {
   const slots = [slot('/w/A', { branch: 'busy1' }), slot('/w/B', { branch: 'busy2', dirty: true, dirtyCount: 1 })]
   const r = resolveSlot(item({ prs: [{ headRefName: 'PY-1-x' }] }), slots, config, { staleBranches: new Set() })

@@ -54,6 +54,62 @@ test('POST /api/run requires a skill name', async () => {
   assert.match(r.message, /skill/i)
 })
 
+test('POST /api/open refuses a skill not applicable to the item (same gate as /api/run)', async () => {
+  // This was the actual bypass: /api/run enforced the applicability check via `skillRequired`,
+  // but /api/open forwarded any supplied skill straight through to openItem unchecked.
+  const item = { id: 'PY-1', key: 'PY-1', repo: 'O/R', prs: [], slot: null, plans: [], jira: null, skills: [] }
+  const routes = new Map()
+  registerRoutes(routes, { getBoard: async () => ({ items: [item] }), config })
+  const r = await routes.get('POST /api/open')({ id: 'PY-1', skill: 'not-a-real-skill' }, { config, invalidate() {} })
+  assert.equal(r.ok, false)
+  assert.match(r.message, /not-a-real-skill/)
+})
+
+test('POST /api/open refuses a plan path that is not among the item\'s known plans', async () => {
+  const item = {
+    id: 'PY-1', key: 'PY-1', repo: 'O/R', prs: [], slot: null,
+    plans: [{ dir: '/docs/PY-1', files: ['plan.md'] }], jira: null, skills: [],
+  }
+  const routes = new Map()
+  registerRoutes(routes, { getBoard: async () => ({ items: [item] }), config })
+  const r = await routes.get('POST /api/open')(
+    { id: 'PY-1', plans: [{ dir: '/etc', file: 'passwd' }] }, { config, invalidate() {} })
+  assert.equal(r.ok, false)
+  assert.match(r.message, /plan path/i)
+})
+
+test('POST /api/open lets a plan path drawn from item.plans through unmodified', async () => {
+  // Positive control: an allowlist that is built slightly wrong (e.g. keyed on the wrong
+  // field) would silently drop every legitimate plan too — this is what would catch it.
+  const slot = { dir: '/w/A', repo: 'O/R', branch: 'PY-1-x', dirty: false, dirtyCount: 0 }
+  const item = {
+    id: 'PY-1', key: 'PY-1', title: 't', repo: 'O/R', prs: [{ headRefName: 'PY-1-x' }], slot,
+    plans: [{ dir: '/docs/PY-1', files: ['plan.md'] }], jira: null, skills: [],
+  }
+  const routes = new Map()
+  registerRoutes(routes, {
+    getBoard: async () => ({ items: [item], slots: [slot] }),
+    config,
+    deps: { dry: true },
+  })
+  const r = await routes.get('POST /api/open')(
+    { id: 'PY-1', plans: [{ dir: '/docs/PY-1', file: 'plan.md' }] }, { config, invalidate() {} })
+  assert.equal(r.ok, true)
+  assert.match(r.detail, /plan\.md/)
+})
+
+test('a body of literal null returns a clean refusal, not a throw, from every route', async () => {
+  // JSON.parse('null') succeeds and yields null, so a caller can hand routes a non-object
+  // body; body.id must not be dereferenced before the shape is checked.
+  const routes = new Map()
+  registerRoutes(routes, { getBoard: async () => ({ items: [] }), config })
+  for (const path of ['POST /api/open', 'POST /api/run', 'POST /api/update-branch', 'POST /api/merge']) {
+    const r = await routes.get(path)(JSON.parse('null'), { config, invalidate() {} })
+    assert.equal(r.ok, false, `${path} with a null body must refuse cleanly`)
+    assert.match(r.message, /JSON object body/)
+  }
+})
+
 test('a successful action invalidates the board cache', async () => {
   let invalidated = false
   const slot = { dir: '/w/A', repo: 'O/R', branch: 'PY-1-x', dirty: false, dirtyCount: 0 }

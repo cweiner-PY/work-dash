@@ -75,6 +75,56 @@ test('fetchByKeys with no keys makes NO request', async () => {
   assert.equal(called, false)
 })
 
+test('an empty result with BAD credentials throws instead of returning []', async () => {
+  // Jira answers an unauthenticated search with 200 + zero issues, so emptiness alone
+  // must never be reported as "no work assigned".
+  const calls = []
+  const fetchImpl = async (url) => {
+    calls.push(url)
+    if (url.endsWith('/myself')) return { ok: false, status: 401, text: async () => 'unauthorized' }
+    return { ok: true, status: 200, json: async () => ({ issues: [] }) }
+  }
+  await assert.rejects(() => fetchPrimary(config, { fetchImpl }), /rejected the credentials/)
+  assert.ok(calls.some((u) => u.endsWith('/myself')), 'must verify identity when empty')
+})
+
+test('an empty result with GOOD credentials returns [] and does not throw', async () => {
+  const fetchImpl = async (url) => {
+    if (url.endsWith('/myself')) return { ok: true, status: 200, json: async () => ({ accountId: 'acct1' }) }
+    return { ok: true, status: 200, json: async () => ({ issues: [] }) }
+  }
+  const out = await fetchPrimary({ ...config, myAccountId: 'acct1' }, { fetchImpl })
+  assert.deepEqual(out, [])
+})
+
+test('a NON-empty result skips the identity check entirely', async () => {
+  const calls = []
+  const fetchImpl = async (url) => {
+    calls.push(url)
+    return { ok: true, status: 200, json: async () => ({ issues: [raw] }) }
+  }
+  const out = await fetchPrimary(config, { fetchImpl })
+  assert.equal(out.length, 1)
+  assert.ok(!calls.some((u) => u.endsWith('/myself')), 'no extra request in the common case')
+})
+
+test('an accountId mismatch warns but still returns the issues', async () => {
+  const warnings = []
+  const realWarn = console.warn
+  console.warn = (...a) => warnings.push(a.join(' '))
+  try {
+    const fetchImpl = async (url) => {
+      if (url.endsWith('/myself')) return { ok: true, status: 200, json: async () => ({ accountId: 'someone-else' }) }
+      return { ok: true, status: 200, json: async () => ({ issues: [] }) }
+    }
+    const out = await fetchPrimary({ ...config, myAccountId: 'acct1' }, { fetchImpl })
+    assert.deepEqual(out, [])
+    assert.ok(warnings.some((w) => /does not match/.test(w)), warnings.join(' | '))
+  } finally {
+    console.warn = realWarn
+  }
+})
+
 test('a non-ok response throws with the status and body', async () => {
   const fetchImpl = async () => ({ ok: false, status: 401, text: async () => 'Unauthorized' })
   await assert.rejects(() => fetchPrimary(config, { fetchImpl }), /401/)

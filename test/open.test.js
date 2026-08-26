@@ -84,6 +84,18 @@ test('refuses to emit a checkout into a dirty slot even when explicitly chosen',
   assert.match(r.message, /uncommitted/i)
 })
 
+test('fails CLOSED on ambiguous dirty state even when the slot is explicitly chosen', async () => {
+  // Mirrors the same fail-closed fix in slot.js: dirty=undefined/null/0/'' must not be
+  // treated as clean on the explicit-choice path either.
+  for (const dirty of [undefined, null, 0, '']) {
+    const ambiguous = { ...slotA, branch: 'busy', dirty, dirtyCount: 5 }
+    const r = await openItem({ item, slots: [ambiguous], plans, skill: null, config, chosenSlotDir: '/w/A' },
+      { run: async () => ({ code: 0, stdout: '', stderr: '' }), writeFile: async () => {}, dry: true })
+    assert.equal(r.ok, false, `dirty=${JSON.stringify(dirty)} must be refused, not launched`)
+    assert.match(r.message, /uncommitted/i)
+  }
+})
+
 test('refuses a chosenSlotDir belonging to a different repo', async () => {
   // The reviewer flagged that open.js shares update-branch.js's cross-repo hazard: a raw
   // API call could hand this item a slotDir from an unrelated repo, and a checkout would
