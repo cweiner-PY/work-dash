@@ -10,7 +10,9 @@ const LANES = [
 export function groupForDisplay(items, { showBacklog, showStale }) {
   const hidden = { backlog: 0, stale: 0, total: 0 }
   const visible = items.filter((i) => {
-    const isBacklogish = i.lane === 'backlog' || i.lane === 'ready-to-start'
+    // ready-to-start is sprint-committed work the user has not started — that belongs
+    // in view by default. Only backlog stays behind the toggle.
+    const isBacklogish = i.lane === 'backlog'
     const isStale = i.signals.stale || i.signals.foreign
     if (!showBacklog && isBacklogish) { hidden.backlog++; hidden.total++; return false }
     // A needs-you item is never hidden by the stale/foreign filter — "ticket is Done but

@@ -18,16 +18,27 @@ const items = [
   it({ id: 'H', lane: 'ready-to-start' }),
 ]
 
-test('default filter hides backlog, ready-to-start and stale items', () => {
+test('default filter hides backlog and stale items, but SHOWS ready-to-start', () => {
+  // Sprint-committed work the user has not started belongs in view by default —
+  // only backlog stays behind its toggle.
   const { lanes, hidden } = groupForDisplay(items, { showBacklog: false, showStale: false })
   const shown = lanes.flatMap((l) => l.subgroups ? l.subgroups.flatMap((s) => s.items) : l.items).map((i) => i.id)
-  assert.deepEqual(shown.sort(), ['A', 'B', 'C', 'D', 'E'])
-  assert.equal(hidden.backlog, 2)   // G and H
+  assert.deepEqual(shown.sort(), ['A', 'B', 'C', 'D', 'E', 'H'])
+  assert.equal(hidden.backlog, 1)   // G only
   assert.equal(hidden.stale, 1)     // F
-  assert.equal(hidden.total, 3)
+  assert.equal(hidden.total, 2)
+  // every item is either shown or accounted for as hidden
+  assert.equal(shown.length + hidden.total, items.length)
 })
 
-test('showBacklog reveals backlog and ready-to-start', () => {
+test('ready-to-start is shown even with showBacklog off; showBacklog only reveals backlog', () => {
+  const { lanes } = groupForDisplay(items, { showBacklog: false, showStale: false })
+  const ids = lanes.flatMap((l) => l.subgroups ? l.subgroups.flatMap((s) => s.items) : l.items).map((i) => i.id)
+  assert.ok(ids.includes('H'), 'ready-to-start item must be visible by default')
+  assert.ok(!ids.includes('G'), 'backlog item must still be hidden by default')
+})
+
+test('showBacklog reveals backlog (ready-to-start was already shown)', () => {
   const { lanes } = groupForDisplay(items, { showBacklog: true, showStale: false })
   const ids = lanes.flatMap((l) => l.subgroups ? l.subgroups.flatMap((s) => s.items) : l.items).map((i) => i.id)
   assert.ok(ids.includes('G'))

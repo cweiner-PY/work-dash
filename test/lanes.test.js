@@ -1,7 +1,13 @@
 // test/lanes.test.js
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { assignLanes, mergeGateFor, myPrOf, isMinePr } from '../lanes.js'
+import { assignLanes, mergeGateFor, myPrOf, isMinePr, needsSprintFallback } from '../lanes.js'
+
+// assignLanes warns once (see needsSprintFallback) whenever every Jira issue in a batch
+// has a null active sprint — true of nearly every single-synthetic-item call below, none
+// of which are testing sprint behavior. Swallow it by default; the dedicated fallback
+// test captures it explicitly instead.
+console.warn = () => {}
 
 const config = {
   inFlightStatusOrder: ['In Progress', 'In Code Review', 'Ready To Test', 'In Testing', 'Ready To Merge'],
@@ -137,11 +143,79 @@ test('an in-flight item with no jira gets the "no ticket" group and Infinity sor
   assert.equal(it.statusGroup, 'no ticket')
   assert.equal(it.sortIndex, Infinity)
 })
-test('To Do with a plan is ready-to-start; without one it is backlog', () => {
-  const withPlan = lane(item({ jira: jira({ status: 'READY', statusCategory: 'To Do' }), plans: [{ dir: '/d', folder: 'f', key: 'PY-1', files: ['plan.md'] }] }))
-  assert.equal(withPlan.lane, 'ready-to-start')
-  const without = lane(item({ jira: jira({ status: 'READY', statusCategory: 'To Do' }) }))
-  assert.equal(without.lane, 'backlog')
+test('In Progress, In Code Review, and Ready To Test with no branch and no slot are all in-flight, not backlog', () => {
+  for (const status of ['In Progress', 'In Code Review', 'Ready To Test']) {
+    const it = lane(item({ jira: jira({ status, statusCategory: 'In Progress' }) }))
+    assert.equal(it.lane, 'in-flight', status)
+  }
+})
+
+// --- ready-to-start: sprint-committed To Do work (Change 2) ---
+// A sentinel item carrying a real active sprint keeps needsSprintFallback false for the
+// whole batch, so these exercise the direct activeSprint rule, not the plan-folder
+// fallback (which single-item calls above would otherwise trigger).
+const sentinel = item({ id: 'sentinel', jira: jira({ activeSprint: 'S1' }) })
+const withSprintConfigured = (it) => assignLanes([it, sentinel], config)[0]
+
+test('ready-to-start requires BOTH To Do AND an active sprint (all four combinations)', () => {
+  const toDoWithSprint = withSprintConfigured(item({ jira: jira({ status: 'READY', statusCategory: 'To Do', activeSprint: 'S1' }) }))
+  assert.equal(toDoWithSprint.lane, 'ready-to-start')
+
+  const toDoNoSprint = withSprintConfigured(item({ jira: jira({ status: 'READY', statusCategory: 'To Do', activeSprint: null }) }))
+  assert.equal(toDoNoSprint.lane, 'backlog')
+
+  const doneWithSprint = withSprintConfigured(item({ jira: jira({ status: 'Done', statusCategory: 'Done', activeSprint: 'S1' }) }))
+  assert.equal(doneWithSprint.lane, 'backlog')
+
+  const doneNoSprint = withSprintConfigured(item({ jira: jira({ status: 'Done', statusCategory: 'Done', activeSprint: null }) }))
+  assert.equal(doneNoSprint.lane, 'backlog')
+})
+
+test('a To Do item with a plan folder but NO active sprint is backlog, not ready-to-start (deliberate behaviour change)', () => {
+  const it = withSprintConfigured(item({
+    jira: jira({ status: 'READY', statusCategory: 'To Do', activeSprint: null }),
+    plans: [{ dir: '/d', folder: 'f', key: 'PY-1', files: ['plan.md'] }],
+  }))
+  assert.equal(it.lane, 'backlog')
+})
+
+test('the reason text names the active sprint', () => {
+  const it = withSprintConfigured(item({ jira: jira({ status: 'READY', statusCategory: 'To Do', activeSprint: 'RW2026.6-S1' }) }))
+  assert.ok(it.reasons.some((r) => r.includes('RW2026.6-S1')))
+})
+
+// --- do-not-silently-degrade: the all-null misconfiguration fallback ---
+test('needsSprintFallback: true when every jira item has a null active sprint', () => {
+  assert.equal(needsSprintFallback([
+    item({ jira: jira({ activeSprint: null }) }),
+    item({ id: 'PY-2', jira: jira({ activeSprint: undefined }) }),
+  ]), true)
+})
+test('needsSprintFallback: false when at least one jira item has a real active sprint', () => {
+  assert.equal(needsSprintFallback([
+    item({ jira: jira({ activeSprint: null }) }),
+    item({ id: 'PY-2', jira: jira({ activeSprint: 'S1' }) }),
+  ]), false)
+})
+test('needsSprintFallback: false when there are no jira items at all (nothing to warn about)', () => {
+  assert.equal(needsSprintFallback([item({ jira: null }), item({ id: 'PY-2', jira: null })]), false)
+})
+
+test('when every Jira issue has a null active sprint, assignLanes warns once (naming the field) and ready-to-start reverts to the plan-folder rule', () => {
+  const warnings = []
+  const realWarn = console.warn
+  console.warn = (...a) => warnings.push(a.join(' '))
+  try {
+    const withPlan = item({ jira: jira({ status: 'READY', statusCategory: 'To Do', activeSprint: null }), plans: [{ dir: '/d', folder: 'f', key: 'PY-1', files: ['plan.md'] }] })
+    const withoutPlan = item({ id: 'PY-2', jira: jira({ status: 'READY', statusCategory: 'To Do', activeSprint: null }) })
+    const [a, b] = assignLanes([withPlan, withoutPlan], { ...config, jiraSprintField: 'customfield_10020' })
+    assert.equal(a.lane, 'ready-to-start')
+    assert.equal(b.lane, 'backlog')
+    assert.equal(warnings.length, 1)
+    assert.match(warnings[0], /customfield_10020/)
+  } finally {
+    console.warn = realWarn
+  }
 })
 
 // --- lane 1 draft gating: a draft's failing checks / conflicts are expected,

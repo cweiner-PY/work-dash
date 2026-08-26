@@ -4,6 +4,7 @@
   "jiraEmail": "colt@performyard.com",
   "jiraToken": "PASTE_TOKEN_FROM_id.atlassian.com",
   "jiraProject": "PY",
+  "jiraSprintField": "customfield_10020",
   "myAccountId": "62b43cb267dff38e0988a3bc",
   "repos": {
     "PerformYard/PerformYard": {

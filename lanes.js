@@ -32,8 +32,32 @@ export const isMinePr = (pr) => pr?.isMine !== false
 // a review-requested PR as if it belonged to the user.
 export const myPrOf = (item) => (item?.prs ?? []).find(isMinePr) ?? null
 
+// If every Jira issue in this item set has a null active sprint, that is almost
+// certainly a misconfigured jiraSprintField for this Jira instance — not "nothing is
+// sprint-committed". Exported so the decision is directly testable without needing to
+// intercept console.warn or re-derive it from assignLanes's output.
+export function needsSprintFallback(items) {
+  const jiraItems = items.filter((i) => i.jira)
+  return jiraItems.length > 0 && jiraItems.every((i) => i.jira.activeSprint == null)
+}
+
 export function assignLanes(items, config) {
   const order = config.inFlightStatusOrder ?? []
+
+  // Do not silently degrade: a lane that quietly goes empty because a field name is
+  // wrong for this instance is exactly the failure class this project keeps getting
+  // bitten by. Warn once, by name, and keep ready-to-start alive via the old
+  // plan-folder-on-disk heuristic instead of going dark.
+  const fallbackToPlans = needsSprintFallback(items)
+  if (fallbackToPlans) {
+    const field = config.jiraSprintField ?? 'customfield_10020'
+    console.warn(
+      `work-dash: every Jira issue has a null active sprint (field "${field}"). This usually ` +
+      `means jiraSprintField is misconfigured for this Jira instance, not that nothing is ` +
+      `sprint-committed. Falling back to the plan-folder heuristic for ready-to-start.`
+    )
+  }
+
   return items.map((item) => {
     const reasons = []
     const myPrs = item.prs.filter(isMinePr)
@@ -87,12 +111,23 @@ export function assignLanes(items, config) {
     }
 
     // --- lane 3: in flight ---
-    if (!lane && (item.slot || pr?.isDraft)) lane = 'in-flight'
+    // A ticket already In Progress (by Jira's own statusCategory, which covers every
+    // literal status in inFlightStatusOrder — In Progress, In Code Review, Ready To
+    // Test, etc.) belongs here even with no branch checked out yet: moving a ticket to
+    // In Progress must not make it LESS visible by dropping it all the way to backlog.
+    if (!lane && (item.slot || pr?.isDraft || item.jira?.statusCategory === 'In Progress')) lane = 'in-flight'
 
     // --- lane 4: ready to start ---
-    if (!lane && item.jira?.statusCategory === 'To Do' && item.plans.length > 0) {
+    // Sprint-committed To Do work is what actually belongs here — the literal status
+    // string (TO DO vs READY) doesn't matter, only the category plus active-sprint
+    // membership. When the sprint field looks misconfigured (see needsSprintFallback),
+    // fall back to the old plan-folder-on-disk heuristic so the lane isn't silently dead.
+    const sprintCommitted = fallbackToPlans ? item.plans.length > 0 : Boolean(item.jira?.activeSprint)
+    if (!lane && item.jira?.statusCategory === 'To Do' && sprintCommitted) {
       lane = 'ready-to-start'
-      reasons.push(`${item.plans.length} plan folder${item.plans.length > 1 ? 's' : ''} on disk`)
+      reasons.push(fallbackToPlans
+        ? `${item.plans.length} plan folder${item.plans.length > 1 ? 's' : ''} on disk`
+        : `sprint-committed: ${item.jira.activeSprint}`)
     }
 
     // --- lane 5: backlog ---

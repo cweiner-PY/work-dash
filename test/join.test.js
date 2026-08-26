@@ -158,10 +158,12 @@ test('the whole fixture set produces the expected board', () => {
     ['PerformYard/Logan:feat/salesforce-implementation-date-source-of-truth'])
   assert.deepEqual(byLane('in-flight'),
     ['PY-12746', 'PY-13044', 'PY-13888', 'PY-13925', 'PerformYard/Logan:update-churn-agent-prompt'])
-  // Only PY-13247 is both To Do and has a plan folder on disk.
-  assert.deepEqual(byLane('ready-to-start'), ['PY-13247'])
+  // PY-13247 and PY-13181 are both To Do and sprint-committed (active sprint
+  // RW2026.6-S1). PY-13088/PY-13076 (READY, no sprint) and PY-12576/PY-11672
+  // (TO DO, no active sprint — PY-11672's sprint exists but is closed) stay backlog.
+  assert.deepEqual(byLane('ready-to-start'), ['PY-13181', 'PY-13247'])
   assert.deepEqual(byLane('backlog'),
-    ['PY-11672', 'PY-12576', 'PY-13076', 'PY-13088', 'PY-13181'])
+    ['PY-11672', 'PY-12576', 'PY-13076', 'PY-13088'])
 
   // three of five occupied slots are reclaimable
   assert.equal(laned.filter((i) => i.signals.reclaimable).length, 3)

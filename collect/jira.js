@@ -1,5 +1,19 @@
 // collect/jira.js
-export function normalizeIssue(raw, jiraSite) {
+
+// customfield_10020 (the sprint field) returns an array of sprint objects, each
+// carrying at least { name, state }. We want the FIRST sprint whose state is
+// 'active' — a closed sprint (a ticket that rode out its sprint and is still
+// open) must not count as sprint-committed. Tolerate the field being absent, a
+// non-array, null entries, and entries missing state or name — never throw.
+function extractActiveSprint(value) {
+  if (!Array.isArray(value)) return null
+  const active = value.find((s) => s && s.state === 'active')
+  return typeof active?.name === 'string' ? active.name : null
+}
+
+// sprintField is instance-specific (config.jiraSprintField) and is threaded through
+// from search() rather than hardcoded here.
+export function normalizeIssue(raw, jiraSite, sprintField = 'customfield_10020') {
   const f = raw.fields ?? {}
   return {
     key: raw.key,
@@ -10,6 +24,7 @@ export function normalizeIssue(raw, jiraSite) {
     priority: f.priority?.name ?? null,
     assignee: f.assignee?.displayName ?? null,
     assigneeAccountId: f.assignee?.accountId ?? null,
+    activeSprint: extractActiveSprint(f[sprintField]),
     url: `${jiraSite}/browse/${raw.key}`,
   }
 }
@@ -36,8 +51,13 @@ const MAX_RESULTS = 100
 // `fields` and `normalize` are overridable so fetchSubtasks can reuse this same request/
 // pagination-warning/redaction machinery with a different field list and a different
 // shape (parentKey/parentSummary instead of priority) — normalizeIssue stays the default
-// so fetchPrimary/fetchByKeys are untouched.
-async function search(config, jql, { fetchImpl = fetch, fields = FIELDS, normalize = normalizeIssue } = {}) {
+// so fetchPrimary/fetchByKeys are untouched. When `fields` is NOT overridden (i.e. the
+// primary and by-keys/enrichment queries), the sprint field is appended so both carry a
+// consistent activeSprint shape; fetchSubtasks explicitly overrides fields and so never
+// requests it.
+async function search(config, jql, { fetchImpl = fetch, fields, normalize = normalizeIssue } = {}) {
+  const sprintField = config.jiraSprintField ?? 'customfield_10020'
+  const effectiveFields = fields ?? [...FIELDS, sprintField]
   const res = await fetchImpl(`${config.jiraSite}/rest/api/3/search/jql`, {
     method: 'POST',
     headers: {
@@ -45,7 +65,7 @@ async function search(config, jql, { fetchImpl = fetch, fields = FIELDS, normali
       'Content-Type': 'application/json',
       Accept: 'application/json',
     },
-    body: JSON.stringify({ jql, fields, maxResults: MAX_RESULTS }),
+    body: JSON.stringify({ jql, fields: effectiveFields, maxResults: MAX_RESULTS }),
   })
   if (!res.ok) {
     let body = await res.text()
@@ -64,7 +84,7 @@ async function search(config, jql, { fetchImpl = fetch, fields = FIELDS, normali
       `may have more. Only the first ${MAX_RESULTS} are shown. Narrow the JQL filter.`
     )
   }
-  return issues.map((raw) => normalize(raw, config.jiraSite))
+  return issues.map((raw) => normalize(raw, config.jiraSite, sprintField))
 }
 
 // Jira's /search/jql returns HTTP 200 with an EMPTY issue list when the credentials are

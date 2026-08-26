@@ -29,6 +29,7 @@ test('normalizes a raw issue', () => {
     priority: 'P2-Medium',
     assignee: 'Colt Weiner',
     assigneeAccountId: '62b43cb267dff38e0988a3bc',
+    activeSprint: null,
     url: 'https://performyard.atlassian.net/browse/PY-13751',
   })
 })
@@ -38,6 +39,118 @@ test('tolerates null assignee and null priority', () => {
   assert.equal(n.assignee, null)
   assert.equal(n.assigneeAccountId, null)
   assert.equal(n.priority, null)
+})
+
+// --- activeSprint normalization ---
+// customfield_10020 (the default sprint field) returns an array of sprint objects,
+// each with at least { name, state }. Only the FIRST sprint whose state is 'active'
+// counts — a closed sprint (PY-11672: a ticket that rode out its sprint and is still
+// open) must normalize to null, not to that closed sprint's name.
+const sprintField = 'customfield_10020'
+const withSprint = (value) => normalizeIssue({ key: 'PY-1', fields: { ...raw.fields, [sprintField]: value } }, config.jiraSite)
+
+test('activeSprint: an active sprint yields its name', () => {
+  const n = withSprint([{ id: 1, name: 'RW2026.6-S1 Ending 2026.08.26', state: 'active' }])
+  assert.equal(n.activeSprint, 'RW2026.6-S1 Ending 2026.08.26')
+})
+
+test('activeSprint: a CLOSED sprint yields null, not the closed sprint\'s name (PY-11672 case)', () => {
+  const n = withSprint([{ id: 1, name: 'RW2026.1-S2 Ending 2026.02.18', state: 'closed' }])
+  assert.equal(n.activeSprint, null)
+})
+
+test('activeSprint: the first ACTIVE sprint wins when multiple sprints are present', () => {
+  const n = withSprint([
+    { id: 1, name: 'Old Sprint', state: 'closed' },
+    { id: 2, name: 'Current Sprint', state: 'active' },
+    { id: 3, name: 'Future Sprint', state: 'future' },
+  ])
+  assert.equal(n.activeSprint, 'Current Sprint')
+})
+
+test('activeSprint: field absent from fields entirely yields null', () => {
+  const n = normalizeIssue(raw, config.jiraSite)
+  assert.equal(n.activeSprint, null)
+})
+
+test('activeSprint: an empty array yields null', () => {
+  assert.equal(withSprint([]).activeSprint, null)
+})
+
+test('activeSprint: null yields null (no throw)', () => {
+  assert.equal(withSprint(null).activeSprint, null)
+})
+
+test('activeSprint: a non-array value yields null (no throw)', () => {
+  assert.equal(withSprint('not an array').activeSprint, null)
+  assert.equal(withSprint({ not: 'an array' }).activeSprint, null)
+})
+
+test('activeSprint: a null entry in the array is tolerated (no throw)', () => {
+  const n = withSprint([null, { id: 2, name: 'Current Sprint', state: 'active' }])
+  assert.equal(n.activeSprint, 'Current Sprint')
+})
+
+test('activeSprint: an active entry missing "name" yields null rather than throwing', () => {
+  assert.equal(withSprint([{ id: 1, state: 'active' }]).activeSprint, null)
+})
+
+test('activeSprint: an active entry missing "state" is never mistaken for active', () => {
+  assert.equal(withSprint([{ id: 1, name: 'No State Sprint' }]).activeSprint, null)
+})
+
+test('normalizeIssue reads the sprint field name passed to it, not just the default', () => {
+  const n = normalizeIssue(
+    { key: 'PY-1', fields: { ...raw.fields, customfield_99999: [{ name: 'Custom Field Sprint', state: 'active' }] } },
+    config.jiraSite,
+    'customfield_99999'
+  )
+  assert.equal(n.activeSprint, 'Custom Field Sprint')
+})
+
+// --- sprint field threaded through the fields list (Change 1) ---
+test('fetchPrimary requests the sprint field, defaulting to customfield_10020', async () => {
+  let seenFields
+  // A non-empty result so fetchPrimary doesn't also hit /myself (which has no body).
+  const fetchImpl = async (_url, opts) => {
+    seenFields = JSON.parse(opts.body).fields
+    return { ok: true, status: 200, json: async () => ({ issues: [raw] }) }
+  }
+  await fetchPrimary(config, { fetchImpl })
+  assert.ok(seenFields.includes('customfield_10020'))
+})
+
+test('fetchByKeys also requests the sprint field, for a consistent shape across all items', async () => {
+  let seenFields
+  const fetchImpl = async (_url, opts) => {
+    seenFields = JSON.parse(opts.body).fields
+    return { ok: true, status: 200, json: async () => ({ issues: [] }) }
+  }
+  await fetchByKeys(config, ['PY-1'], { fetchImpl })
+  assert.ok(seenFields.includes('customfield_10020'))
+})
+
+test('a configured jiraSprintField overrides the default in the requested fields AND the normalized output', async () => {
+  let seenFields
+  const raw99999 = { key: 'PY-1', fields: { ...raw.fields, customfield_99999: [{ name: 'Instance Sprint', state: 'active' }] } }
+  const fetchImpl = async (_url, opts) => {
+    seenFields = JSON.parse(opts.body).fields
+    return { ok: true, status: 200, json: async () => ({ issues: [raw99999] }) }
+  }
+  const out = await fetchPrimary({ ...config, jiraSprintField: 'customfield_99999' }, { fetchImpl })
+  assert.ok(seenFields.includes('customfield_99999'))
+  assert.ok(!seenFields.includes('customfield_10020'))
+  assert.equal(out[0].activeSprint, 'Instance Sprint')
+})
+
+test('fetchSubtasks does NOT request the sprint field — subtasks keep their own field list', async () => {
+  let seenFields
+  const fetchImpl = async (_url, opts) => {
+    seenFields = JSON.parse(opts.body).fields
+    return { ok: true, status: 200, json: async () => ({ issues: [] }) }
+  }
+  await fetchSubtasks(config, ['PY-1'], { fetchImpl })
+  assert.ok(!seenFields.includes('customfield_10020'))
 })
 
 test('fetchPrimary sends the right JQL and basic auth', async () => {
