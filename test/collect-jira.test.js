@@ -85,3 +85,79 @@ test('the error message never contains the token', async () => {
   await assert.rejects(() => fetchPrimary(config, { fetchImpl }),
     (e) => !e.message.includes('tok') || e.message.includes('[redacted]'))
 })
+
+test('a response of exactly 100 issues triggers pagination warning', async () => {
+  const warnings = []
+  const originalWarn = console.warn
+  console.warn = (...args) => warnings.push(args.join(''))
+  try {
+    const issues = Array(100).fill(raw)
+    const fetchImpl = async () => ({ ok: true, status: 200, json: async () => ({ issues }) })
+    await fetchPrimary(config, { fetchImpl })
+    assert.equal(warnings.length, 1)
+    assert.match(warnings[0], /at least 100/)
+  } finally {
+    console.warn = originalWarn
+  }
+})
+
+test('a response of 3 issues does not trigger pagination warning', async () => {
+  const warnings = []
+  const originalWarn = console.warn
+  console.warn = (...args) => warnings.push(args.join(''))
+  try {
+    const issues = Array(3).fill(raw)
+    const fetchImpl = async () => ({ ok: true, status: 200, json: async () => ({ issues }) })
+    await fetchPrimary(config, { fetchImpl })
+    assert.equal(warnings.length, 0)
+  } finally {
+    console.warn = originalWarn
+  }
+})
+
+test('isLast === false triggers pagination warning even with fewer issues', async () => {
+  const warnings = []
+  const originalWarn = console.warn
+  console.warn = (...args) => warnings.push(args.join(''))
+  try {
+    const issues = Array(5).fill(raw)
+    const fetchImpl = async () => ({ ok: true, status: 200, json: async () => ({ issues, isLast: false }) })
+    await fetchPrimary(config, { fetchImpl })
+    assert.equal(warnings.length, 1)
+    assert.match(warnings[0], /at least 5/)
+  } finally {
+    console.warn = originalWarn
+  }
+})
+
+test('nextPageToken in response triggers pagination warning', async () => {
+  const warnings = []
+  const originalWarn = console.warn
+  console.warn = (...args) => warnings.push(args.join(''))
+  try {
+    const issues = Array(50).fill(raw)
+    const fetchImpl = async () => ({ ok: true, status: 200, json: async () => ({ issues, nextPageToken: 'abc123' }) })
+    await fetchPrimary(config, { fetchImpl })
+    assert.equal(warnings.length, 1)
+    assert.match(warnings[0], /at least 50/)
+  } finally {
+    console.warn = originalWarn
+  }
+})
+
+test('with empty jiraToken, error message does not get garbled', async () => {
+  const configNoToken = { ...config, jiraToken: '' }
+  const fetchImpl = async () => ({ ok: false, status: 401, text: async () => 'Unauthorized: bad credentials' })
+  await assert.rejects(
+    () => fetchPrimary(configNoToken, { fetchImpl }),
+    (e) => e.message.includes('Unauthorized: bad credentials')
+  )
+})
+
+test('with a real token, existing redaction still works', async () => {
+  const fetchImpl = async () => ({ ok: false, status: 401, text: async () => 'Invalid token: tok' })
+  await assert.rejects(
+    () => fetchPrimary(config, { fetchImpl }),
+    (e) => !e.message.includes('tok') && e.message.includes('[redacted]')
+  )
+})
