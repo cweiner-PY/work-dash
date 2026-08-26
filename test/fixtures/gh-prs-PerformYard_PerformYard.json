@@ -1,1 +1,1893 @@
-[{"headRefName":"PY-12275-parse-latency-instrumentation","isDraft":true,"mergeable":"CONFLICTING","number":7306,"reviewDecision":"REVIEW_REQUIRED","statusCheckRollup":[{"__typename":"CheckRun","completedAt":"2026-08-11T14:44:44Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503077867/job/93817748448","name":"Build Temp Deployment","startedAt":"2026-08-11T14:44:00Z","status":"COMPLETED","workflowName":"Build and Deploy"},{"__typename":"CheckRun","completedAt":"2026-08-11T14:45:57Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503077913/job/93817749232","name":"Build: python-webserver","startedAt":"2026-08-11T14:44:01Z","status":"COMPLETED","workflowName":"Docker Build Apps"},{"__typename":"CheckRun","completedAt":"2026-08-11T14:46:45Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824719719","name":"Cache Build","startedAt":"2026-08-11T14:44:00Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-11T14:43:22Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503082560/job/93817765160","name":"Pull request labeler","startedAt":"2026-08-11T14:43:17Z","status":"COMPLETED","workflowName":"Pull request labeler"},{"__typename":"CheckRun","completedAt":"2026-08-11T14:44:19Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503078059/job/93817749351","name":"Webserver Python Linting","startedAt":"2026-08-11T14:43:22Z","status":"COMPLETED","workflowName":"Python Workflows"},{"__typename":"CheckRun","completedAt":"2026-08-11T14:45:09Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503082557/job/93817764941","name":"QA Code Review","startedAt":"2026-08-11T14:44:01Z","status":"COMPLETED","workflowName":"Review Enforcer"},{"__typename":"CheckRun","completedAt":"2026-08-11T14:48:07Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503077913/job/93817749105","name":"Build: reporting-webserver","startedAt":"2026-08-11T14:44:02Z","status":"COMPLETED","workflowName":"Docker Build Apps"},{"__typename":"CheckRun","completedAt":"2026-08-11T14:47:27Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824764187","name":"Type Check","startedAt":"2026-08-11T14:44:02Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-11T14:43:36Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503082560/job/93817798064","name":"Identify Testing Environment","startedAt":"2026-08-11T14:43:24Z","status":"COMPLETED","workflowName":"Pull request labeler"},{"__typename":"CheckRun","completedAt":"2026-08-11T14:44:00Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503078059/job/93817749469","name":"Webserver Python Formatting","startedAt":"2026-08-11T14:43:15Z","status":"COMPLETED","workflowName":"Python Workflows"},{"__typename":"CheckRun","completedAt":"2026-08-11T15:10:24Z","conclusion":"FAILURE","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824718965","name":"Prettier","startedAt":"2026-08-11T15:05:48Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-11T14:45:37Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503077913/job/93817749093","name":"Build: internal-api (node-webserver)","startedAt":"2026-08-11T14:44:00Z","status":"COMPLETED","workflowName":"Docker Build Apps"},{"__typename":"CheckRun","completedAt":"2026-08-11T14:50:13Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503078059/job/93817749670","name":"Webserver Python Unit Tests (1)","startedAt":"2026-08-11T14:43:59Z","status":"COMPLETED","workflowName":"Python Workflows"},{"__typename":"CheckRun","completedAt":"2026-08-11T14:51:19Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503078059/job/93817749455","name":"Webserver Python Unit Tests (2)","startedAt":"2026-08-11T14:43:58Z","status":"COMPLETED","workflowName":"Python Workflows"},{"__typename":"CheckRun","completedAt":"2026-08-11T14:50:29Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503078059/job/93817749596","name":"Webserver Python Unit Tests (3)","startedAt":"2026-08-11T14:43:59Z","status":"COMPLETED","workflowName":"Python Workflows"},{"__typename":"CheckRun","completedAt":"2026-08-11T14:50:31Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503078059/job/93817749475","name":"Webserver Python Unit Tests (4)","startedAt":"2026-08-11T14:43:59Z","status":"COMPLETED","workflowName":"Python Workflows"},{"__typename":"CheckRun","completedAt":"2026-08-11T14:48:41Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503077913/job/93817749053","name":"Build: integrations-api","startedAt":"2026-08-11T14:43:59Z","status":"COMPLETED","workflowName":"Docker Build Apps"},{"__typename":"CheckRun","completedAt":"2026-08-11T14:47:30Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824719636","name":"Linting","startedAt":"2026-08-11T14:44:00Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-11T15:08:17Z","conclusion":"FAILURE","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824719344","name":"Spellcheck","startedAt":"2026-08-11T15:05:48Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-11T14:46:17Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503077913/job/93817749063","name":"Build: workers","startedAt":"2026-08-11T14:43:59Z","status":"COMPLETED","workflowName":"Docker Build Apps"},{"__typename":"CheckRun","completedAt":"2026-08-11T14:47:35Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503077913/job/93817748903","name":"Build: public-api","startedAt":"2026-08-11T14:43:59Z","status":"COMPLETED","workflowName":"Docker Build Apps"},{"__typename":"CheckRun","completedAt":"2026-08-11T14:48:43Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824771500","name":"Deploy React App","startedAt":"2026-08-11T14:44:00Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-11T14:46:20Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503077913/job/93817749380","name":"Build: reporting-etls","startedAt":"2026-08-11T14:44:01Z","status":"COMPLETED","workflowName":"Docker Build Apps"},{"__typename":"CheckRun","completedAt":"2026-08-11T15:13:15Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824718960","name":"Build CDK Container","startedAt":"2026-08-11T15:05:47Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-11T14:45:47Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503077913/job/93817749211","name":"Build: event-consumer","startedAt":"2026-08-11T14:44:00Z","status":"COMPLETED","workflowName":"Docker Build Apps"},{"__typename":"CheckRun","completedAt":"2026-08-11T14:54:04Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824726207","name":"Unit Tests (1/8)","startedAt":"2026-08-11T14:46:59Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-11T14:52:11Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824726099","name":"Unit Tests (2/8)","startedAt":"2026-08-11T14:46:58Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-11T14:51:10Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824726723","name":"Unit Tests (3/8)","startedAt":"2026-08-11T14:46:58Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-11T14:52:31Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824726638","name":"Unit Tests (4/8)","startedAt":"2026-08-11T14:47:00Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-11T14:52:17Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824726792","name":"Unit Tests (5/8)","startedAt":"2026-08-11T14:46:56Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-11T14:52:17Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824727445","name":"Unit Tests (6/8)","startedAt":"2026-08-11T14:47:00Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-11T14:51:53Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824727935","name":"Unit Tests (7/8)","startedAt":"2026-08-11T14:47:04Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-11T14:51:15Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824728022","name":"Unit Tests (8/8)","startedAt":"2026-08-11T14:46:55Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-11T14:45:50Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503077913/job/93817749167","name":"Build: notifications-tier-3-asap","startedAt":"2026-08-11T14:44:00Z","status":"COMPLETED","workflowName":"Docker Build Apps"},{"__typename":"CheckRun","completedAt":"2026-08-11T14:49:36Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824726252","name":"React Timezone Tests (UTC)","startedAt":"2026-08-11T14:46:59Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-11T14:49:49Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824726063","name":"React Timezone Tests (Pacific/Marquesas)","startedAt":"2026-08-11T14:46:58Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-11T14:48:50Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824726098","name":"React Timezone Tests (EST)","startedAt":"2026-08-11T14:46:58Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-11T14:50:02Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824726865","name":"React Timezone Tests (EDT)","startedAt":"2026-08-11T14:46:58Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-11T14:49:38Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824726611","name":"React Timezone Tests (Pacific/Chatham)","startedAt":"2026-08-11T14:46:58Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-11T14:45:45Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503077913/job/93817749068","name":"Build: notifications-tier-3-daily","startedAt":"2026-08-11T14:44:00Z","status":"COMPLETED","workflowName":"Docker Build Apps"},{"__typename":"CheckRun","completedAt":"2026-08-11T14:52:18Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824725886","name":"Integration Tests (1/3)","startedAt":"2026-08-11T14:46:57Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-11T14:50:31Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824726612","name":"Integration Tests (2/3)","startedAt":"2026-08-11T14:46:57Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-11T15:11:13Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824725789","name":"Integration Tests (3/3)","startedAt":"2026-08-11T15:05:47Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-11T14:45:46Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503077913/job/93817749365","name":"Build: notifications-weekly-digest","startedAt":"2026-08-11T14:44:02Z","status":"COMPLETED","workflowName":"Docker Build Apps"},{"__typename":"CheckRun","completedAt":"2026-08-11T14:49:18Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824726260","name":"CDK Logical ID Stability","startedAt":"2026-08-11T14:46:58Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-11T14:45:40Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503077913/job/93817749149","name":"Build: notifications-admin-weekly-digest","startedAt":"2026-08-11T14:43:59Z","status":"COMPLETED","workflowName":"Docker Build Apps"},{"__typename":"CheckRun","completedAt":"2026-08-11T14:49:29Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824726120","name":"CDK Environment Tags","startedAt":"2026-08-11T14:47:00Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-11T14:45:24Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503077913/job/93817749309","name":"Build: otel-collector-sidecar","startedAt":"2026-08-11T14:44:01Z","status":"COMPLETED","workflowName":"Docker Build Apps"},{"__typename":"CheckRun","completedAt":"2026-08-11T14:49:18Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824726179","name":"CDK CLI Compatibility","startedAt":"2026-08-11T14:46:47Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-11T14:53:16Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503077913/job/93817749125","name":"Build: lambda-rag-document","startedAt":"2026-08-11T14:44:00Z","status":"COMPLETED","workflowName":"Docker Build Apps"},{"__typename":"CheckRun","completedAt":"2026-08-11T14:53:54Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824726124","name":"Bundle Lambdas","startedAt":"2026-08-11T14:46:55Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-11T14:59:05Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503077913/job/93817749230","name":"Build: lambda-print-pdf","startedAt":"2026-08-11T14:44:01Z","status":"COMPLETED","workflowName":"Docker Build Apps"},{"__typename":"CheckRun","completedAt":"2026-08-11T15:13:24Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93827047813","name":"Notify Deployment Ready","startedAt":"2026-08-11T15:13:19Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-11T14:45:46Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503077913/job/93817749173","name":"Build: lambda-approve-easy-add-reports","startedAt":"2026-08-11T14:44:00Z","status":"COMPLETED","workflowName":"Docker Build Apps"},{"__typename":"CheckRun","completedAt":"2026-08-11T14:59:12Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/31503077913/job/93822691011","name":"Notify Deployment Ready","startedAt":"2026-08-11T14:59:08Z","status":"COMPLETED","workflowName":"Docker Build Apps"}],"title":"Py 12275 parse latency instrumentation","updatedAt":"2026-08-20T18:39:13Z","url":"https://github.com/PerformYard/PerformYard/pull/7306"},{"headRefName":"PY-13751-report-subject-scoping-check-never-runs","isDraft":false,"mergeable":"MERGEABLE","number":7230,"reviewDecision":"APPROVED","statusCheckRollup":[{"__typename":"CheckRun","completedAt":"2026-08-21T14:23:34Z","conclusion":"FAILURE","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491843744/job/96801076902","name":"QA Code Review","startedAt":"2026-08-21T14:23:09Z","status":"COMPLETED","workflowName":"Review Enforcer"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:23:55Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491838901/job/96801061999","name":"Build Temp Deployment","startedAt":"2026-08-21T14:23:09Z","status":"COMPLETED","workflowName":"Build and Deploy"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:24:19Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491839842/job/96801071632","name":"Analyze (actions)","startedAt":"2026-08-21T14:23:05Z","status":"COMPLETED","workflowName":"CodeQL"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:23:59Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491839204/job/96801064088","name":"Build: python-webserver","startedAt":"2026-08-21T14:23:10Z","status":"COMPLETED","workflowName":"Docker Build Apps"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:24:50Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801061856","name":"Cache Build","startedAt":"2026-08-21T14:23:10Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:23:12Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491843626/job/96801076099","name":"Pull request labeler","startedAt":"2026-08-21T14:23:07Z","status":"COMPLETED","workflowName":"Pull request labeler"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:24:40Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491838935/job/96801062201","name":"Webserver Python Linting","startedAt":"2026-08-21T14:23:03Z","status":"COMPLETED","workflowName":"Python Workflows"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:25:08Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491843870/job/96801077303","name":"Check removed test IDs against QA","startedAt":"2026-08-21T14:23:10Z","status":"COMPLETED","workflowName":"QA Test ID Guard"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:24:27Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491839204/job/96801064544","name":"Build: reporting-webserver","startedAt":"2026-08-21T14:23:10Z","status":"COMPLETED","workflowName":"Docker Build Apps"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:24:59Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801061803","name":"Type Check","startedAt":"2026-08-21T14:23:10Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:23:30Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491843626/job/96801117466","name":"Identify Testing Environment","startedAt":"2026-08-21T14:23:15Z","status":"COMPLETED","workflowName":"Pull request labeler"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:23:41Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491838935/job/96801062077","name":"Webserver Python Formatting","startedAt":"2026-08-21T14:23:03Z","status":"COMPLETED","workflowName":"Python Workflows"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:24:38Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491839204/job/96801064666","name":"Build: internal-api (node-webserver)","startedAt":"2026-08-21T14:23:11Z","status":"COMPLETED","workflowName":"Docker Build Apps"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:25:18Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801061409","name":"Prettier","startedAt":"2026-08-21T14:23:09Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:29:45Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491838935/job/96801062451","name":"Webserver Python Unit Tests (1)","startedAt":"2026-08-21T14:23:09Z","status":"COMPLETED","workflowName":"Python Workflows"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:27:12Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491838935/job/96801062498","name":"Webserver Python Unit Tests (2)","startedAt":"2026-08-21T14:23:09Z","status":"COMPLETED","workflowName":"Python Workflows"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:28:38Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491838935/job/96801062701","name":"Webserver Python Unit Tests (3)","startedAt":"2026-08-21T14:23:09Z","status":"COMPLETED","workflowName":"Python Workflows"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:28:09Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491838935/job/96801062387","name":"Webserver Python Unit Tests (4)","startedAt":"2026-08-21T14:23:09Z","status":"COMPLETED","workflowName":"Python Workflows"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:24:25Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491839204/job/96801064342","name":"Build: integrations-api","startedAt":"2026-08-21T14:23:10Z","status":"COMPLETED","workflowName":"Docker Build Apps"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:25:47Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801061710","name":"Linting","startedAt":"2026-08-21T14:23:09Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:24:17Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491839204/job/96801064635","name":"Build: workers","startedAt":"2026-08-21T14:23:10Z","status":"COMPLETED","workflowName":"Docker Build Apps"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:24:33Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801061826","name":"Spellcheck","startedAt":"2026-08-21T14:23:10Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:24:17Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491839204/job/96801064183","name":"Build: public-api","startedAt":"2026-08-21T14:23:09Z","status":"COMPLETED","workflowName":"Docker Build Apps"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:24:54Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801061684","name":"Deploy React App","startedAt":"2026-08-21T14:23:09Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:24:19Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491839204/job/96801064426","name":"Build: reporting-etls","startedAt":"2026-08-21T14:23:10Z","status":"COMPLETED","workflowName":"Docker Build Apps"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:25:48Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801061730","name":"Build CDK Container","startedAt":"2026-08-21T14:23:09Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:23:50Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491839204/job/96801064292","name":"Build: event-consumer","startedAt":"2026-08-21T14:23:10Z","status":"COMPLETED","workflowName":"Docker Build Apps"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:26:25Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801589671","name":"Public API Swagger Up To Date","startedAt":"2026-08-21T14:24:59Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:28:12Z","conclusion":"CANCELLED","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801589713","name":"Unit Tests (1/8)","startedAt":"2026-08-21T14:24:59Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:23:46Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491839204/job/96801064529","name":"Build: notifications-tier-3-asap","startedAt":"2026-08-21T14:23:11Z","status":"COMPLETED","workflowName":"Docker Build Apps"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:28:20Z","conclusion":"CANCELLED","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801589954","name":"Unit Tests (2/8)","startedAt":"2026-08-21T14:24:59Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:28:12Z","conclusion":"CANCELLED","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801589748","name":"Unit Tests (3/8)","startedAt":"2026-08-21T14:24:58Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:28:25Z","conclusion":"CANCELLED","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801589901","name":"Unit Tests (4/8)","startedAt":"2026-08-21T14:24:59Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:28:17Z","conclusion":"CANCELLED","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801589860","name":"Unit Tests (5/8)","startedAt":"2026-08-21T14:24:59Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:28:03Z","conclusion":"FAILURE","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801589870","name":"Unit Tests (6/8)","startedAt":"2026-08-21T14:24:59Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:28:16Z","conclusion":"CANCELLED","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801589760","name":"Unit Tests (7/8)","startedAt":"2026-08-21T14:24:58Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:28:09Z","conclusion":"CANCELLED","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801589736","name":"Unit Tests (8/8)","startedAt":"2026-08-21T14:24:59Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:23:46Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491839204/job/96801064371","name":"Build: notifications-tier-3-daily","startedAt":"2026-08-21T14:23:10Z","status":"COMPLETED","workflowName":"Docker Build Apps"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:26:41Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801589733","name":"React Timezone Tests (UTC)","startedAt":"2026-08-21T14:24:58Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:26:32Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801589771","name":"React Timezone Tests (Pacific/Marquesas)","startedAt":"2026-08-21T14:24:59Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:26:43Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801589766","name":"React Timezone Tests (EST)","startedAt":"2026-08-21T14:24:58Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:26:39Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801589683","name":"React Timezone Tests (EDT)","startedAt":"2026-08-21T14:24:59Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:26:48Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801589817","name":"React Timezone Tests (Pacific/Chatham)","startedAt":"2026-08-21T14:24:59Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:23:45Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491839204/job/96801064206","name":"Build: notifications-weekly-digest","startedAt":"2026-08-21T14:23:09Z","status":"COMPLETED","workflowName":"Docker Build Apps"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:27:42Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801589751","name":"Integration Tests (1/3)","startedAt":"2026-08-21T14:24:58Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:27:41Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801589917","name":"Integration Tests (2/3)","startedAt":"2026-08-21T14:24:59Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:28:11Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801589878","name":"Integration Tests (3/3)","startedAt":"2026-08-21T14:24:59Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:23:45Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491839204/job/96801064617","name":"Build: notifications-admin-weekly-digest","startedAt":"2026-08-21T14:23:10Z","status":"COMPLETED","workflowName":"Docker Build Apps"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:26:52Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801589708","name":"CDK Logical ID Stability","startedAt":"2026-08-21T14:24:59Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:23:36Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491839204/job/96801064429","name":"Build: otel-collector-sidecar","startedAt":"2026-08-21T14:23:10Z","status":"COMPLETED","workflowName":"Docker Build Apps"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:26:53Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801589641","name":"CDK Environment Tags","startedAt":"2026-08-21T14:24:58Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:25:55Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491839204/job/96801064325","name":"Build: lambda-rag-document","startedAt":"2026-08-21T14:23:10Z","status":"COMPLETED","workflowName":"Docker Build Apps"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:26:43Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801589690","name":"CDK CLI Compatibility","startedAt":"2026-08-21T14:24:59Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:26:01Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491839204/job/96801064513","name":"Build: lambda-print-pdf","startedAt":"2026-08-21T14:23:12Z","status":"COMPLETED","workflowName":"Docker Build Apps"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:26:24Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801589628","name":"Bundle Lambdas","startedAt":"2026-08-21T14:24:59Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:25:59Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491839204/job/96801064653","name":"Build: lambda-ai-document-importer","startedAt":"2026-08-21T14:23:12Z","status":"COMPLETED","workflowName":"Docker Build Apps"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:26:31Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96802036543","name":"Notify Deployment Ready","startedAt":"2026-08-21T14:26:26Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:23:47Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491839204/job/96801064304","name":"Build: lambda-approve-easy-add-reports","startedAt":"2026-08-21T14:23:10Z","status":"COMPLETED","workflowName":"Docker Build Apps"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:26:08Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32491839204/job/96801926467","name":"Notify Deployment Ready","startedAt":"2026-08-21T14:26:04Z","status":"COMPLETED","workflowName":"Docker Build Apps"},{"__typename":"CheckRun","completedAt":"2026-08-21T14:24:04Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/runs/96801356660","name":"CodeQL","startedAt":"2026-08-21T14:24:02Z","status":"COMPLETED","workflowName":""}],"title":"PY-13751 report subject scoping check never runs","updatedAt":"2026-08-21T14:22:59Z","url":"https://github.com/PerformYard/PerformYard/pull/7230"},{"headRefName":"PY-12746-competency-management-prototype-competency-catalog","isDraft":true,"mergeable":"CONFLICTING","number":7110,"reviewDecision":"REVIEW_REQUIRED","statusCheckRollup":[{"__typename":"CheckRun","completedAt":"2026-08-21T15:39:09Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658594/job/96823011204","name":"Build Temp Deployment","startedAt":"2026-08-21T15:38:15Z","status":"COMPLETED","workflowName":"Build and Deploy"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:39:17Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498654770/job/96823002265","name":"Analyze (actions)","startedAt":"2026-08-21T15:38:08Z","status":"COMPLETED","workflowName":"CodeQL"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:39:11Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658670/job/96823012152","name":"Build: python-webserver","startedAt":"2026-08-21T15:38:17Z","status":"COMPLETED","workflowName":"Docker Build Apps"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:40:01Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823012273","name":"Cache Build","startedAt":"2026-08-21T15:38:14Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:38:16Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498659497/job/96823014007","name":"Pull request labeler","startedAt":"2026-08-21T15:38:10Z","status":"COMPLETED","workflowName":"Pull request labeler"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:39:04Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658737/job/96823011914","name":"Webserver Python Linting","startedAt":"2026-08-21T15:38:11Z","status":"COMPLETED","workflowName":"Python Workflows"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:40:18Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498659494/job/96823014177","name":"Check removed test IDs against QA","startedAt":"2026-08-21T15:38:14Z","status":"COMPLETED","workflowName":"QA Test ID Guard"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:38:42Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498659495/job/96823014024","name":"QA Code Review","startedAt":"2026-08-21T15:38:15Z","status":"COMPLETED","workflowName":"Review Enforcer"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:39:29Z","conclusion":"FAILURE","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823012340","name":"Type Check","startedAt":"2026-08-21T15:38:15Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:39:50Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658670/job/96823011904","name":"Build: reporting-webserver","startedAt":"2026-08-21T15:38:15Z","status":"COMPLETED","workflowName":"Docker Build Apps"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:38:30Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498659497/job/96823058791","name":"Identify Testing Environment","startedAt":"2026-08-21T15:38:19Z","status":"COMPLETED","workflowName":"Pull request labeler"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:38:47Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658737/job/96823011570","name":"Webserver Python Formatting","startedAt":"2026-08-21T15:38:09Z","status":"COMPLETED","workflowName":"Python Workflows"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:39:40Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658670/job/96823012231","name":"Build: internal-api (node-webserver)","startedAt":"2026-08-21T15:38:17Z","status":"COMPLETED","workflowName":"Docker Build Apps"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:40:26Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823012116","name":"Prettier","startedAt":"2026-08-21T15:38:15Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:44:46Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658737/job/96823012120","name":"Webserver Python Unit Tests (1)","startedAt":"2026-08-21T15:38:15Z","status":"COMPLETED","workflowName":"Python Workflows"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:42:20Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658737/job/96823011860","name":"Webserver Python Unit Tests (2)","startedAt":"2026-08-21T15:38:15Z","status":"COMPLETED","workflowName":"Python Workflows"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:43:43Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658737/job/96823012101","name":"Webserver Python Unit Tests (3)","startedAt":"2026-08-21T15:38:15Z","status":"COMPLETED","workflowName":"Python Workflows"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:43:18Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658737/job/96823011831","name":"Webserver Python Unit Tests (4)","startedAt":"2026-08-21T15:38:15Z","status":"COMPLETED","workflowName":"Python Workflows"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:40:53Z","conclusion":"FAILURE","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823012199","name":"Linting","startedAt":"2026-08-21T15:38:15Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:39:41Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658670/job/96823012172","name":"Build: integrations-api","startedAt":"2026-08-21T15:38:16Z","status":"COMPLETED","workflowName":"Docker Build Apps"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:39:32Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658670/job/96823012123","name":"Build: workers","startedAt":"2026-08-21T15:38:17Z","status":"COMPLETED","workflowName":"Docker Build Apps"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:39:37Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823011986","name":"Spellcheck","startedAt":"2026-08-21T15:38:15Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:39:35Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658670/job/96823012160","name":"Build: public-api","startedAt":"2026-08-21T15:38:17Z","status":"COMPLETED","workflowName":"Docker Build Apps"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:40:07Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823012149","name":"Deploy React App","startedAt":"2026-08-21T15:38:15Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:39:26Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658670/job/96823012425","name":"Build: reporting-etls","startedAt":"2026-08-21T15:38:17Z","status":"COMPLETED","workflowName":"Docker Build Apps"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:44:02Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823011721","name":"Build CDK Container","startedAt":"2026-08-21T15:38:15Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:38:54Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658670/job/96823012364","name":"Build: event-consumer","startedAt":"2026-08-21T15:38:17Z","status":"COMPLETED","workflowName":"Docker Build Apps"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:41:44Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823549450","name":"Public API Swagger Up To Date","startedAt":"2026-08-21T15:40:10Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:38:54Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658670/job/96823012305","name":"Build: notifications-tier-3-asap","startedAt":"2026-08-21T15:38:17Z","status":"COMPLETED","workflowName":"Docker Build Apps"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:43:30Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823549567","name":"Unit Tests (1/8)","startedAt":"2026-08-21T15:40:09Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:43:40Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823549641","name":"Unit Tests (2/8)","startedAt":"2026-08-21T15:40:10Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:43:56Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823549588","name":"Unit Tests (3/8)","startedAt":"2026-08-21T15:40:09Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:43:32Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823549558","name":"Unit Tests (4/8)","startedAt":"2026-08-21T15:40:09Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:43:45Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823549660","name":"Unit Tests (5/8)","startedAt":"2026-08-21T15:40:11Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:43:43Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823549551","name":"Unit Tests (6/8)","startedAt":"2026-08-21T15:40:10Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:43:31Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823549665","name":"Unit Tests (7/8)","startedAt":"2026-08-21T15:40:10Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:43:19Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823549703","name":"Unit Tests (8/8)","startedAt":"2026-08-21T15:40:10Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:38:58Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658670/job/96823012315","name":"Build: notifications-tier-3-daily","startedAt":"2026-08-21T15:38:16Z","status":"COMPLETED","workflowName":"Docker Build Apps"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:41:57Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823549537","name":"React Timezone Tests (UTC)","startedAt":"2026-08-21T15:40:10Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:42:00Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823549488","name":"React Timezone Tests (Pacific/Marquesas)","startedAt":"2026-08-21T15:40:09Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:42:03Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823549616","name":"React Timezone Tests (EST)","startedAt":"2026-08-21T15:40:11Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:41:54Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823549510","name":"React Timezone Tests (EDT)","startedAt":"2026-08-21T15:40:10Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:41:48Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823549559","name":"React Timezone Tests (Pacific/Chatham)","startedAt":"2026-08-21T15:40:10Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:38:52Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658670/job/96823012048","name":"Build: notifications-weekly-digest","startedAt":"2026-08-21T15:38:16Z","status":"COMPLETED","workflowName":"Docker Build Apps"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:42:56Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823549669","name":"Integration Tests (1/3)","startedAt":"2026-08-21T15:40:11Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:42:54Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823549470","name":"Integration Tests (2/3)","startedAt":"2026-08-21T15:40:10Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:43:22Z","conclusion":"FAILURE","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823549502","name":"Integration Tests (3/3)","startedAt":"2026-08-21T15:40:10Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:38:52Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658670/job/96823011976","name":"Build: notifications-admin-weekly-digest","startedAt":"2026-08-21T15:38:15Z","status":"COMPLETED","workflowName":"Docker Build Apps"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:41:59Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823549377","name":"CDK Logical ID Stability","startedAt":"2026-08-21T15:40:09Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:38:40Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658670/job/96823012312","name":"Build: otel-collector-sidecar","startedAt":"2026-08-21T15:38:17Z","status":"COMPLETED","workflowName":"Docker Build Apps"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:42:05Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823549396","name":"CDK Environment Tags","startedAt":"2026-08-21T15:40:19Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:41:23Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658670/job/96823012420","name":"Build: lambda-rag-document","startedAt":"2026-08-21T15:38:17Z","status":"COMPLETED","workflowName":"Docker Build Apps"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:41:57Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823549466","name":"CDK CLI Compatibility","startedAt":"2026-08-21T15:40:09Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:41:27Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658670/job/96823011970","name":"Build: lambda-print-pdf","startedAt":"2026-08-21T15:38:15Z","status":"COMPLETED","workflowName":"Docker Build Apps"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:45:35Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823549409","name":"Bundle Lambdas","startedAt":"2026-08-21T15:40:09Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:41:31Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658670/job/96823012128","name":"Build: lambda-ai-document-importer","startedAt":"2026-08-21T15:38:15Z","status":"COMPLETED","workflowName":"Docker Build Apps"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:45:46Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96825155190","name":"Notify Deployment Ready","startedAt":"2026-08-21T15:45:40Z","status":"COMPLETED","workflowName":"JS/TS Pipeline"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:38:54Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658670/job/96823012523","name":"Build: lambda-approve-easy-add-reports","startedAt":"2026-08-21T15:38:17Z","status":"COMPLETED","workflowName":"Docker Build Apps"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:41:38Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/actions/runs/32498658670/job/96823985338","name":"Notify Deployment Ready","startedAt":"2026-08-21T15:41:34Z","status":"COMPLETED","workflowName":"Docker Build Apps"},{"__typename":"CheckRun","completedAt":"2026-08-21T15:48:28Z","conclusion":"FAILURE","detailsUrl":"https://console.aws.amazon.com/amplify/home?region=us-east-1#/dft10h8u4uxo0/pr-7110/2","name":"AWS Amplify Console Web Preview","startedAt":"2026-08-21T15:48:28Z","status":"COMPLETED","workflowName":""},{"__typename":"CheckRun","completedAt":"2026-08-21T15:39:01Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/PerformYard/PerformYard/runs/96823254249","name":"CodeQL","startedAt":"2026-08-21T15:38:58Z","status":"COMPLETED","workflowName":""}],"title":"PY-12746 competency management prototype competency catalog","updatedAt":"2026-08-21T15:38:02Z","url":"https://github.com/PerformYard/PerformYard/pull/7110"}]
+[
+  {
+    "headRefName": "PY-12275-parse-latency-instrumentation",
+    "isDraft": true,
+    "mergeable": "CONFLICTING",
+    "number": 7306,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T14:44:44Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503077867/job/93817748448",
+        "name": "Build Temp Deployment",
+        "startedAt": "2026-08-11T14:44:00Z",
+        "status": "COMPLETED",
+        "workflowName": "Build and Deploy"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T14:45:57Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503077913/job/93817749232",
+        "name": "Build: python-webserver",
+        "startedAt": "2026-08-11T14:44:01Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T14:46:45Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824719719",
+        "name": "Cache Build",
+        "startedAt": "2026-08-11T14:44:00Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T14:43:22Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503082560/job/93817765160",
+        "name": "Pull request labeler",
+        "startedAt": "2026-08-11T14:43:17Z",
+        "status": "COMPLETED",
+        "workflowName": "Pull request labeler"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T14:44:19Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503078059/job/93817749351",
+        "name": "Webserver Python Linting",
+        "startedAt": "2026-08-11T14:43:22Z",
+        "status": "COMPLETED",
+        "workflowName": "Python Workflows"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T14:45:09Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503082557/job/93817764941",
+        "name": "QA Code Review",
+        "startedAt": "2026-08-11T14:44:01Z",
+        "status": "COMPLETED",
+        "workflowName": "Review Enforcer"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T14:48:07Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503077913/job/93817749105",
+        "name": "Build: reporting-webserver",
+        "startedAt": "2026-08-11T14:44:02Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T14:47:27Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824764187",
+        "name": "Type Check",
+        "startedAt": "2026-08-11T14:44:02Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T14:43:36Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503082560/job/93817798064",
+        "name": "Identify Testing Environment",
+        "startedAt": "2026-08-11T14:43:24Z",
+        "status": "COMPLETED",
+        "workflowName": "Pull request labeler"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T14:44:00Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503078059/job/93817749469",
+        "name": "Webserver Python Formatting",
+        "startedAt": "2026-08-11T14:43:15Z",
+        "status": "COMPLETED",
+        "workflowName": "Python Workflows"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T15:10:24Z",
+        "conclusion": "FAILURE",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824718965",
+        "name": "Prettier",
+        "startedAt": "2026-08-11T15:05:48Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T14:45:37Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503077913/job/93817749093",
+        "name": "Build: internal-api (node-webserver)",
+        "startedAt": "2026-08-11T14:44:00Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T14:50:13Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503078059/job/93817749670",
+        "name": "Webserver Python Unit Tests (1)",
+        "startedAt": "2026-08-11T14:43:59Z",
+        "status": "COMPLETED",
+        "workflowName": "Python Workflows"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T14:51:19Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503078059/job/93817749455",
+        "name": "Webserver Python Unit Tests (2)",
+        "startedAt": "2026-08-11T14:43:58Z",
+        "status": "COMPLETED",
+        "workflowName": "Python Workflows"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T14:50:29Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503078059/job/93817749596",
+        "name": "Webserver Python Unit Tests (3)",
+        "startedAt": "2026-08-11T14:43:59Z",
+        "status": "COMPLETED",
+        "workflowName": "Python Workflows"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T14:50:31Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503078059/job/93817749475",
+        "name": "Webserver Python Unit Tests (4)",
+        "startedAt": "2026-08-11T14:43:59Z",
+        "status": "COMPLETED",
+        "workflowName": "Python Workflows"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T14:48:41Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503077913/job/93817749053",
+        "name": "Build: integrations-api",
+        "startedAt": "2026-08-11T14:43:59Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T14:47:30Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824719636",
+        "name": "Linting",
+        "startedAt": "2026-08-11T14:44:00Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T15:08:17Z",
+        "conclusion": "FAILURE",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824719344",
+        "name": "Spellcheck",
+        "startedAt": "2026-08-11T15:05:48Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T14:46:17Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503077913/job/93817749063",
+        "name": "Build: workers",
+        "startedAt": "2026-08-11T14:43:59Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T14:47:35Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503077913/job/93817748903",
+        "name": "Build: public-api",
+        "startedAt": "2026-08-11T14:43:59Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T14:48:43Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824771500",
+        "name": "Deploy React App",
+        "startedAt": "2026-08-11T14:44:00Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T14:46:20Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503077913/job/93817749380",
+        "name": "Build: reporting-etls",
+        "startedAt": "2026-08-11T14:44:01Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T15:13:15Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824718960",
+        "name": "Build CDK Container",
+        "startedAt": "2026-08-11T15:05:47Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T14:45:47Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503077913/job/93817749211",
+        "name": "Build: event-consumer",
+        "startedAt": "2026-08-11T14:44:00Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T14:54:04Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824726207",
+        "name": "Unit Tests (1/8)",
+        "startedAt": "2026-08-11T14:46:59Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T14:52:11Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824726099",
+        "name": "Unit Tests (2/8)",
+        "startedAt": "2026-08-11T14:46:58Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T14:51:10Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824726723",
+        "name": "Unit Tests (3/8)",
+        "startedAt": "2026-08-11T14:46:58Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T14:52:31Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824726638",
+        "name": "Unit Tests (4/8)",
+        "startedAt": "2026-08-11T14:47:00Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T14:52:17Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824726792",
+        "name": "Unit Tests (5/8)",
+        "startedAt": "2026-08-11T14:46:56Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T14:52:17Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824727445",
+        "name": "Unit Tests (6/8)",
+        "startedAt": "2026-08-11T14:47:00Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T14:51:53Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824727935",
+        "name": "Unit Tests (7/8)",
+        "startedAt": "2026-08-11T14:47:04Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T14:51:15Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824728022",
+        "name": "Unit Tests (8/8)",
+        "startedAt": "2026-08-11T14:46:55Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T14:45:50Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503077913/job/93817749167",
+        "name": "Build: notifications-tier-3-asap",
+        "startedAt": "2026-08-11T14:44:00Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T14:49:36Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824726252",
+        "name": "React Timezone Tests (UTC)",
+        "startedAt": "2026-08-11T14:46:59Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T14:49:49Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824726063",
+        "name": "React Timezone Tests (Pacific/Marquesas)",
+        "startedAt": "2026-08-11T14:46:58Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T14:48:50Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824726098",
+        "name": "React Timezone Tests (EST)",
+        "startedAt": "2026-08-11T14:46:58Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T14:50:02Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824726865",
+        "name": "React Timezone Tests (EDT)",
+        "startedAt": "2026-08-11T14:46:58Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T14:49:38Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824726611",
+        "name": "React Timezone Tests (Pacific/Chatham)",
+        "startedAt": "2026-08-11T14:46:58Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T14:45:45Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503077913/job/93817749068",
+        "name": "Build: notifications-tier-3-daily",
+        "startedAt": "2026-08-11T14:44:00Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T14:52:18Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824725886",
+        "name": "Integration Tests (1/3)",
+        "startedAt": "2026-08-11T14:46:57Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T14:50:31Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824726612",
+        "name": "Integration Tests (2/3)",
+        "startedAt": "2026-08-11T14:46:57Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T15:11:13Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824725789",
+        "name": "Integration Tests (3/3)",
+        "startedAt": "2026-08-11T15:05:47Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T14:45:46Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503077913/job/93817749365",
+        "name": "Build: notifications-weekly-digest",
+        "startedAt": "2026-08-11T14:44:02Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T14:49:18Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824726260",
+        "name": "CDK Logical ID Stability",
+        "startedAt": "2026-08-11T14:46:58Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T14:45:40Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503077913/job/93817749149",
+        "name": "Build: notifications-admin-weekly-digest",
+        "startedAt": "2026-08-11T14:43:59Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T14:49:29Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824726120",
+        "name": "CDK Environment Tags",
+        "startedAt": "2026-08-11T14:47:00Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T14:45:24Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503077913/job/93817749309",
+        "name": "Build: otel-collector-sidecar",
+        "startedAt": "2026-08-11T14:44:01Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T14:49:18Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824726179",
+        "name": "CDK CLI Compatibility",
+        "startedAt": "2026-08-11T14:46:47Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T14:53:16Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503077913/job/93817749125",
+        "name": "Build: lambda-rag-document",
+        "startedAt": "2026-08-11T14:44:00Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T14:53:54Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93824726124",
+        "name": "Bundle Lambdas",
+        "startedAt": "2026-08-11T14:46:55Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T14:59:05Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503077913/job/93817749230",
+        "name": "Build: lambda-print-pdf",
+        "startedAt": "2026-08-11T14:44:01Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T15:13:24Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503077941/job/93827047813",
+        "name": "Notify Deployment Ready",
+        "startedAt": "2026-08-11T15:13:19Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T14:45:46Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503077913/job/93817749173",
+        "name": "Build: lambda-approve-easy-add-reports",
+        "startedAt": "2026-08-11T14:44:00Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-11T14:59:12Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/31503077913/job/93822691011",
+        "name": "Notify Deployment Ready",
+        "startedAt": "2026-08-11T14:59:08Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      }
+    ],
+    "title": "Py 12275 parse latency instrumentation",
+    "updatedAt": "2026-08-20T18:39:13Z",
+    "url": "https://github.com/PerformYard/PerformYard/pull/7306",
+    "reviews": []
+  },
+  {
+    "headRefName": "PY-13751-report-subject-scoping-check-never-runs",
+    "isDraft": false,
+    "mergeable": "MERGEABLE",
+    "number": 7230,
+    "reviewDecision": "APPROVED",
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:23:34Z",
+        "conclusion": "FAILURE",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491843744/job/96801076902",
+        "name": "QA Code Review",
+        "startedAt": "2026-08-21T14:23:09Z",
+        "status": "COMPLETED",
+        "workflowName": "Review Enforcer"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:23:55Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491838901/job/96801061999",
+        "name": "Build Temp Deployment",
+        "startedAt": "2026-08-21T14:23:09Z",
+        "status": "COMPLETED",
+        "workflowName": "Build and Deploy"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:24:19Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491839842/job/96801071632",
+        "name": "Analyze (actions)",
+        "startedAt": "2026-08-21T14:23:05Z",
+        "status": "COMPLETED",
+        "workflowName": "CodeQL"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:23:59Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491839204/job/96801064088",
+        "name": "Build: python-webserver",
+        "startedAt": "2026-08-21T14:23:10Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:24:50Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801061856",
+        "name": "Cache Build",
+        "startedAt": "2026-08-21T14:23:10Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:23:12Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491843626/job/96801076099",
+        "name": "Pull request labeler",
+        "startedAt": "2026-08-21T14:23:07Z",
+        "status": "COMPLETED",
+        "workflowName": "Pull request labeler"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:24:40Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491838935/job/96801062201",
+        "name": "Webserver Python Linting",
+        "startedAt": "2026-08-21T14:23:03Z",
+        "status": "COMPLETED",
+        "workflowName": "Python Workflows"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:25:08Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491843870/job/96801077303",
+        "name": "Check removed test IDs against QA",
+        "startedAt": "2026-08-21T14:23:10Z",
+        "status": "COMPLETED",
+        "workflowName": "QA Test ID Guard"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:24:27Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491839204/job/96801064544",
+        "name": "Build: reporting-webserver",
+        "startedAt": "2026-08-21T14:23:10Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:24:59Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801061803",
+        "name": "Type Check",
+        "startedAt": "2026-08-21T14:23:10Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:23:30Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491843626/job/96801117466",
+        "name": "Identify Testing Environment",
+        "startedAt": "2026-08-21T14:23:15Z",
+        "status": "COMPLETED",
+        "workflowName": "Pull request labeler"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:23:41Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491838935/job/96801062077",
+        "name": "Webserver Python Formatting",
+        "startedAt": "2026-08-21T14:23:03Z",
+        "status": "COMPLETED",
+        "workflowName": "Python Workflows"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:24:38Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491839204/job/96801064666",
+        "name": "Build: internal-api (node-webserver)",
+        "startedAt": "2026-08-21T14:23:11Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:25:18Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801061409",
+        "name": "Prettier",
+        "startedAt": "2026-08-21T14:23:09Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:29:45Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491838935/job/96801062451",
+        "name": "Webserver Python Unit Tests (1)",
+        "startedAt": "2026-08-21T14:23:09Z",
+        "status": "COMPLETED",
+        "workflowName": "Python Workflows"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:27:12Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491838935/job/96801062498",
+        "name": "Webserver Python Unit Tests (2)",
+        "startedAt": "2026-08-21T14:23:09Z",
+        "status": "COMPLETED",
+        "workflowName": "Python Workflows"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:28:38Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491838935/job/96801062701",
+        "name": "Webserver Python Unit Tests (3)",
+        "startedAt": "2026-08-21T14:23:09Z",
+        "status": "COMPLETED",
+        "workflowName": "Python Workflows"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:28:09Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491838935/job/96801062387",
+        "name": "Webserver Python Unit Tests (4)",
+        "startedAt": "2026-08-21T14:23:09Z",
+        "status": "COMPLETED",
+        "workflowName": "Python Workflows"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:24:25Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491839204/job/96801064342",
+        "name": "Build: integrations-api",
+        "startedAt": "2026-08-21T14:23:10Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:25:47Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801061710",
+        "name": "Linting",
+        "startedAt": "2026-08-21T14:23:09Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:24:17Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491839204/job/96801064635",
+        "name": "Build: workers",
+        "startedAt": "2026-08-21T14:23:10Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:24:33Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801061826",
+        "name": "Spellcheck",
+        "startedAt": "2026-08-21T14:23:10Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:24:17Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491839204/job/96801064183",
+        "name": "Build: public-api",
+        "startedAt": "2026-08-21T14:23:09Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:24:54Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801061684",
+        "name": "Deploy React App",
+        "startedAt": "2026-08-21T14:23:09Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:24:19Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491839204/job/96801064426",
+        "name": "Build: reporting-etls",
+        "startedAt": "2026-08-21T14:23:10Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:25:48Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801061730",
+        "name": "Build CDK Container",
+        "startedAt": "2026-08-21T14:23:09Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:23:50Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491839204/job/96801064292",
+        "name": "Build: event-consumer",
+        "startedAt": "2026-08-21T14:23:10Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:26:25Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801589671",
+        "name": "Public API Swagger Up To Date",
+        "startedAt": "2026-08-21T14:24:59Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:28:12Z",
+        "conclusion": "CANCELLED",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801589713",
+        "name": "Unit Tests (1/8)",
+        "startedAt": "2026-08-21T14:24:59Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:23:46Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491839204/job/96801064529",
+        "name": "Build: notifications-tier-3-asap",
+        "startedAt": "2026-08-21T14:23:11Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:28:20Z",
+        "conclusion": "CANCELLED",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801589954",
+        "name": "Unit Tests (2/8)",
+        "startedAt": "2026-08-21T14:24:59Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:28:12Z",
+        "conclusion": "CANCELLED",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801589748",
+        "name": "Unit Tests (3/8)",
+        "startedAt": "2026-08-21T14:24:58Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:28:25Z",
+        "conclusion": "CANCELLED",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801589901",
+        "name": "Unit Tests (4/8)",
+        "startedAt": "2026-08-21T14:24:59Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:28:17Z",
+        "conclusion": "CANCELLED",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801589860",
+        "name": "Unit Tests (5/8)",
+        "startedAt": "2026-08-21T14:24:59Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:28:03Z",
+        "conclusion": "FAILURE",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801589870",
+        "name": "Unit Tests (6/8)",
+        "startedAt": "2026-08-21T14:24:59Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:28:16Z",
+        "conclusion": "CANCELLED",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801589760",
+        "name": "Unit Tests (7/8)",
+        "startedAt": "2026-08-21T14:24:58Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:28:09Z",
+        "conclusion": "CANCELLED",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801589736",
+        "name": "Unit Tests (8/8)",
+        "startedAt": "2026-08-21T14:24:59Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:23:46Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491839204/job/96801064371",
+        "name": "Build: notifications-tier-3-daily",
+        "startedAt": "2026-08-21T14:23:10Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:26:41Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801589733",
+        "name": "React Timezone Tests (UTC)",
+        "startedAt": "2026-08-21T14:24:58Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:26:32Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801589771",
+        "name": "React Timezone Tests (Pacific/Marquesas)",
+        "startedAt": "2026-08-21T14:24:59Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:26:43Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801589766",
+        "name": "React Timezone Tests (EST)",
+        "startedAt": "2026-08-21T14:24:58Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:26:39Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801589683",
+        "name": "React Timezone Tests (EDT)",
+        "startedAt": "2026-08-21T14:24:59Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:26:48Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801589817",
+        "name": "React Timezone Tests (Pacific/Chatham)",
+        "startedAt": "2026-08-21T14:24:59Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:23:45Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491839204/job/96801064206",
+        "name": "Build: notifications-weekly-digest",
+        "startedAt": "2026-08-21T14:23:09Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:27:42Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801589751",
+        "name": "Integration Tests (1/3)",
+        "startedAt": "2026-08-21T14:24:58Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:27:41Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801589917",
+        "name": "Integration Tests (2/3)",
+        "startedAt": "2026-08-21T14:24:59Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:28:11Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801589878",
+        "name": "Integration Tests (3/3)",
+        "startedAt": "2026-08-21T14:24:59Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:23:45Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491839204/job/96801064617",
+        "name": "Build: notifications-admin-weekly-digest",
+        "startedAt": "2026-08-21T14:23:10Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:26:52Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801589708",
+        "name": "CDK Logical ID Stability",
+        "startedAt": "2026-08-21T14:24:59Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:23:36Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491839204/job/96801064429",
+        "name": "Build: otel-collector-sidecar",
+        "startedAt": "2026-08-21T14:23:10Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:26:53Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801589641",
+        "name": "CDK Environment Tags",
+        "startedAt": "2026-08-21T14:24:58Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:25:55Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491839204/job/96801064325",
+        "name": "Build: lambda-rag-document",
+        "startedAt": "2026-08-21T14:23:10Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:26:43Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801589690",
+        "name": "CDK CLI Compatibility",
+        "startedAt": "2026-08-21T14:24:59Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:26:01Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491839204/job/96801064513",
+        "name": "Build: lambda-print-pdf",
+        "startedAt": "2026-08-21T14:23:12Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:26:24Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96801589628",
+        "name": "Bundle Lambdas",
+        "startedAt": "2026-08-21T14:24:59Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:25:59Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491839204/job/96801064653",
+        "name": "Build: lambda-ai-document-importer",
+        "startedAt": "2026-08-21T14:23:12Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:26:31Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491838633/job/96802036543",
+        "name": "Notify Deployment Ready",
+        "startedAt": "2026-08-21T14:26:26Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:23:47Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491839204/job/96801064304",
+        "name": "Build: lambda-approve-easy-add-reports",
+        "startedAt": "2026-08-21T14:23:10Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:26:08Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32491839204/job/96801926467",
+        "name": "Notify Deployment Ready",
+        "startedAt": "2026-08-21T14:26:04Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T14:24:04Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/runs/96801356660",
+        "name": "CodeQL",
+        "startedAt": "2026-08-21T14:24:02Z",
+        "status": "COMPLETED",
+        "workflowName": ""
+      }
+    ],
+    "title": "PY-13751 report subject scoping check never runs",
+    "updatedAt": "2026-08-21T14:22:59Z",
+    "url": "https://github.com/PerformYard/PerformYard/pull/7230",
+    "reviews": [
+      {
+        "author": {
+          "login": "cursor"
+        },
+        "authorAssociation": "NONE",
+        "state": "COMMENTED"
+      },
+      {
+        "author": {
+          "login": "jleo-py"
+        },
+        "authorAssociation": "MEMBER",
+        "state": "COMMENTED"
+      },
+      {
+        "author": {
+          "login": "jleo-py"
+        },
+        "authorAssociation": "MEMBER",
+        "state": "COMMENTED"
+      },
+      {
+        "author": {
+          "login": "cweiner-PY"
+        },
+        "authorAssociation": "MEMBER",
+        "state": "COMMENTED"
+      },
+      {
+        "author": {
+          "login": "cweiner-PY"
+        },
+        "authorAssociation": "MEMBER",
+        "state": "COMMENTED"
+      },
+      {
+        "author": {
+          "login": "cweiner-PY"
+        },
+        "authorAssociation": "MEMBER",
+        "state": "COMMENTED"
+      },
+      {
+        "author": {
+          "login": "cweiner-PY"
+        },
+        "authorAssociation": "MEMBER",
+        "state": "COMMENTED"
+      },
+      {
+        "author": {
+          "login": "cweiner-PY"
+        },
+        "authorAssociation": "MEMBER",
+        "state": "COMMENTED"
+      },
+      {
+        "author": {
+          "login": "jleo-py"
+        },
+        "authorAssociation": "MEMBER",
+        "state": "COMMENTED"
+      },
+      {
+        "author": {
+          "login": "cweiner-PY"
+        },
+        "authorAssociation": "MEMBER",
+        "state": "COMMENTED"
+      },
+      {
+        "author": {
+          "login": "cweiner-PY"
+        },
+        "authorAssociation": "MEMBER",
+        "state": "COMMENTED"
+      },
+      {
+        "author": {
+          "login": "cweiner-PY"
+        },
+        "authorAssociation": "MEMBER",
+        "state": "COMMENTED"
+      },
+      {
+        "author": {
+          "login": "jleo-py"
+        },
+        "authorAssociation": "MEMBER",
+        "state": "APPROVED"
+      }
+    ]
+  },
+  {
+    "headRefName": "PY-12746-competency-management-prototype-competency-catalog",
+    "isDraft": true,
+    "mergeable": "CONFLICTING",
+    "number": 7110,
+    "reviewDecision": "REVIEW_REQUIRED",
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:39:09Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658594/job/96823011204",
+        "name": "Build Temp Deployment",
+        "startedAt": "2026-08-21T15:38:15Z",
+        "status": "COMPLETED",
+        "workflowName": "Build and Deploy"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:39:17Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498654770/job/96823002265",
+        "name": "Analyze (actions)",
+        "startedAt": "2026-08-21T15:38:08Z",
+        "status": "COMPLETED",
+        "workflowName": "CodeQL"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:39:11Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658670/job/96823012152",
+        "name": "Build: python-webserver",
+        "startedAt": "2026-08-21T15:38:17Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:40:01Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823012273",
+        "name": "Cache Build",
+        "startedAt": "2026-08-21T15:38:14Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:38:16Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498659497/job/96823014007",
+        "name": "Pull request labeler",
+        "startedAt": "2026-08-21T15:38:10Z",
+        "status": "COMPLETED",
+        "workflowName": "Pull request labeler"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:39:04Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658737/job/96823011914",
+        "name": "Webserver Python Linting",
+        "startedAt": "2026-08-21T15:38:11Z",
+        "status": "COMPLETED",
+        "workflowName": "Python Workflows"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:40:18Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498659494/job/96823014177",
+        "name": "Check removed test IDs against QA",
+        "startedAt": "2026-08-21T15:38:14Z",
+        "status": "COMPLETED",
+        "workflowName": "QA Test ID Guard"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:38:42Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498659495/job/96823014024",
+        "name": "QA Code Review",
+        "startedAt": "2026-08-21T15:38:15Z",
+        "status": "COMPLETED",
+        "workflowName": "Review Enforcer"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:39:29Z",
+        "conclusion": "FAILURE",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823012340",
+        "name": "Type Check",
+        "startedAt": "2026-08-21T15:38:15Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:39:50Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658670/job/96823011904",
+        "name": "Build: reporting-webserver",
+        "startedAt": "2026-08-21T15:38:15Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:38:30Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498659497/job/96823058791",
+        "name": "Identify Testing Environment",
+        "startedAt": "2026-08-21T15:38:19Z",
+        "status": "COMPLETED",
+        "workflowName": "Pull request labeler"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:38:47Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658737/job/96823011570",
+        "name": "Webserver Python Formatting",
+        "startedAt": "2026-08-21T15:38:09Z",
+        "status": "COMPLETED",
+        "workflowName": "Python Workflows"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:39:40Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658670/job/96823012231",
+        "name": "Build: internal-api (node-webserver)",
+        "startedAt": "2026-08-21T15:38:17Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:40:26Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823012116",
+        "name": "Prettier",
+        "startedAt": "2026-08-21T15:38:15Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:44:46Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658737/job/96823012120",
+        "name": "Webserver Python Unit Tests (1)",
+        "startedAt": "2026-08-21T15:38:15Z",
+        "status": "COMPLETED",
+        "workflowName": "Python Workflows"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:42:20Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658737/job/96823011860",
+        "name": "Webserver Python Unit Tests (2)",
+        "startedAt": "2026-08-21T15:38:15Z",
+        "status": "COMPLETED",
+        "workflowName": "Python Workflows"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:43:43Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658737/job/96823012101",
+        "name": "Webserver Python Unit Tests (3)",
+        "startedAt": "2026-08-21T15:38:15Z",
+        "status": "COMPLETED",
+        "workflowName": "Python Workflows"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:43:18Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658737/job/96823011831",
+        "name": "Webserver Python Unit Tests (4)",
+        "startedAt": "2026-08-21T15:38:15Z",
+        "status": "COMPLETED",
+        "workflowName": "Python Workflows"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:40:53Z",
+        "conclusion": "FAILURE",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823012199",
+        "name": "Linting",
+        "startedAt": "2026-08-21T15:38:15Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:39:41Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658670/job/96823012172",
+        "name": "Build: integrations-api",
+        "startedAt": "2026-08-21T15:38:16Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:39:32Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658670/job/96823012123",
+        "name": "Build: workers",
+        "startedAt": "2026-08-21T15:38:17Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:39:37Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823011986",
+        "name": "Spellcheck",
+        "startedAt": "2026-08-21T15:38:15Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:39:35Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658670/job/96823012160",
+        "name": "Build: public-api",
+        "startedAt": "2026-08-21T15:38:17Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:40:07Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823012149",
+        "name": "Deploy React App",
+        "startedAt": "2026-08-21T15:38:15Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:39:26Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658670/job/96823012425",
+        "name": "Build: reporting-etls",
+        "startedAt": "2026-08-21T15:38:17Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:44:02Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823011721",
+        "name": "Build CDK Container",
+        "startedAt": "2026-08-21T15:38:15Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:38:54Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658670/job/96823012364",
+        "name": "Build: event-consumer",
+        "startedAt": "2026-08-21T15:38:17Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:41:44Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823549450",
+        "name": "Public API Swagger Up To Date",
+        "startedAt": "2026-08-21T15:40:10Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:38:54Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658670/job/96823012305",
+        "name": "Build: notifications-tier-3-asap",
+        "startedAt": "2026-08-21T15:38:17Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:43:30Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823549567",
+        "name": "Unit Tests (1/8)",
+        "startedAt": "2026-08-21T15:40:09Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:43:40Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823549641",
+        "name": "Unit Tests (2/8)",
+        "startedAt": "2026-08-21T15:40:10Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:43:56Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823549588",
+        "name": "Unit Tests (3/8)",
+        "startedAt": "2026-08-21T15:40:09Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:43:32Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823549558",
+        "name": "Unit Tests (4/8)",
+        "startedAt": "2026-08-21T15:40:09Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:43:45Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823549660",
+        "name": "Unit Tests (5/8)",
+        "startedAt": "2026-08-21T15:40:11Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:43:43Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823549551",
+        "name": "Unit Tests (6/8)",
+        "startedAt": "2026-08-21T15:40:10Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:43:31Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823549665",
+        "name": "Unit Tests (7/8)",
+        "startedAt": "2026-08-21T15:40:10Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:43:19Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823549703",
+        "name": "Unit Tests (8/8)",
+        "startedAt": "2026-08-21T15:40:10Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:38:58Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658670/job/96823012315",
+        "name": "Build: notifications-tier-3-daily",
+        "startedAt": "2026-08-21T15:38:16Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:41:57Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823549537",
+        "name": "React Timezone Tests (UTC)",
+        "startedAt": "2026-08-21T15:40:10Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:42:00Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823549488",
+        "name": "React Timezone Tests (Pacific/Marquesas)",
+        "startedAt": "2026-08-21T15:40:09Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:42:03Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823549616",
+        "name": "React Timezone Tests (EST)",
+        "startedAt": "2026-08-21T15:40:11Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:41:54Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823549510",
+        "name": "React Timezone Tests (EDT)",
+        "startedAt": "2026-08-21T15:40:10Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:41:48Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823549559",
+        "name": "React Timezone Tests (Pacific/Chatham)",
+        "startedAt": "2026-08-21T15:40:10Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:38:52Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658670/job/96823012048",
+        "name": "Build: notifications-weekly-digest",
+        "startedAt": "2026-08-21T15:38:16Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:42:56Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823549669",
+        "name": "Integration Tests (1/3)",
+        "startedAt": "2026-08-21T15:40:11Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:42:54Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823549470",
+        "name": "Integration Tests (2/3)",
+        "startedAt": "2026-08-21T15:40:10Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:43:22Z",
+        "conclusion": "FAILURE",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823549502",
+        "name": "Integration Tests (3/3)",
+        "startedAt": "2026-08-21T15:40:10Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:38:52Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658670/job/96823011976",
+        "name": "Build: notifications-admin-weekly-digest",
+        "startedAt": "2026-08-21T15:38:15Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:41:59Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823549377",
+        "name": "CDK Logical ID Stability",
+        "startedAt": "2026-08-21T15:40:09Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:38:40Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658670/job/96823012312",
+        "name": "Build: otel-collector-sidecar",
+        "startedAt": "2026-08-21T15:38:17Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:42:05Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823549396",
+        "name": "CDK Environment Tags",
+        "startedAt": "2026-08-21T15:40:19Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:41:23Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658670/job/96823012420",
+        "name": "Build: lambda-rag-document",
+        "startedAt": "2026-08-21T15:38:17Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:41:57Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823549466",
+        "name": "CDK CLI Compatibility",
+        "startedAt": "2026-08-21T15:40:09Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:41:27Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658670/job/96823011970",
+        "name": "Build: lambda-print-pdf",
+        "startedAt": "2026-08-21T15:38:15Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:45:35Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96823549409",
+        "name": "Bundle Lambdas",
+        "startedAt": "2026-08-21T15:40:09Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:41:31Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658670/job/96823012128",
+        "name": "Build: lambda-ai-document-importer",
+        "startedAt": "2026-08-21T15:38:15Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:45:46Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658732/job/96825155190",
+        "name": "Notify Deployment Ready",
+        "startedAt": "2026-08-21T15:45:40Z",
+        "status": "COMPLETED",
+        "workflowName": "JS/TS Pipeline"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:38:54Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658670/job/96823012523",
+        "name": "Build: lambda-approve-easy-add-reports",
+        "startedAt": "2026-08-21T15:38:17Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:41:38Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/actions/runs/32498658670/job/96823985338",
+        "name": "Notify Deployment Ready",
+        "startedAt": "2026-08-21T15:41:34Z",
+        "status": "COMPLETED",
+        "workflowName": "Docker Build Apps"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:48:28Z",
+        "conclusion": "FAILURE",
+        "detailsUrl": "https://console.aws.amazon.com/amplify/home?region=us-east-1#/dft10h8u4uxo0/pr-7110/2",
+        "name": "AWS Amplify Console Web Preview",
+        "startedAt": "2026-08-21T15:48:28Z",
+        "status": "COMPLETED",
+        "workflowName": ""
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-08-21T15:39:01Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/PerformYard/PerformYard/runs/96823254249",
+        "name": "CodeQL",
+        "startedAt": "2026-08-21T15:38:58Z",
+        "status": "COMPLETED",
+        "workflowName": ""
+      }
+    ],
+    "title": "PY-12746 competency management prototype competency catalog",
+    "updatedAt": "2026-08-21T15:38:02Z",
+    "url": "https://github.com/PerformYard/PerformYard/pull/7110",
+    "reviews": []
+  }
+]
