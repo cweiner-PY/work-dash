@@ -53,6 +53,13 @@ export function registerRoutes(routes, { getBoard, config, deps = {} }) {
     if (body.skill && !item.skills.includes(body.skill)) {
       return { ok: false, message: `${body.skill} does not apply to ${item.id}.` }
     }
+    // A repo hint is only meaningful for a branchless, repo-less item — the user telling
+    // the picker which repo to draw a working directory from. Validate it against
+    // configured repos so a raw API call cannot point slot resolution at an arbitrary
+    // string; do not pass it through unvalidated.
+    if (body.repo != null && !Object.prototype.hasOwnProperty.call(config.repos, body.repo)) {
+      return { ok: false, message: `Unknown repo: ${body.repo}` }
+    }
     // Only accept plan paths the server already knows belong to this item. `plans` becomes
     // --add-dir arguments granting Claude filesystem access, so an unvalidated list would let
     // a caller point it anywhere (/etc, ~/.ssh). slotDir is validated the same way; plans
@@ -67,7 +74,7 @@ export function registerRoutes(routes, { getBoard, config, deps = {} }) {
     const result = await openItem({
       item, slots: board.slots ?? [], plans, skill: body.skill ?? null,
       config, chosenSlotDir: body.slotDir ?? null, staleBranches: staleBranchesOf(board),
-      claimedDirs: liveClaimedDirs(claims),
+      claimedDirs: liveClaimedDirs(claims), repo: body.repo ?? null,
     }, deps)
     if (result.ok) {
       ctx.invalidate()

@@ -110,6 +110,28 @@ export function updateBranchSpec(item, mainPr) {
   }
 }
 
+// Mirrors actions/slot.js's branchFor without importing it: public/app.js runs in the
+// browser as a static file, and server.js's static-file guard deliberately will not
+// serve anything outside public/ (lanes.js/actions/ included) to a client.
+export function hasBranch(item) {
+  const mainPr = item.prs.find((p) => p.isMine !== false)
+  return Boolean(mainPr?.headRefName ?? item.slot?.branch)
+}
+
+// A branchless, repo-less item (a To Do ticket Jira never identifies a repo for) cannot
+// resolve a slot pool on its own — the user must say which repo. An item that already
+// has a repo or a branch keeps today's single-button rendering.
+export function needsRepoChoice(item) {
+  return !hasBranch(item) && !item.repo
+}
+
+// docsSubdir is already the short name PerformYard uses for this repo elsewhere (see
+// config.repos[...].docsSubdir) — reused here rather than inventing a second short name,
+// and falls back to the full "Owner/Repo" key if a repo has none configured.
+export function repoLabel(config, repoKey) {
+  return config?.repos?.[repoKey]?.docsSubdir ?? repoKey
+}
+
 // Pure bucketing, not a sort within either bucket: openList holds every subtask whose
 // statusCategory isn't 'Done' (rendered first in the card), doneList holds the rest
 // (rendered after, dimmed) — regardless of the order they arrived in.
@@ -122,7 +144,7 @@ export function summarizeSubtasks(subtasks) {
 // --- appended to public/app.js ---
 // Guarded so the module stays importable by node --test (no document there).
 if (typeof document !== 'undefined') {
-  const state = { board: null, showBacklog: false, showStale: false, busy: new Set() }
+  const state = { board: null, config: null, showBacklog: false, showStale: false, busy: new Set() }
   const $ = (sel) => document.querySelector(sel)
   const el = (tag, cls, text) => {
     const n = document.createElement(tag)
@@ -143,6 +165,13 @@ if (typeof document !== 'undefined') {
   async function load({ force = false } = {}) {
     state.board = force ? await api('/api/refresh', {}) : await api('/api/items')
     render()
+  }
+
+  // Fetched once at startup, not on every poll — needed only to list configured repos
+  // and their short (docsSubdir) labels for a branchless, repo-less item's per-repo
+  // open/skill buttons (see needsRepoChoice/repoLabel).
+  async function loadConfig() {
+    state.config = await api('/api/config')
   }
 
   function sourceBar(sources) {
@@ -298,14 +327,38 @@ if (typeof document !== 'undefined') {
     // update-branch button below and the merge button.
     const mainPr = item.prs.find((p) => p.isMine !== false)
 
-    const open = el('button', null, 'open')
-    open.addEventListener('click', () => post('/api/open', {}, open))
-    actions.append(open)
+    // A branchless, repo-less item can't resolve a slot pool on its own — offer one
+    // button per configured repo instead of guessing which one. Falls back to the plain
+    // single-button rendering if config hasn't loaded yet or has no repos.
+    const repoKeys = Object.keys(state.config?.repos ?? {})
+    const offerRepoChoice = needsRepoChoice(item) && repoKeys.length > 0
+
+    if (offerRepoChoice) {
+      actions.append(el('span', 'repo-choice-label', 'open in:'))
+      for (const key of repoKeys) {
+        const b = el('button', null, repoLabel(state.config, key))
+        b.addEventListener('click', () => post('/api/open', { repo: key }, b))
+        actions.append(b)
+      }
+    } else {
+      const open = el('button', null, 'open')
+      open.addEventListener('click', () => post('/api/open', {}, open))
+      actions.append(open)
+    }
 
     for (const skill of item.skills ?? []) {
-      const b = el('button', null, `/${skill}`)
-      b.addEventListener('click', () => post('/api/run', { skill }, b))
-      actions.append(b)
+      if (offerRepoChoice) {
+        actions.append(el('span', 'repo-choice-label', `/${skill} in:`))
+        for (const key of repoKeys) {
+          const b = el('button', null, repoLabel(state.config, key))
+          b.addEventListener('click', () => post('/api/run', { skill, repo: key }, b))
+          actions.append(b)
+        }
+      } else {
+        const b = el('button', null, `/${skill}`)
+        b.addEventListener('click', () => post('/api/run', { skill }, b))
+        actions.append(b)
+      }
     }
 
     const spec = updateBranchSpec(item, mainPr)
@@ -364,7 +417,7 @@ if (typeof document !== 'undefined') {
   $('#showBacklog').addEventListener('change', (e) => { state.showBacklog = e.target.checked; render() })
   $('#showStale').addEventListener('change', (e) => { state.showStale = e.target.checked; render() })
 
-  load()
+  loadConfig().then(load)
   setInterval(() => load(), 60_000)
 
   window.__workDash = { state, load, render, selectedPlans }

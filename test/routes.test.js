@@ -111,6 +111,39 @@ test('POST /api/open lets a plan path drawn from item.plans through unmodified',
   assert.match(r.detail, /plan\.md/)
 })
 
+test('POST /api/open rejects an unconfigured repo string rather than passing it through', async () => {
+  const item = { id: 'PY-1', key: 'PY-1', repo: null, prs: [], slot: null, plans: [], jira: null, skills: [] }
+  const routes = new Map()
+  registerRoutes(routes, { getBoard: async () => ({ items: [item] }), config })
+  const r = await routes.get('POST /api/open')({ id: 'PY-1', repo: 'Not/Configured' }, { config, invalidate() {} })
+  assert.equal(r.ok, false)
+  assert.match(r.message, /unknown repo/i)
+})
+
+test('POST /api/run also rejects an unconfigured repo string', async () => {
+  const item = { id: 'PY-1', key: 'PY-1', repo: null, prs: [], slot: null, plans: [], jira: null, skills: ['ticket-planner'] }
+  const routes = new Map()
+  registerRoutes(routes, { getBoard: async () => ({ items: [item] }), config })
+  const r = await routes.get('POST /api/run')(
+    { id: 'PY-1', skill: 'ticket-planner', repo: 'Not/Configured' }, { config, invalidate() {} })
+  assert.equal(r.ok, false)
+  assert.match(r.message, /unknown repo/i)
+})
+
+test('POST /api/open with a valid repo resolves a branchless, repo-less item into that pool', async () => {
+  const slot = { dir: '/w/A', repo: 'O/R', branch: 'master', dirty: false, dirtyCount: 0 }
+  const item = { id: 'PY-1', key: 'PY-1', repo: null, prs: [], slot: null, plans: [], jira: null, skills: [] }
+  const routes = new Map()
+  registerRoutes(routes, {
+    getBoard: async () => ({ items: [item], slots: [slot] }),
+    config,
+    deps: { dry: true },
+  })
+  const r = await routes.get('POST /api/open')({ id: 'PY-1', repo: 'O/R' }, { config, invalidate() {} })
+  assert.equal(r.ok, true)
+  assert.equal(r.slot, '/w/A')
+})
+
 test('a body of literal null returns a clean refusal, not a throw, from every route', async () => {
   // JSON.parse('null') succeeds and yields null, so a caller can hand routes a non-object
   // body; body.id must not be dereferenced before the shape is checked.

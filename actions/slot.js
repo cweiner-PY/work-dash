@@ -8,39 +8,76 @@ export function branchFor(item) {
   return myPrOf(item)?.headRefName ?? item.slot?.branch ?? null
 }
 
-export function resolveSlot(item, slots, config, { staleBranches = new Set(), claimedDirs = new Set() } = {}) {
-  const branch = branchFor(item)
-  if (!item.repo || !branch) {
-    return { needsPicker: true, candidates: [], message: 'No branch is known for this item — nothing to check out.' }
+// Same fail-closed dirty check and claim check as the branch-known path below — factored
+// out so the branchless path (no target branch, so no master/main/stale distinction
+// applies) and the branch-known path share exactly one definition of "safe to touch".
+function eligibility(s, { claimedDirs }) {
+  if (s.dirty !== false || (s.dirtyCount ?? 0) > 0) {
+    return { eligible: false, why: `${s.dirtyCount ?? 'unknown'} uncommitted change(s)` }
   }
-  const pool = (config.repos[item.repo]?.slots ?? [])
+  if (claimedDirs.has(s.dir)) {
+    // A launch happens asynchronously in a Terminal window the server never waits on,
+    // so re-polling the board cannot observe the new checkout for seconds. Without this,
+    // two concurrent opens resolve deterministically to the SAME slot — rank() prefers
+    // master/main every time, not occasionally — and two sessions fight over one checkout.
+    return { eligible: false, why: 'recently claimed by another launch' }
+  }
+  return null
+}
+
+export function resolveSlot(
+  item, slots, config,
+  { staleBranches = new Set(), claimedDirs = new Set(), repo = null } = {}
+) {
+  // Jira carries nothing identifying the repo — a To Do ticket's title mentioning
+  // "Logan" is prose, not data. item.repo (known from a PR or an existing slot) always
+  // wins; a caller-supplied repo is only consulted when the item itself doesn't know.
+  const effectiveRepo = item.repo ?? repo
+  if (!effectiveRepo) {
+    return {
+      needsPicker: true, needsRepo: true, candidates: [],
+      message: 'This ticket has no known repository yet — which one is it in?',
+    }
+  }
+
+  const branch = branchFor(item)
+  const pool = (config.repos[effectiveRepo]?.slots ?? [])
   const mine = slots.filter((s) => pool.includes(s.dir))
+
+  if (!branch) {
+    // A To Do ticket has no branch by definition — /ticket-planner and similar skills
+    // exist to run BEFORE branching, so this resolves a clean working directory only.
+    // No checkout is emitted (buildLauncher already guards its checkout line on branch
+    // being truthy). Busy-with-another-branch is not disqualifying here — nothing is
+    // being taken over, only borrowed for research — but dirty and claimed still are.
+    const candidates = mine.map((s) => {
+      const blocked = eligibility(s, { claimedDirs })
+      return {
+        dir: s.dir, branch: s.branch, dirty: s.dirty, dirtyCount: s.dirtyCount,
+        eligible: !blocked, why: blocked?.why ?? 'free', slot: s,
+      }
+    })
+    const free = candidates.filter((c) => c.eligible)
+    if (free.length) return { slot: free[0].slot, alreadyOnBranch: false }
+    return {
+      needsPicker: true,
+      candidates: candidates.map(({ slot, ...c }) => c),
+      message: 'No free checkout — pick a slot to use.',
+    }
+  }
 
   const already = mine.find((s) => s.branch === branch)
   if (already) return { slot: already, alreadyOnBranch: true }
 
   const candidates = mine.map((s) => {
-    let eligible = true
-    let why = 'free'
-    // Fail CLOSED: anything other than an explicit `dirty: false` counts as dirty, and a
-    // non-zero dirtyCount overrides a false flag. This is the AUTOMATIC selection path — it
-    // picks a checkout without the user choosing one — so ambiguous safety data must never
-    // read as "safe to clobber".
-    if (s.dirty !== false || (s.dirtyCount ?? 0) > 0) {
-      eligible = false
-      why = `${s.dirtyCount ?? 'unknown'} uncommitted change(s)`
+    const blocked = eligibility(s, { claimedDirs })
+    let eligible = !blocked
+    let why = blocked?.why ?? 'free'
+    if (!blocked) {
+      if (s.branch === 'master' || s.branch === 'main') why = `on ${s.branch}`
+      else if (staleBranches.has(s.branch)) why = 'holding a finished or reassigned ticket'
+      else { eligible = false; why = `busy with ${s.branch}` }
     }
-    else if (claimedDirs.has(s.dir)) {
-      // A launch happens asynchronously in a Terminal window the server never waits on,
-      // so re-polling the board cannot observe the new checkout for seconds. Without this,
-      // two concurrent opens resolve deterministically to the SAME slot — rank() prefers
-      // master/main every time, not occasionally — and two sessions fight over one checkout.
-      eligible = false
-      why = 'recently claimed by another launch'
-    }
-    else if (s.branch === 'master' || s.branch === 'main') why = `on ${s.branch}`
-    else if (staleBranches.has(s.branch)) why = 'holding a finished or reassigned ticket'
-    else { eligible = false; why = `busy with ${s.branch}` }
     return { dir: s.dir, branch: s.branch, dirty: s.dirty, dirtyCount: s.dirtyCount, eligible, why, slot: s }
   })
 

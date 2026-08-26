@@ -1,7 +1,7 @@
 // test/render.test.js
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { groupForDisplay, sourceChip, prChecksChip, summarizeSubtasks, updateBranchSpec } from '../public/app.js'
+import { groupForDisplay, sourceChip, prChecksChip, summarizeSubtasks, updateBranchSpec, hasBranch, needsRepoChoice, repoLabel } from '../public/app.js'
 
 const it = (o) => ({ id: o.id, lane: o.lane, statusGroup: o.statusGroup ?? 'no ticket',
   sortIndex: o.sortIndex ?? Infinity, signals: { foreign: false, stale: false, reclaimable: false, ...o.signals },
@@ -225,4 +225,38 @@ test('updateBranchSpec: no PR and a dirty slot is disabled with the uncommitted-
   const spec = updateBranchSpec({ slot: { behind: 0, dirty: true, dirtyCount: 3 } }, null)
   assert.equal(spec.disabled, true)
   assert.match(spec.title, /3 uncommitted/)
+})
+
+// --- hasBranch / needsRepoChoice / repoLabel ---
+
+test('hasBranch: true from the user\'s own PR headRefName', () => {
+  assert.equal(hasBranch({ prs: [{ isMine: true, headRefName: 'PY-1-x' }], slot: null }), true)
+})
+
+test('hasBranch: a colleague\'s review-requested PR does not count', () => {
+  assert.equal(hasBranch({ prs: [{ isMine: false, headRefName: 'PY-1-bruce' }], slot: null }), false)
+})
+
+test('hasBranch: falls back to the slot\'s branch', () => {
+  assert.equal(hasBranch({ prs: [], slot: { branch: 'PY-1-x' } }), true)
+})
+
+test('hasBranch: false with no PR of the user\'s and no slot', () => {
+  assert.equal(hasBranch({ prs: [], slot: null }), false)
+})
+
+test('needsRepoChoice: true only when both branchless AND repo-less', () => {
+  assert.equal(needsRepoChoice({ prs: [], slot: null, repo: null }), true)
+  assert.equal(needsRepoChoice({ prs: [], slot: null, repo: 'O/R' }), false, 'a known repo keeps today\'s single button')
+  assert.equal(needsRepoChoice({ prs: [{ isMine: true, headRefName: 'b' }], slot: null, repo: null }), false, 'a known branch keeps today\'s single button')
+})
+
+test('repoLabel: uses docsSubdir when configured', () => {
+  const config = { repos: { 'PerformYard/Logan': { docsSubdir: 'Logan' } } }
+  assert.equal(repoLabel(config, 'PerformYard/Logan'), 'Logan')
+})
+
+test('repoLabel: falls back to the full repo key when docsSubdir is unset', () => {
+  const config = { repos: { 'Owner/Repo': {} } }
+  assert.equal(repoLabel(config, 'Owner/Repo'), 'Owner/Repo')
 })

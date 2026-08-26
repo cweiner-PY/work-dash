@@ -102,8 +102,61 @@ test('only considers slots belonging to the item repo', () => {
   assert.equal(r.candidates.length, 1)
 })
 
-test('an item with no repo and no branch cannot resolve a slot', () => {
+test('an item with no repo and no branch, and no repo supplied, asks which repository', () => {
   const r = resolveSlot(item({ repo: null, prs: [] }), [], config, { staleBranches: new Set() })
   assert.equal(r.needsPicker, true)
-  assert.match(r.message, /branch/i)
+  assert.equal(r.needsRepo, true)
+  assert.match(r.message, /repositor/i)
+})
+
+// --- branchless items (Change: a To Do ticket has no branch by definition) ---
+
+test('a branchless item with a supplied repo resolves a clean slot from that pool', () => {
+  const slots = [slot('/w/A', { branch: 'master' }), slot('/w/B', { branch: 'other-branch' })]
+  const r = resolveSlot(item({ repo: null, prs: [] }), slots, config, { staleBranches: new Set(), repo: 'O/R' })
+  assert.equal(r.needsPicker, undefined)
+  // No target branch — busy-with-a-different-branch is not disqualifying, only dirty/claimed are.
+  assert.equal(r.slot.dir, '/w/A')
+})
+
+test('a branchless item with item.repo already set ignores a conflicting supplied repo', () => {
+  const cfg = { repos: { 'O/R': { slots: ['/w/A'] }, 'O/S': { slots: ['/w/Z'] } } }
+  const slots = [slot('/w/A', { branch: 'master' }), { ...slot('/w/Z', { branch: 'master' }), repo: 'O/S' }]
+  const r = resolveSlot(item({ repo: 'O/R', prs: [] }), slots, cfg, { staleBranches: new Set(), repo: 'O/S' })
+  assert.equal(r.slot.dir, '/w/A', "item.repo must win over a caller-supplied repo hint")
+})
+
+test('a branchless item never auto-selects a dirty slot', () => {
+  const slots = [slot('/w/A', { branch: 'master', dirty: true, dirtyCount: 2 })]
+  const r = resolveSlot(item({ repo: null, prs: [] }), slots, config, { staleBranches: new Set(), repo: 'O/R' })
+  assert.equal(r.needsPicker, true)
+  const c = r.candidates.find((x) => x.dir === '/w/A')
+  assert.equal(c.eligible, false)
+  assert.match(c.why, /uncommitted/i)
+})
+
+test('a branchless item never auto-selects a claimed slot', () => {
+  const slots = [slot('/w/A', { branch: 'master' }), slot('/w/B', { branch: 'master' })]
+  const r = resolveSlot(item({ repo: null, prs: [] }), slots, config,
+    { staleBranches: new Set(), repo: 'O/R', claimedDirs: new Set(['/w/A']) })
+  assert.equal(r.needsPicker, undefined)
+  assert.equal(r.slot.dir, '/w/B', 'the claimed slot must be skipped')
+})
+
+test('a branchless item with every slot dirty or claimed gets a picker naming why', () => {
+  const slots = [slot('/w/A', { branch: 'master', dirty: true, dirtyCount: 1 }), slot('/w/B', { branch: 'master' })]
+  const r = resolveSlot(item({ repo: null, prs: [] }), slots, config,
+    { staleBranches: new Set(), repo: 'O/R', claimedDirs: new Set(['/w/B']) })
+  assert.equal(r.needsPicker, true)
+  assert.equal(r.needsRepo, undefined, 'the repo IS known here — only the working directory is unresolved')
+  assert.equal(r.candidates.length, 2)
+})
+
+test('an item that DOES have a branch behaves exactly as before, repo option or not', () => {
+  const slots = [slot('/w/A', { branch: 'busy-thing' }), slot('/w/B', { branch: 'master' })]
+  const withBranch = item({ prs: [{ headRefName: 'PY-1-x' }] })
+  const r1 = resolveSlot(withBranch, slots, config, { staleBranches: new Set() })
+  const r2 = resolveSlot(withBranch, slots, config, { staleBranches: new Set(), repo: 'O/S' })
+  assert.equal(r1.slot.dir, '/w/B')
+  assert.equal(r2.slot.dir, '/w/B', 'item.repo already being set means the repo option is never consulted')
 })

@@ -22,7 +22,10 @@ export function buildLauncher({ item, slot, plans, skill, config }) {
     `Active ticket: ${item.key ?? item.id} — ${item.title ?? ''}`.trim(),
     item.jira?.status ? `Jira status: ${item.jira.status}.` : null,
     item.jira?.url ? `Jira: ${item.jira.url}` : null,
-    branch ? `Branch: ${branch}` : null,
+    // No branch yet is the normal state for a To Do ticket. Say so plainly, and name the
+    // repo from the resolved slot, so Claude does not go hunting for a branch that
+    // doesn't exist — /ticket-planner and similar skills exist to run before branching.
+    branch ? `Branch: ${branch}` : `No branch yet — this ticket has not been started. Repo: ${slot.repo}.`,
     myPr ? `PR: #${myPr.number} ${myPr.url}` : null,
     planFiles.length ? `Plan files: ${planFiles.join(', ')}. Read them before acting.` : null,
   ].filter(Boolean).join('\n')
@@ -45,7 +48,7 @@ export function buildLauncher({ item, slot, plans, skill, config }) {
 }
 
 export async function openItem(
-  { item, slots, plans = [], skill = null, config, chosenSlotDir = null, staleBranches, claimedDirs },
+  { item, slots, plans = [], skill = null, config, chosenSlotDir = null, staleBranches, claimedDirs, repo = null },
   { run = defaultRun, writeFile = fsWriteFile, dry = false } = {}
 ) {
   let slot
@@ -65,8 +68,8 @@ export async function openItem(
       return { ok: false, message: `${slot.dir} has ${slot.dirtyCount ?? 'an unknown number of'} uncommitted change(s) — commit or stash first.` }
     }
   } else {
-    const r = resolveSlot(item, slots, config, { staleBranches, claimedDirs })
-    if (r.needsPicker) return { ok: false, message: r.message, candidates: r.candidates }
+    const r = resolveSlot(item, slots, config, { staleBranches, claimedDirs, repo })
+    if (r.needsPicker) return { ok: false, message: r.message, candidates: r.candidates, needsRepo: r.needsRepo }
     slot = r.slot
   }
 

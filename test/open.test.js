@@ -122,6 +122,46 @@ test('two opens of the same ticket use different launcher paths (no path collisi
   assert.notEqual(paths[0], paths[1], 'a second open of the same ticket must not race the first on one file')
 })
 
+test('a branchless item with a supplied repo resolves a clean slot, and the launcher has no git checkout', async () => {
+  const branchless = { ...item, repo: null, prs: [] }
+  const r = await openItem({ item: branchless, slots: [slotA], plans, skill: null, config, repo: 'O/R' },
+    { run: async () => ({ code: 0, stdout: '', stderr: '' }), writeFile: async () => {}, dry: true })
+  assert.equal(r.ok, true)
+  assert.equal(r.slot, '/w/A')
+  assert.ok(!/git checkout/.test(r.detail), 'a To Do ticket with no branch must never emit a checkout')
+})
+
+test('buildLauncher tells Claude plainly there is no branch yet, and names the repo', () => {
+  const branchless = { ...item, repo: null, prs: [] }
+  const s = buildLauncher({ item: branchless, slot: slotA, plans, skill: null, config })
+  assert.match(s, /no branch yet/i)
+  assert.match(s, /Repo: O\/R/)
+  assert.ok(!/git checkout/.test(s))
+})
+
+test('a branchless item with no repo at all, and none supplied, returns a picker asking for the repo', async () => {
+  const branchless = { ...item, repo: null, prs: [] }
+  const r = await openItem({ item: branchless, slots: [slotA], plans, skill: null, config },
+    { run: async () => ({ code: 0, stdout: '', stderr: '' }), writeFile: async () => {}, dry: true })
+  assert.equal(r.ok, false)
+  assert.equal(r.needsRepo, true)
+  assert.match(r.message, /repositor/i)
+})
+
+test('a branchless item still never auto-selects a dirty or claimed slot', async () => {
+  const branchless = { ...item, repo: null, prs: [] }
+  const dirty = { ...slotA, dirty: true, dirtyCount: 2 }
+  const r1 = await openItem({ item: branchless, slots: [dirty], plans, skill: null, config, repo: 'O/R' },
+    { run: async () => ({ code: 0, stdout: '', stderr: '' }), writeFile: async () => {}, dry: true })
+  assert.equal(r1.ok, false)
+
+  const other = { ...slotA, dir: '/w/OTHER' }
+  const r2 = await openItem(
+    { item: branchless, slots: [other], plans, skill: null, config, repo: 'O/R', claimedDirs: new Set(['/w/OTHER']) },
+    { run: async () => ({ code: 0, stdout: '', stderr: '' }), writeFile: async () => {}, dry: true })
+  assert.equal(r2.ok, false)
+})
+
 test('refuses a chosenSlotDir belonging to a different repo', async () => {
   // The reviewer flagged that open.js shares update-branch.js's cross-repo hazard: a raw
   // API call could hand this item a slotDir from an unrelated repo, and a checkout would
