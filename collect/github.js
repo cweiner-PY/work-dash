@@ -14,9 +14,16 @@ export function summarizeChecks(rollup) {
   return out
 }
 
+// `known: true` means we actually read the list. An empty list with known:true is a
+// real "this repo requires nothing" (PerformYard/Logan is exactly that) and passes the
+// gate. Absence of knowledge is NOT absence of failures — see mergeGateFor.
 export function parseRequiredChecks(arr) {
   const list = arr ?? []
-  return { total: list.length, failing: list.filter((c) => c.state !== 'SUCCESS').map((c) => c.name) }
+  return {
+    total: list.length,
+    failing: list.filter((c) => c.state !== 'SUCCESS').map((c) => c.name),
+    known: true,
+  }
 }
 
 // A PR has review comments worth acting on only when a HUMAN TEAMMATE left
@@ -41,7 +48,10 @@ export function normalizePr(raw, repo, { mine, myLogin }) {
     mergeable: raw.mergeable ?? null,
     isDraft: Boolean(raw.isDraft),
     checks: summarizeChecks(raw.statusCheckRollup),
-    requiredChecks: { total: 0, failing: [] }, // filled by fetchGithub
+    // Starts UNKNOWN, not "zero required checks". fetchGithub replaces this with a
+    // known:true result on a successful read; if the read fails it stays unknown and
+    // the merge gate refuses rather than mistaking silence for a clean bill of health.
+    requiredChecks: { total: 0, failing: [], known: false },
     hasReviewComments: hasHumanReviewFeedback(raw.reviews, myLogin),
     isMine: mine,
     url: raw.url ?? null,
@@ -76,10 +86,17 @@ export async function fetchGithub(config, { run = defaultRun } = {}) {
   await Promise.all(prs.map(async (pr) => {
     const r = await run('gh', ['pr', 'checks', String(pr.number), '--repo', pr.repo,
                                '--required', '--json', 'name,state,link'])
-    // gh exits non-zero when any check is failing, so parse stdout regardless.
+    // gh exits non-zero when any check is FAILING, so parse stdout regardless of code.
     if (r.stdout.trim()) {
       try { pr.requiredChecks = parseRequiredChecks(JSON.parse(r.stdout)) }
       catch { errors.push(`could not parse required checks for ${pr.repo}#${pr.number}`) }
+    } else if (r.code !== 0) {
+      // A genuine gh failure: expired auth, no network, gh missing, rate limited.
+      // requiredChecks stays known:false, so the merge gate refuses this PR.
+      errors.push(
+        `could not fetch required checks for ${pr.repo}#${pr.number}: ` +
+        `${r.stderr.trim() || `exit ${r.code}`}`
+      )
     }
   }))
 
