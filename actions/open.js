@@ -53,8 +53,9 @@ export async function openItem(
       return { ok: false, message: `${slot.dir} belongs to ${slot.repo}, not ${item.repo}.` }
     }
     // Explicit choice never overrides the dirty-tree rule.
-    if (slot.dirty && slot.branch !== branchFor(item)) {
-      return { ok: false, message: `${slot.dir} has ${slot.dirtyCount} uncommitted change(s) — commit or stash first.` }
+    const looksDirty = slot.dirty !== false || (slot.dirty ?? 0) > 0 || (slot.dirtyCount ?? 0) > 0
+    if (looksDirty && slot.branch !== branchFor(item)) {
+      return { ok: false, message: `${slot.dir} has ${slot.dirtyCount ?? 'an unknown number of'} uncommitted change(s) — commit or stash first.` }
     }
   } else {
     const r = resolveSlot(item, slots, config, { staleBranches })
@@ -67,6 +68,13 @@ export async function openItem(
 
   if (dry) return { ok: true, message: `dry run — would launch in ${slot.dir}`, detail: script, slot: slot.dir }
 
+  // The filename is sanitised above to [\w.-] only, so it cannot contain a quote. Assert
+  // that here rather than trusting it from a distance: this string has no escaping of its
+  // own, so if the sanitiser is ever loosened, this must fail loudly instead of silently
+  // becoming an AppleScript injection point.
+  if (/["\\\n]/.test(path)) {
+    return { ok: false, message: `Refusing to launch: unsafe launcher path ${path}` }
+  }
   await writeFile(path, script, { mode: 0o700 })
   const applescript = `tell application "Terminal" to do script "bash ${path}"`
   const r = await run('osascript', ['-e', applescript, '-e', 'tell application "Terminal" to activate'])

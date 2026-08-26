@@ -17,7 +17,14 @@ export function resolveSlot(item, slots, config, { staleBranches = new Set() } =
   const candidates = mine.map((s) => {
     let eligible = true
     let why = 'free'
-    if (s.dirty) { eligible = false; why = `${s.dirtyCount} uncommitted change(s)` }
+    // Fail CLOSED: anything other than an explicit `dirty: false` counts as dirty, and a
+    // non-zero dirtyCount overrides a false flag. This is the AUTOMATIC selection path — it
+    // picks a checkout without the user choosing one — so ambiguous safety data must never
+    // read as "safe to clobber".
+    if (s.dirty !== false || (s.dirtyCount ?? 0) > 0) {
+      eligible = false
+      why = `${s.dirtyCount ?? 'unknown'} uncommitted change(s)`
+    }
     else if (s.branch === 'master' || s.branch === 'main') why = `on ${s.branch}`
     else if (staleBranches.has(s.branch)) why = 'holding a finished or reassigned ticket'
     else { eligible = false; why = `busy with ${s.branch}` }

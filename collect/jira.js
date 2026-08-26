@@ -47,10 +47,44 @@ async function search(config, jql, { fetchImpl = fetch } = {}) {
   return issues.map((raw) => normalizeIssue(raw, config.jiraSite))
 }
 
-export function fetchPrimary(config, opts) {
+// Jira's /search/jql returns HTTP 200 with an EMPTY issue list when the credentials are
+// bad, rather than 401. Verified against the live API: with a wrong jiraEmail, /myself
+// returns 401 while the same search returns 200 and zero issues. So an expired token or a
+// typo'd email would render a completely empty board that is indistinguishable from
+// "you have nothing to do" — the single most misleading state this dashboard could show.
+// We therefore only pay for an identity check when the result is empty, and use it to tell
+// the two cases apart.
+async function assertAuthenticated(config, { fetchImpl = fetch } = {}) {
+  const res = await fetchImpl(`${config.jiraSite}/rest/api/3/myself`, {
+    headers: {
+      Authorization: 'Basic ' + Buffer.from(`${config.jiraEmail}:${config.jiraToken}`).toString('base64'),
+      Accept: 'application/json',
+    },
+  })
+  if (!res.ok) {
+    throw new Error(
+      `Jira rejected the credentials (HTTP ${res.status}). Check jiraEmail and jiraToken in ` +
+      `config.json — note the email must be the one your Atlassian account actually uses, ` +
+      `which is not always your work address.`
+    )
+  }
+  const me = await res.json()
+  if (config.myAccountId && me.accountId && me.accountId !== config.myAccountId) {
+    console.warn(
+      `work-dash: config myAccountId (${config.myAccountId}) does not match the token's ` +
+      `account (${me.accountId}). "Assigned to me" and the foreign-ticket flag will be wrong.`
+    )
+  }
+  return me
+}
+
+export async function fetchPrimary(config, opts) {
   const jql = `assignee = currentUser() AND project = ${config.jiraProject}` +
               ` AND statusCategory != Done ORDER BY updated DESC`
-  return search(config, jql, opts)
+  const issues = await search(config, jql, opts)
+  // Empty is ambiguous: genuinely nothing assigned, or silently unauthenticated.
+  if (issues.length === 0) await assertAuthenticated(config, opts)
+  return issues
 }
 
 export async function fetchByKeys(config, keys, opts) {
