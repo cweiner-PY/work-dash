@@ -32,13 +32,17 @@ export const isMinePr = (pr) => pr?.isMine !== false
 // a review-requested PR as if it belonged to the user.
 export const myPrOf = (item) => (item?.prs ?? []).find(isMinePr) ?? null
 
-// If every Jira issue in this item set has a null active sprint, that is almost
-// certainly a misconfigured jiraSprintField for this Jira instance — not "nothing is
-// sprint-committed". Exported so the decision is directly testable without needing to
-// intercept console.warn or re-derive it from assignLanes's output.
+// If the configured sprint field is ABSENT from every Jira issue's raw `fields` — not
+// merely null-valued — that is almost certainly a misconfigured jiraSprintField for this
+// Jira instance. Jira omits an unrecognized custom field entirely rather than returning
+// it as null (verified against the live API), so presence is the only reliable
+// discriminator: a field that IS present but empty just means "no active sprint right
+// now, legitimately", which must never warn or silently switch ready-to-start back to
+// the plan-folder heuristic. Exported so the decision is directly testable without
+// needing to intercept console.warn or re-derive it from assignLanes's output.
 export function needsSprintFallback(items) {
   const jiraItems = items.filter((i) => i.jira)
-  return jiraItems.length > 0 && jiraItems.every((i) => i.jira.activeSprint == null)
+  return jiraItems.length > 0 && jiraItems.every((i) => !i.jira.sprintFieldPresent)
 }
 
 export function assignLanes(items, config) {
@@ -52,9 +56,10 @@ export function assignLanes(items, config) {
   if (fallbackToPlans) {
     const field = config.jiraSprintField ?? 'customfield_10020'
     console.warn(
-      `work-dash: every Jira issue has a null active sprint (field "${field}"). This usually ` +
-      `means jiraSprintField is misconfigured for this Jira instance, not that nothing is ` +
-      `sprint-committed. Falling back to the plan-folder heuristic for ready-to-start.`
+      `work-dash: the configured sprint field ("${field}") is absent from every Jira ` +
+      `issue's fields entirely (not merely null-valued). This usually means jiraSprintField ` +
+      `is misconfigured for this Jira instance — Jira omits an unrecognized field rather ` +
+      `than returning it as null. Falling back to the plan-folder heuristic for ready-to-start.`
     )
   }
 

@@ -25,6 +25,12 @@ export function normalizeIssue(raw, jiraSite, sprintField = 'customfield_10020')
     assignee: f.assignee?.displayName ?? null,
     assigneeAccountId: f.assignee?.accountId ?? null,
     activeSprint: extractActiveSprint(f[sprintField]),
+    // Jira OMITS an unrecognized custom field from `fields` entirely rather than
+    // returning it as null — verified against the live API. So presence (not the value)
+    // is what tells "this Jira instance genuinely has no active sprint right now" apart
+    // from "jiraSprintField is misconfigured for this instance". See needsSprintFallback
+    // in lanes.js, the actual consumer of this flag.
+    sprintFieldPresent: Object.prototype.hasOwnProperty.call(f, sprintField),
     url: `${jiraSite}/browse/${raw.key}`,
   }
 }

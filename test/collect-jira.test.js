@@ -30,6 +30,9 @@ test('normalizes a raw issue', () => {
     assignee: 'Colt Weiner',
     assigneeAccountId: '62b43cb267dff38e0988a3bc',
     activeSprint: null,
+    // `raw.fields` above has no customfield_10020 key at all — the field is absent,
+    // not merely null-valued.
+    sprintFieldPresent: false,
     url: 'https://performyard.atlassian.net/browse/PY-13751',
   })
 })
@@ -106,6 +109,43 @@ test('normalizeIssue reads the sprint field name passed to it, not just the defa
     'customfield_99999'
   )
   assert.equal(n.activeSprint, 'Custom Field Sprint')
+})
+
+// --- sprintFieldPresent: presence, not value, distinguishes "no active sprint right
+// now" from "jiraSprintField is misconfigured" (see needsSprintFallback in lanes.js) ---
+
+test('sprintFieldPresent: true when the field key exists on fields, even with a null-ish value', () => {
+  assert.equal(withSprint(null).sprintFieldPresent, true)
+  assert.equal(withSprint([]).sprintFieldPresent, true)
+  assert.equal(withSprint([{ id: 1, name: 'S1', state: 'active' }]).sprintFieldPresent, true)
+})
+
+test('sprintFieldPresent: false when the field is absent from fields entirely', () => {
+  const n = normalizeIssue(raw, config.jiraSite)
+  assert.equal(n.sprintFieldPresent, false)
+})
+
+test('sprintFieldPresent respects an overridden sprint field name, not just the default', () => {
+  const present = normalizeIssue(
+    { key: 'PY-1', fields: { ...raw.fields, customfield_99999: null } },
+    config.jiraSite, 'customfield_99999')
+  assert.equal(present.sprintFieldPresent, true)
+  // raw.fields has customfield_10020 nowhere, so asking about a DIFFERENT field name
+  // must also report absent — it must check the actual configured key, not just any key.
+  const absent = normalizeIssue(raw, config.jiraSite, 'customfield_99999')
+  assert.equal(absent.sprintFieldPresent, false)
+})
+
+test('the enrichment query (fetchByKeys) carries sprintFieldPresent the same way fetchPrimary does', async () => {
+  // A board built mostly from enriched items must not miss a real misconfiguration, nor
+  // false-alarm on one just because the field happened to be checked via a different query.
+  const fetchImpl = async (_url, opts) => {
+    const { fields } = JSON.parse(opts.body)
+    assert.ok(fields.includes('customfield_10020'))
+    return { ok: true, status: 200, json: async () => ({ issues: [raw] }) } // raw carries NO sprint field key
+  }
+  const out = await fetchByKeys(config, ['PY-13751'], { fetchImpl })
+  assert.equal(out[0].sprintFieldPresent, false)
 })
 
 // --- sprint field threaded through the fields list (Change 1) ---

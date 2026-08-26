@@ -3,12 +3,6 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { assignLanes, mergeGateFor, myPrOf, isMinePr, needsSprintFallback } from '../lanes.js'
 
-// assignLanes warns once (see needsSprintFallback) whenever every Jira issue in a batch
-// has a null active sprint — true of nearly every single-synthetic-item call below, none
-// of which are testing sprint behavior. Swallow it by default; the dedicated fallback
-// test captures it explicitly instead.
-console.warn = () => {}
-
 const config = {
   inFlightStatusOrder: ['In Progress', 'In Code Review', 'Ready To Test', 'In Testing', 'Ready To Merge'],
   myAccountId: 'me',
@@ -22,7 +16,13 @@ const pr = (o = {}) => ({
   requiredChecks: { total: 3, failing: [], known: true },
   hasReviewComments: false, isMine: true, url: 'u', ...o,
 })
-const jira = (o = {}) => ({ key: 'PY-1', summary: 's', status: 'In Progress', statusCategory: 'In Progress', assignee: 'Colt Weiner', isMine: true, ...o })
+const jira = (o = {}) => ({ key: 'PY-1', summary: 's', status: 'In Progress', statusCategory: 'In Progress',
+  assignee: 'Colt Weiner', isMine: true,
+  // Realistic default: the sprint field IS present on a normalized Jira issue (Jira omits
+  // it entirely only when misconfigured — see needsSprintFallback in lanes.js). Tests that
+  // specifically exercise the fallback override this explicitly.
+  sprintFieldPresent: true,
+  ...o })
 const item = (o = {}) => ({ id: 'PY-1', key: 'PY-1', title: 's', repo: 'O/R', jira: null, prs: [], slot: null, plans: [], ...o })
 
 // --- myPrOf / isMinePr ---
@@ -184,35 +184,69 @@ test('the reason text names the active sprint', () => {
   assert.ok(it.reasons.some((r) => r.includes('RW2026.6-S1')))
 })
 
-// --- do-not-silently-degrade: the all-null misconfiguration fallback ---
-test('needsSprintFallback: true when every jira item has a null active sprint', () => {
+// --- do-not-silently-degrade: the field-ABSENT misconfiguration fallback. Presence, not
+// value, is the discriminator — Jira omits an unrecognized field entirely rather than
+// returning it as null, so a field that IS present but empty just means "no active
+// sprint right now", which must never warn or trigger the fallback. ---
+test('needsSprintFallback: true when every jira item is missing the sprint field entirely', () => {
   assert.equal(needsSprintFallback([
-    item({ jira: jira({ activeSprint: null }) }),
-    item({ id: 'PY-2', jira: jira({ activeSprint: undefined }) }),
+    item({ jira: jira({ sprintFieldPresent: false }) }),
+    item({ id: 'PY-2', jira: jira({ sprintFieldPresent: false }) }),
   ]), true)
 })
-test('needsSprintFallback: false when at least one jira item has a real active sprint', () => {
+test('needsSprintFallback: false when at least one jira item has the field present, even with a null value', () => {
   assert.equal(needsSprintFallback([
-    item({ jira: jira({ activeSprint: null }) }),
-    item({ id: 'PY-2', jira: jira({ activeSprint: 'S1' }) }),
+    item({ jira: jira({ sprintFieldPresent: false }) }),
+    item({ id: 'PY-2', jira: jira({ sprintFieldPresent: true, activeSprint: null }) }),
   ]), false)
 })
 test('needsSprintFallback: false when there are no jira items at all (nothing to warn about)', () => {
   assert.equal(needsSprintFallback([item({ jira: null }), item({ id: 'PY-2', jira: null })]), false)
 })
 
-test('when every Jira issue has a null active sprint, assignLanes warns once (naming the field) and ready-to-start reverts to the plan-folder rule', () => {
+test('field present but every active sprint is null: NO fallback, NO warning, ready-to-start is legitimately empty', () => {
   const warnings = []
   const realWarn = console.warn
   console.warn = (...a) => warnings.push(a.join(' '))
   try {
-    const withPlan = item({ jira: jira({ status: 'READY', statusCategory: 'To Do', activeSprint: null }), plans: [{ dir: '/d', folder: 'f', key: 'PY-1', files: ['plan.md'] }] })
-    const withoutPlan = item({ id: 'PY-2', jira: jira({ status: 'READY', statusCategory: 'To Do', activeSprint: null }) })
+    const a = item({ jira: jira({ status: 'READY', statusCategory: 'To Do', activeSprint: null, sprintFieldPresent: true }) })
+    const b = item({ id: 'PY-2', jira: jira({ status: 'In Progress', statusCategory: 'In Progress', activeSprint: null, sprintFieldPresent: true }) })
+    const out = assignLanes([a, b], config)
+    assert.equal(warnings.length, 0, 'genuinely between sprints must not warn about a misconfiguration that does not exist')
+    assert.ok(!out.some((i) => i.lane === 'ready-to-start'), 'ready-to-start is legitimately empty, not silently reverted to the plan heuristic')
+  } finally {
+    console.warn = realWarn
+  }
+})
+
+test('field absent on every item: fallback triggers, assignLanes warns exactly once (naming the field), and ready-to-start reverts to the plan-folder rule', () => {
+  const warnings = []
+  const realWarn = console.warn
+  console.warn = (...a) => warnings.push(a.join(' '))
+  try {
+    const withPlan = item({ jira: jira({ status: 'READY', statusCategory: 'To Do', activeSprint: null, sprintFieldPresent: false }), plans: [{ dir: '/d', folder: 'f', key: 'PY-1', files: ['plan.md'] }] })
+    const withoutPlan = item({ id: 'PY-2', jira: jira({ status: 'READY', statusCategory: 'To Do', activeSprint: null, sprintFieldPresent: false }) })
     const [a, b] = assignLanes([withPlan, withoutPlan], { ...config, jiraSprintField: 'customfield_10020' })
     assert.equal(a.lane, 'ready-to-start')
     assert.equal(b.lane, 'backlog')
     assert.equal(warnings.length, 1)
     assert.match(warnings[0], /customfield_10020/)
+  } finally {
+    console.warn = realWarn
+  }
+})
+
+test('field present on some items with a real active sprint: normal sprint-committed behaviour, no warning', () => {
+  const warnings = []
+  const realWarn = console.warn
+  console.warn = (...a) => warnings.push(a.join(' '))
+  try {
+    const withSprint = item({ jira: jira({ status: 'READY', statusCategory: 'To Do', activeSprint: 'S1', sprintFieldPresent: true }) })
+    const withoutSprint = item({ id: 'PY-2', jira: jira({ status: 'READY', statusCategory: 'To Do', activeSprint: null, sprintFieldPresent: true }) })
+    const [a, b] = assignLanes([withSprint, withoutSprint], config)
+    assert.equal(a.lane, 'ready-to-start')
+    assert.equal(b.lane, 'backlog')
+    assert.equal(warnings.length, 0)
   } finally {
     console.warn = realWarn
   }
