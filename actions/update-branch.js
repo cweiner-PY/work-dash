@@ -1,9 +1,14 @@
 // actions/update-branch.js
 import { run as defaultRun } from '../util/run.js'
 
-export async function updateBranch({ item, slots, chosenSlotDir = null }, { run = defaultRun, dry = false } = {}) {
+export async function updateBranch(
+  { item, slots, chosenSlotDir = null, defaultBranch = 'master' },
+  { run = defaultRun, dry = false } = {}
+) {
   const slot = chosenSlotDir ? slots.find((s) => s.dir === chosenSlotDir) : item.slot
   if (!slot) return { ok: false, message: 'This item has no checkout to update.' }
+  // Same base collect/slots.js measures "N behind" against — see the interface note.
+  const base = `origin/${defaultBranch}`
 
   // Refuse before touching git at all.
   if (slot.dirty) {
@@ -11,7 +16,7 @@ export async function updateBranch({ item, slots, chosenSlotDir = null }, { run 
   }
   if (dry) {
     return { ok: true, message: `dry run — would update ${slot.dir}`,
-             detail: `cd ${slot.dir}\ngit fetch origin\ngit merge origin/master` }
+             detail: `cd ${slot.dir}\ngit fetch origin\ngit merge ${base}` }
   }
 
   const fetched = await run('git', ['fetch', 'origin'], { cwd: slot.dir })
@@ -19,7 +24,7 @@ export async function updateBranch({ item, slots, chosenSlotDir = null }, { run 
     return { ok: false, message: `git fetch failed: ${fetched.stderr.trim() || fetched.stdout.trim()}` }
   }
 
-  const merged = await run('git', ['merge', 'origin/master'], { cwd: slot.dir })
+  const merged = await run('git', ['merge', base], { cwd: slot.dir })
   const output = `${merged.stdout}\n${merged.stderr}`.trim()
   if (merged.code !== 0) {
     // Leave the repo exactly as git left it so the user can resolve by hand.
@@ -32,5 +37,5 @@ export async function updateBranch({ item, slots, chosenSlotDir = null }, { run 
       detail: output,
     }
   }
-  return { ok: true, message: `Merged origin/master into ${slot.branch}`, detail: output }
+  return { ok: true, message: `Merged ${base} into ${slot.branch}`, detail: output }
 }

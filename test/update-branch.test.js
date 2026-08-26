@@ -11,7 +11,20 @@ test('fetches then merges origin/master', async () => {
   const run = async (cmd, args) => { calls.push(args.join(' ')); return { code: 0, stdout: 'Fast-forward', stderr: '' } }
   const r = await updateBranch({ item: { ...item, slot: clean }, slots: [clean] }, { run })
   assert.equal(r.ok, true)
-  assert.deepEqual(calls, ['fetch origin', 'merge origin/master'])
+  assert.deepEqual(calls, ['fetch origin', 'merge origin/master'])  // default base
+})
+
+test('merges the CONFIGURED default branch, not a hardcoded master', async () => {
+  // slots.js measures "N behind" against origin/<defaultBranch>. If this button merged
+  // something else, the count on the card and the action that clears it would disagree.
+  const calls = []
+  const run = async (cmd, args) => { calls.push(args.join(' ')); return { code: 0, stdout: '', stderr: '' } }
+  const r = await updateBranch(
+    { item: { ...item, slot: clean }, slots: [clean], defaultBranch: 'trunk' }, { run })
+  assert.equal(r.ok, true)
+  assert.deepEqual(calls, ['fetch origin', 'merge origin/trunk'])
+  assert.match(r.message, /origin\/trunk/)
+  assert.ok(!calls.some((c) => c.includes('origin/master')), 'must not fall back to master')
 })
 
 test('refuses when the working tree is dirty', async () => {
