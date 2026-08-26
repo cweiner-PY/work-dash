@@ -46,3 +46,41 @@ test('unparseable expression throws PredicateError', () => {
   assert.throws(() => evalPredicate('slot &&', ctx), PredicateError)
   assert.throws(() => evalPredicate('slot === "x"', ctx), PredicateError)
 })
+test('malformed dotted paths throw PredicateError', () => {
+  assert.throws(() => evalPredicate('pr..x', ctx), PredicateError)
+  assert.throws(() => evalPredicate('slot.', ctx), PredicateError)
+  assert.throws(() => evalPredicate('pr.1x', ctx), PredicateError)
+  assert.throws(() => evalPredicate('.slot', ctx), PredicateError)
+})
+test('deeply nested parentheses beyond depth limit throw PredicateError', () => {
+  let expr = 'slot'
+  for (let i = 0; i < 2000; i++) {
+    expr = `(${expr})`
+  }
+  assert.throws(() => evalPredicate(expr, ctx), PredicateError)
+})
+test('long negation runs beyond depth limit throw PredicateError', () => {
+  let expr = 'slot'
+  for (let i = 0; i < 2000; i++) {
+    expr = `!${expr}`
+  }
+  assert.throws(() => evalPredicate(expr, ctx), PredicateError)
+})
+test('regression: three-level dotted path works', () => {
+  assert.equal(evalPredicate('a.b.c', { a: { b: { c: true } } }), true)
+  assert.equal(evalPredicate('a.b.c', { a: { b: { c: false } } }), false)
+})
+test('regression: legitimate nested parens work', () => {
+  assert.equal(evalPredicate('((slot))', ctx), true)
+  assert.equal(evalPredicate('(!(slot && pr))', ctx), false)
+  assert.equal(evalPredicate('((slot) && (pr))', ctx), true)
+})
+test('regression: all original expressions still work', () => {
+  assert.equal(evalPredicate('slot', ctx), true)
+  assert.equal(evalPredicate('pr.hasReviewComments', ctx), true)
+  assert.equal(evalPredicate('pr.changesRequested', ctx), false)
+  assert.equal(evalPredicate("repo == 'PerformYard/Logan'", ctx), true)
+  assert.equal(evalPredicate('!branch && !pr', empty), true)
+  assert.equal(evalPredicate('pr.hasReviewComments || pr.changesRequested', ctx), true)
+  assert.equal(evalPredicate('!(slot && pr)', ctx), false)
+})

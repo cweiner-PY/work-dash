@@ -1,5 +1,22 @@
 export class PredicateError extends Error {}
 
+function validateIdentifier(token) {
+  // Validate that identifier follows pattern: segment(.segment)*
+  // Each segment must start with letter or underscore, contain only alphanumerics and underscores
+  const parts = token.split('.')
+  if (parts.length === 0) {
+    throw new PredicateError(`Invalid identifier: ${JSON.stringify(token)}`)
+  }
+  for (const part of parts) {
+    if (part === '') {
+      throw new PredicateError(`Invalid identifier: ${JSON.stringify(token)}`)
+    }
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(part)) {
+      throw new PredicateError(`Invalid identifier: ${JSON.stringify(token)}`)
+    }
+  }
+}
+
 function tokenize(src) {
   const tokens = []
   const re = /\s*(\|\||&&|==|!=|!|\(|\)|'[^']*'|[A-Za-z_][A-Za-z0-9_.]*)/g
@@ -7,7 +24,12 @@ function tokenize(src) {
   let m
   while ((m = re.exec(src)) !== null) {
     if (m.index !== pos) break
-    tokens.push(m[1])
+    const token = m[1]
+    // Validate identifier tokens
+    if (/^[A-Za-z_]/.test(token)) {
+      validateIdentifier(token)
+    }
+    tokens.push(token)
     pos = re.lastIndex
   }
   if (src.slice(pos).trim() !== '') {
@@ -31,6 +53,8 @@ function lookup(path, ctx) {
   return cur
 }
 
+const MAX_DEPTH = 64
+
 // Recursive descent: or -> and -> cmp -> unary -> primary
 export function evalPredicate(expr, ctx) {
   if (typeof expr !== 'string' || expr.trim() === '') {
@@ -38,43 +62,71 @@ export function evalPredicate(expr, ctx) {
   }
   const tokens = tokenize(expr)
   let i = 0
+  let depth = 0
   const peek = () => tokens[i]
   const eat = (t) => {
     if (tokens[i] !== t) throw new PredicateError(`Expected ${t} in: ${expr}`)
     i++
   }
+  const checkDepth = () => {
+    if (depth > MAX_DEPTH) {
+      throw new PredicateError(`Predicate nesting depth exceeds limit of ${MAX_DEPTH}`)
+    }
+  }
 
   function primary() {
+    depth++
+    checkDepth()
     const t = peek()
     if (t === undefined) throw new PredicateError(`Unexpected end of predicate: ${expr}`)
-    if (t === '(') { eat('('); const v = or(); eat(')'); return v }
-    if (t.startsWith("'")) { i++; return t.slice(1, -1) }
-    if (/^[A-Za-z_]/.test(t)) { i++; return lookup(t, ctx) }
-    throw new PredicateError(`Unexpected token ${JSON.stringify(t)} in: ${expr}`)
+    let result
+    if (t === '(') { eat('('); result = or(); eat(')') }
+    else if (t.startsWith("'")) { i++; result = t.slice(1, -1) }
+    else if (/^[A-Za-z_]/.test(t)) { i++; result = lookup(t, ctx) }
+    else throw new PredicateError(`Unexpected token ${JSON.stringify(t)} in: ${expr}`)
+    depth--
+    return result
   }
   function unary() {
-    if (peek() === '!') { i++; return !truthy(unary()) }
-    return primary()
+    depth++
+    checkDepth()
+    let result
+    if (peek() === '!') { i++; result = !truthy(unary()) }
+    else result = primary()
+    depth--
+    return result
   }
   function cmp() {
+    depth++
+    checkDepth()
     const left = unary()
     const op = peek()
+    let result
     if (op === '==' || op === '!=') {
       i++
       const right = unary()
       const eq = left === right
-      return op === '==' ? eq : !eq
+      result = op === '==' ? eq : !eq
+    } else {
+      result = left
     }
-    return left
+    depth--
+    return result
   }
   function and() {
+    depth++
+    checkDepth()
     let v = cmp()
     while (peek() === '&&') { i++; const r = cmp(); v = truthy(v) && truthy(r) }
+    depth--
     return v
   }
   function or() {
+    depth++
+    checkDepth()
     let v = and()
     while (peek() === '||') { i++; const r = and(); v = truthy(v) || truthy(r) }
+    depth--
     return v
   }
 
