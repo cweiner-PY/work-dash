@@ -76,6 +76,15 @@ test('normalizePr maps the fields the board needs', () => {
   assert.equal(pr.isDraft, true)
   assert.equal(pr.isMine, true)
   assert.deepEqual(pr.requiredChecks, { total: 0, failing: [], known: false }) // filled in later by fetchGithub
+  // The fixture predates PR_FIELDS carrying mergeStateStatus, so it is absent from the
+  // raw JSON — confirms the documented default rather than an undefined passthrough.
+  assert.equal(pr.mergeStateStatus, null)
+})
+
+test('normalizePr carries mergeStateStatus onto the normalized PR when GitHub provides it', () => {
+  const raw = fx('gh-prs-PerformYard_PerformYard.json').find((p) => p.number === 7110)
+  const pr = normalizePr({ ...raw, mergeStateStatus: 'BEHIND' }, 'PerformYard/PerformYard', { mine: true, myLogin: 'cweiner-PY' })
+  assert.equal(pr.mergeStateStatus, 'BEHIND')
 })
 
 test('hasReviewComments is true only for human teammate feedback', () => {

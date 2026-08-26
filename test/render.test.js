@@ -1,7 +1,7 @@
 // test/render.test.js
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { groupForDisplay, sourceChip, prChecksChip, summarizeSubtasks } from '../public/app.js'
+import { groupForDisplay, sourceChip, prChecksChip, summarizeSubtasks, updateBranchSpec } from '../public/app.js'
 
 const it = (o) => ({ id: o.id, lane: o.lane, statusGroup: o.statusGroup ?? 'no ticket',
   sortIndex: o.sortIndex ?? Infinity, signals: { foreign: false, stale: false, reclaimable: false, ...o.signals },
@@ -166,4 +166,52 @@ test('summarizeSubtasks: an all-done set', () => {
 test('summarizeSubtasks: an empty set', () => {
   const s = summarizeSubtasks([])
   assert.deepEqual(s, { open: 0, done: 0, total: 0, openList: [], doneList: [] })
+})
+
+// --- updateBranchSpec ---
+
+test('updateBranchSpec: BEHIND is enabled with the plain "update branch" label', () => {
+  const spec = updateBranchSpec({ slot: null }, { number: 1, mergeStateStatus: 'BEHIND' })
+  assert.equal(spec.disabled, false)
+  assert.equal(spec.label, 'update branch')
+})
+
+test('updateBranchSpec: DIRTY is disabled, labelled to resolve locally, with a reason in the title', () => {
+  const spec = updateBranchSpec({ slot: null }, { number: 42, mergeStateStatus: 'DIRTY' })
+  assert.equal(spec.disabled, true)
+  assert.match(spec.label, /resolve conflicts locally/)
+  assert.match(spec.title, /#42/)
+})
+
+test('updateBranchSpec: CLEAN, BLOCKED and UNSTABLE are all disabled and labelled "up to date"', () => {
+  for (const mergeStateStatus of ['CLEAN', 'BLOCKED', 'UNSTABLE']) {
+    const spec = updateBranchSpec({ slot: null }, { number: 1, mergeStateStatus })
+    assert.equal(spec.disabled, true, mergeStateStatus)
+    assert.equal(spec.label, 'up to date', mergeStateStatus)
+  }
+})
+
+test('updateBranchSpec: UNKNOWN and a missing mergeStateStatus are disabled and labelled "state unknown"', () => {
+  for (const mergeStateStatus of ['UNKNOWN', null, undefined]) {
+    const spec = updateBranchSpec({ slot: null }, { number: 1, mergeStateStatus })
+    assert.equal(spec.disabled, true)
+    assert.equal(spec.label, 'state unknown')
+  }
+})
+
+test('updateBranchSpec: no PR falls back to the local behind count, relabelled as stale', () => {
+  const spec = updateBranchSpec({ slot: { behind: 13, dirty: false, dirtyCount: 0 } }, null)
+  assert.equal(spec.disabled, false)
+  assert.match(spec.label, /13 behind/)
+  assert.match(spec.label, /as of last fetch/, 'the stale local count must be labelled as such, never presented as current')
+})
+
+test('updateBranchSpec: no PR and no slot means nothing to show', () => {
+  assert.equal(updateBranchSpec({ slot: null }, null), null)
+})
+
+test('updateBranchSpec: no PR and a dirty slot is disabled with the uncommitted-count title', () => {
+  const spec = updateBranchSpec({ slot: { behind: 0, dirty: true, dirtyCount: 3 } }, null)
+  assert.equal(spec.disabled, true)
+  assert.match(spec.title, /3 uncommitted/)
 })

@@ -1,7 +1,7 @@
 // collect/github.js
 import { run as defaultRun } from '../util/run.js'
 
-const PR_FIELDS = 'number,title,headRefName,reviewDecision,mergeable,isDraft,statusCheckRollup,updatedAt,url,reviews'
+const PR_FIELDS = 'number,title,headRefName,reviewDecision,mergeable,isDraft,statusCheckRollup,updatedAt,url,reviews,mergeStateStatus'
 
 // gh signals "this repo configures no required checks" via a non-zero exit and this
 // message on stderr, NOT via an empty JSON array on stdout.
@@ -66,6 +66,10 @@ export function normalizePr(raw, repo, { mine, myLogin }) {
     isMine: mine,
     url: raw.url ?? null,
     updatedAt: raw.updatedAt ?? null,
+    // GitHub's own comparison of this PR's branch against its base — the only correct
+    // source for "is this behind", since collect/slots.js is deliberately read-only and
+    // never fetches, so the local ahead/behind count can be days stale.
+    mergeStateStatus: raw.mergeStateStatus ?? null,
   }
 }
 

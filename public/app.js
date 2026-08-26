@@ -75,6 +75,39 @@ export function prChecksChip(rc) {
   return { cls: 'ok', text: `required ${rc.total}/${rc.total}` }
 }
 
+// The update-branch button's label and enabled state are driven by the PR's
+// mergeStateStatus, not the local (possibly days-stale) "N behind" count — see
+// actions/update-branch.js. Pure and exported so it is testable without a DOM, same as
+// prChecksChip. `mainPr` is the item's OWN PR (never a colleague's review request) or null.
+export function updateBranchSpec(item, mainPr) {
+  if (mainPr) {
+    switch (mainPr.mergeStateStatus) {
+      case 'BEHIND':
+        return { label: 'update branch', disabled: false, title: null }
+      case 'DIRTY':
+        return {
+          label: 'resolve conflicts locally', disabled: true,
+          title: `#${mainPr.number} conflicts with the base branch — resolve it locally, GitHub can't.`,
+        }
+      case 'CLEAN': case 'BLOCKED': case 'UNSTABLE':
+        return { label: 'up to date', disabled: true, title: 'Already up to date with the base branch.' }
+      default:
+        return {
+          label: 'state unknown', disabled: true,
+          title: "GitHub hasn't finished computing this yet — try again after the next refresh.",
+        }
+    }
+  }
+  // No PR: fall back to the old local-only signal. The count is only as fresh as the
+  // user's last manual fetch, so it must never be presented as current.
+  if (!item.slot) return null
+  return {
+    label: item.slot.behind > 0 ? `update (${item.slot.behind} behind, as of last fetch)` : 'update branch',
+    disabled: item.slot.dirty,
+    title: item.slot.dirty ? `${item.slot.dirtyCount} uncommitted change(s)` : null,
+  }
+}
+
 // Pure bucketing, not a sort within either bucket: openList holds every subtask whose
 // statusCategory isn't 'Done' (rendered first in the card), doneList holds the rest
 // (rendered after, dimmed) — regardless of the order they arrived in.
@@ -221,7 +254,7 @@ if (typeof document !== 'undefined') {
       s.append(el('span', 'slot-dir', item.slot.dir.split('/').pop()))
       s.append(el('span', 'slot-branch', item.slot.branch ?? 'detached'))
       if (item.slot.dirty) s.append(el('span', 'chip bad', `${item.slot.dirtyCount} uncommitted`))
-      if (item.slot.behind > 0) s.append(el('span', 'chip warn', `${item.slot.behind} behind`))
+      if (item.slot.behind > 0) s.append(el('span', 'chip warn', `${item.slot.behind} behind (as of last fetch)`))
       if (item.signals.reclaimable) s.append(el('span', 'chip', 'reclaimable'))
       c.append(s)
     }
@@ -259,6 +292,10 @@ if (typeof document !== 'undefined') {
       if (res.ok) setTimeout(() => load({ force: true }), 1200)
     }
 
+    // The user's own PR (never a colleague's review-requested one) — drives both the
+    // update-branch button below and the merge button.
+    const mainPr = item.prs.find((p) => p.isMine !== false)
+
     const open = el('button', null, 'open')
     open.addEventListener('click', () => post('/api/open', {}, open))
     actions.append(open)
@@ -269,14 +306,15 @@ if (typeof document !== 'undefined') {
       actions.append(b)
     }
 
-    if (item.slot) {
-      const u = el('button', null, item.slot.behind > 0 ? `update (${item.slot.behind} behind)` : 'update branch')
-      if (item.slot.dirty) { u.disabled = true; u.title = `${item.slot.dirtyCount} uncommitted change(s)` }
+    const spec = updateBranchSpec(item, mainPr)
+    if (spec) {
+      const u = el('button', null, spec.label)
+      u.disabled = spec.disabled
+      if (spec.title) u.title = spec.title
       u.addEventListener('click', () => post('/api/update-branch', {}, u))
       actions.append(u)
     }
 
-    const mainPr = item.prs.find((p) => p.isMine !== false)
     if (mainPr) {
       const m = el('button', null, 'squash & merge')
       if (!item.mergeGate.allowed) { m.disabled = true; m.title = item.mergeGate.blockers.join('; ') }

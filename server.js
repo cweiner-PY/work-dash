@@ -6,6 +6,7 @@ import { loadConfig, ConfigError } from './config.js'
 import { buildBoard } from './board.js'
 import { registerRoutes } from './routes.js'
 import { isTrustedRequest } from './util/trusted-request.js'
+import { describePortError } from './util/port-error.js'
 
 const PUBLIC = join(import.meta.dirname, 'public')
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json' }
@@ -80,6 +81,18 @@ const server = createServer(async (req, res) => {
     if (e.code === 'ENOENT') return json(res, 404, { ok: false, message: 'not found' })
     json(res, 500, { ok: false, message: e.message })
   }
+})
+
+// A raw Node stack trace here ("Error: listen EADDRINUSE") is exactly the kind of
+// confusion this dashboard's own error handling elsewhere tries to avoid — matches the
+// tone of the ConfigError handling above.
+server.on('error', (e) => {
+  const message = describePortError(e, config.port)
+  if (message) {
+    console.error(message)
+    process.exit(1)
+  }
+  throw e
 })
 
 server.listen(config.port, '127.0.0.1', () => {

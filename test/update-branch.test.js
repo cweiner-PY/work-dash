@@ -114,3 +114,153 @@ test('dry run runs nothing', async () => {
   assert.equal(ran, false)
   assert.match(r.detail, /git merge origin\/master/)
 })
+
+// --- state-aware redesign: the user HAS an open PR, so GitHub's mergeStateStatus (not
+// the local, possibly days-stale, ahead/behind count) decides what happens. ---
+
+const pr = (o = {}) => ({
+  number: 7110, repo: 'O/R', headRefName: 'PY-1-x', isMine: true, mergeStateStatus: null, ...o,
+})
+const itemWithPr = (p) => ({ id: 'PY-1', key: 'PY-1', repo: 'O/R', slot: null, prs: [p] })
+
+test('CLEAN, BLOCKED and UNSTABLE all refuse as a no-op: already up to date', async () => {
+  for (const status of ['CLEAN', 'BLOCKED', 'UNSTABLE']) {
+    let ran = 0
+    const r = await updateBranch({ item: itemWithPr(pr({ mergeStateStatus: status })), slots: [] },
+      { run: async () => { ran++; return { code: 0, stdout: '', stderr: '' } } })
+    assert.equal(ran, 0, `${status} must not run anything`)
+    assert.equal(r.ok, false)
+    assert.match(r.message, /up to date/i)
+  }
+})
+
+test('UNKNOWN and a null/undefined mergeStateStatus all refuse, suggesting a retry after the next refresh', async () => {
+  for (const status of ['UNKNOWN', null, undefined]) {
+    let ran = 0
+    const r = await updateBranch({ item: itemWithPr(pr({ mergeStateStatus: status })), slots: [] },
+      { run: async () => { ran++; return { code: 0, stdout: '', stderr: '' } } })
+    assert.equal(ran, 0)
+    assert.equal(r.ok, false)
+    assert.match(r.message, /not known yet|refresh/i)
+  }
+})
+
+test('DIRTY refuses, naming the slot that holds the branch — server-side cannot resolve conflicts', async () => {
+  let ran = 0
+  const r = await updateBranch({ item: itemWithPr(pr({ mergeStateStatus: 'DIRTY' })), slots: [clean] },
+    { run: async () => { ran++; return { code: 0, stdout: '', stderr: '' } } })
+  assert.equal(ran, 0)
+  assert.equal(r.ok, false)
+  assert.match(r.message, /conflicts/i)
+  assert.match(r.message, /checked out in A/)
+})
+
+test('DIRTY refuses, saying it is not checked out anywhere when no slot holds the branch', async () => {
+  let ran = 0
+  const r = await updateBranch({ item: itemWithPr(pr({ mergeStateStatus: 'DIRTY' })), slots: [] },
+    { run: async () => { ran++; return { code: 0, stdout: '', stderr: '' } } })
+  assert.equal(ran, 0)
+  assert.equal(r.ok, false)
+  assert.match(r.message, /not checked out anywhere/i)
+})
+
+test('BEHIND with a clean slot holding the branch: gh update-branch then git pull --ff-only, in order', async () => {
+  const calls = []
+  const run = async (cmd, args) => { calls.push([cmd, ...args].join(' ')); return { code: 0, stdout: 'ok', stderr: '' } }
+  const r = await updateBranch({ item: itemWithPr(pr({ mergeStateStatus: 'BEHIND' })), slots: [clean] }, { run })
+  assert.equal(r.ok, true)
+  assert.deepEqual(calls, ['gh pr update-branch 7110 --repo O/R', 'git pull --ff-only'])
+  assert.match(r.message, /Updated #7110 from master/)
+  assert.match(r.message, /pulled into A/)
+})
+
+test('BEHIND with no slot holding the branch: remote update only, message says not pulled locally', async () => {
+  const calls = []
+  const run = async (cmd, args) => { calls.push([cmd, ...args].join(' ')); return { code: 0, stdout: 'ok', stderr: '' } }
+  const r = await updateBranch({ item: itemWithPr(pr({ mergeStateStatus: 'BEHIND' })), slots: [] }, { run })
+  assert.equal(r.ok, true)
+  assert.deepEqual(calls, ['gh pr update-branch 7110 --repo O/R'])
+  assert.match(r.message, /not checked out locally/)
+})
+
+test('BEHIND with a dirty slot holding the branch: remote update happens, local pull does not', async () => {
+  const calls = []
+  const run = async (cmd, args) => { calls.push([cmd, ...args].join(' ')); return { code: 0, stdout: 'ok', stderr: '' } }
+  const dirty = { ...clean, dirty: true, dirtyCount: 2 }
+  const r = await updateBranch({ item: itemWithPr(pr({ mergeStateStatus: 'BEHIND' })), slots: [dirty] }, { run })
+  assert.equal(r.ok, true)
+  assert.deepEqual(calls, ['gh pr update-branch 7110 --repo O/R'], 'the local pull must not be attempted')
+  assert.match(r.message, /uncommitted changes/i)
+})
+
+test('a failed gh pr update-branch does not attempt the local pull', async () => {
+  const calls = []
+  const run = async (cmd, args) => {
+    calls.push([cmd, ...args].join(' '))
+    return { code: 1, stdout: '', stderr: 'GraphQL: not authorized' }
+  }
+  const r = await updateBranch({ item: itemWithPr(pr({ mergeStateStatus: 'BEHIND' })), slots: [clean] }, { run })
+  assert.equal(r.ok, false)
+  assert.deepEqual(calls, ['gh pr update-branch 7110 --repo O/R'])
+  assert.match(r.message, /not authorized/)
+})
+
+test('a git pull that cannot fast-forward is reported, with no merge/reset/force/rebase attempted anywhere', async () => {
+  const calls = []
+  const run = async (cmd, args) => {
+    calls.push([cmd, ...args].join(' '))
+    if (cmd === 'gh') return { code: 0, stdout: 'ok', stderr: '' }
+    return { code: 1, stdout: '', stderr: 'fatal: Not possible to fast-forward, aborting.' }
+  }
+  const r = await updateBranch({ item: itemWithPr(pr({ mergeStateStatus: 'BEHIND' })), slots: [clean] }, { run })
+  assert.equal(r.ok, true, 'the remote update already succeeded; the local pull is opportunistic')
+  assert.match(r.message, /did not fast-forward/i)
+  for (const c of calls) {
+    assert.ok(!c.includes('merge'), 'must not fall back to a merge')
+    assert.ok(!c.includes('reset'), 'must not reset')
+    assert.ok(!c.includes('--force'), 'must not force anything')
+    assert.ok(!c.includes('rebase'), 'must not rebase')
+  }
+})
+
+test('BEHIND with an explicit chosenSlotDir belonging to a different repo refuses before running anything', async () => {
+  let ran = 0
+  const foreign = { ...clean, dir: '/w/OTHER', repo: 'X/Y' }
+  const r = await updateBranch(
+    { item: itemWithPr(pr({ mergeStateStatus: 'BEHIND' })), slots: [foreign], chosenSlotDir: '/w/OTHER' },
+    { run: async () => { ran++; return { code: 0, stdout: '', stderr: '' } } })
+  assert.equal(ran, 0)
+  assert.equal(r.ok, false)
+  assert.match(r.message, /belongs to X\/Y/)
+})
+
+test('BEHIND dry run composes both commands and runs nothing', async () => {
+  let ran = false
+  const r = await updateBranch({ item: itemWithPr(pr({ mergeStateStatus: 'BEHIND' })), slots: [clean] },
+    { run: async () => { ran = true; return { code: 0, stdout: '', stderr: '' } }, dry: true })
+  assert.equal(r.ok, true)
+  assert.equal(ran, false)
+  assert.match(r.detail, /gh pr update-branch 7110 --repo O\/R/)
+  assert.match(r.detail, /git pull --ff-only/)
+})
+
+test('BEHIND dry run with no local candidate composes only the remote command', async () => {
+  let ran = false
+  const r = await updateBranch({ item: itemWithPr(pr({ mergeStateStatus: 'BEHIND' })), slots: [] },
+    { run: async () => { ran = true; return { code: 0, stdout: '', stderr: '' } }, dry: true })
+  assert.equal(r.ok, true)
+  assert.equal(ran, false)
+  assert.match(r.detail, /gh pr update-branch 7110 --repo O\/R/)
+  assert.ok(!r.detail.includes('git pull'), 'nothing to pull into with no local checkout')
+})
+
+test('a review-requested PR (not the user\'s own) does not divert this from the old local-only path', async () => {
+  // myPrOf must exclude a colleague's PR — an item carrying only one must still take the
+  // local fetch+merge path, not the remote-state path.
+  const calls = []
+  const run = async (cmd, args) => { calls.push(args.join(' ')); return { code: 0, stdout: 'Fast-forward', stderr: '' } }
+  const reviewOnly = { id: 'PY-1', key: 'PY-1', repo: 'O/R', slot: clean, prs: [pr({ isMine: false, mergeStateStatus: 'BEHIND' })] }
+  const r = await updateBranch({ item: reviewOnly, slots: [clean] }, { run })
+  assert.equal(r.ok, true)
+  assert.deepEqual(calls, ['fetch origin', 'merge origin/master'])
+})
