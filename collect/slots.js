@@ -12,13 +12,31 @@ export async function collectSlots(config, { run = defaultRun } = {}) {
   const errors = []
 
   for (const [repo, cfg] of Object.entries(config.repos)) {
+    const base = `origin/${cfg.defaultBranch ?? 'master'}`
     for (const dir of cfg.slots ?? []) {
       try {
         const branch = (await git(run, dir, ['branch', '--show-current'])).trim() || null
         const porcelain = await git(run, dir, ['status', '--porcelain'])
         const dirtyCount = porcelain.split('\n').filter((l) => l.trim() !== '').length
-        const counts = await git(run, dir, ['rev-list', '--left-right', '--count', 'origin/master...HEAD'])
-        const [behind, ahead] = counts.trim().split(/\s+/).map((n) => Number(n) || 0)
+
+        // Ahead/behind is the LEAST important field here and the most likely to fail
+        // (a repo whose default branch is not `master`, a missing remote ref). It gets
+        // its own guard so its failure cannot take the slot down with it: `dirty` is
+        // safety information — it is how the user learns a checkout holds uncommitted
+        // work — and it must survive an unrelated git command failing.
+        let behind = null
+        let ahead = null
+        try {
+          const counts = await git(run, dir, ['rev-list', '--left-right', '--count', `${base}...HEAD`])
+          const parts = counts.trim().split(/\s+/)
+          if (parts.length >= 2) {
+            behind = Number(parts[0]) || 0
+            ahead = Number(parts[1]) || 0
+          }
+        } catch (e) {
+          errors.push(e.message)
+        }
+
         slots.push({ dir, repo, branch, dirty: dirtyCount > 0, dirtyCount, behind, ahead })
       } catch (e) {
         errors.push(e.message)

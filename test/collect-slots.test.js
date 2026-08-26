@@ -62,6 +62,48 @@ test('a broken slot is reported and the others still return', async () => {
   assert.match(errors[0], /PY-1/)
 })
 
+test('a rev-list failure keeps the slot and preserves the dirty flag', async () => {
+  // The dirty flag is safety information. A missing origin/<default> must not erase it.
+  const run = async (cmd, args) => {
+    if (args[0] === 'branch') return { code: 0, stdout: 'PY-13888-fix\n', stderr: '' }
+    if (args[0] === 'status') return { code: 0, stdout: ' M a.ts\n M b.ts\n', stderr: '' }
+    return { code: 128, stdout: '', stderr: "fatal: ambiguous argument 'origin/master'" }
+  }
+  const { slots, errors } = await collectSlots({ repos: { 'O/R': { slots: ['/w/PY-1'] } } }, { run })
+  assert.equal(slots.length, 1, 'the slot must survive')
+  assert.equal(slots[0].dirty, true)
+  assert.equal(slots[0].dirtyCount, 2)
+  assert.equal(slots[0].branch, 'PY-13888-fix')
+  assert.equal(slots[0].behind, null, 'unknown, not 0 — 0 would falsely mean up to date')
+  assert.equal(slots[0].ahead, null)
+  assert.equal(errors.length, 1)
+})
+
+test('the comparison base honours a repo whose default branch is not master', async () => {
+  const seen = []
+  const run = async (cmd, args) => {
+    seen.push(args.join(' '))
+    if (args[0] === 'branch') return { code: 0, stdout: 'feature\n', stderr: '' }
+    if (args[0] === 'status') return { code: 0, stdout: '', stderr: '' }
+    return { code: 0, stdout: '1\t2\n', stderr: '' }
+  }
+  await collectSlots({ repos: { 'O/QA': { defaultBranch: 'main', slots: ['/w/QA'] } } }, { run })
+  assert.ok(seen.some((c) => c.includes('origin/main...HEAD')), seen.join(' | '))
+  assert.ok(!seen.some((c) => c.includes('origin/master')), 'must not fall back to master')
+})
+
+test('short rev-list output leaves behind/ahead null rather than undefined', async () => {
+  const run = async (cmd, args) => {
+    if (args[0] === 'branch') return { code: 0, stdout: 'b\n', stderr: '' }
+    if (args[0] === 'status') return { code: 0, stdout: '', stderr: '' }
+    return { code: 0, stdout: '\n', stderr: '' }
+  }
+  const { slots } = await collectSlots({ repos: { 'O/R': { slots: ['/w/x'] } } }, { run })
+  assert.equal(slots[0].behind, null)
+  assert.equal(slots[0].ahead, null)
+  assert.ok('ahead' in slots[0], 'the key must exist so JSON.stringify keeps it')
+})
+
 test('a detached HEAD yields a null branch, not a crash', async () => {
   const run = async (cmd, args) => {
     if (args[0] === 'branch') return { code: 0, stdout: '\n', stderr: '' }
