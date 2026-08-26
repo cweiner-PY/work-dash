@@ -1,7 +1,7 @@
 // test/render.test.js
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { groupForDisplay } from '../public/app.js'
+import { groupForDisplay, sourceChip, prChecksChip } from '../public/app.js'
 
 const it = (o) => ({ id: o.id, lane: o.lane, statusGroup: o.statusGroup ?? 'no ticket',
   sortIndex: o.sortIndex ?? Infinity, signals: { foreign: false, stale: false, reclaimable: false, ...o.signals },
@@ -69,4 +69,67 @@ test('the catch-all lane is absent when every lane is recognised', () => {
 test('empty lanes are omitted', () => {
   const { lanes } = groupForDisplay([it({ id: 'A', lane: 'needs-you' })], { showBacklog: true, showStale: true })
   assert.deepEqual(lanes.map((l) => l.id), ['needs-you'])
+})
+
+test('a needs-you item is never hidden by the default filter, even when stale or foreign', () => {
+  const staleNeedsYou = it({ id: 'NY', lane: 'needs-you', signals: { stale: true } })
+  const foreignNeedsYou = it({ id: 'NY2', lane: 'needs-you', signals: { foreign: true } })
+  const staleInFlight = it({ id: 'IF', lane: 'in-flight', statusGroup: 'Done', signals: { stale: true } })
+  const { lanes, hidden } = groupForDisplay(
+    [staleNeedsYou, foreignNeedsYou, staleInFlight],
+    { showBacklog: false, showStale: false }
+  )
+  const shown = lanes.flatMap((l) => l.items ?? l.subgroups.flatMap((s) => s.items)).map((i) => i.id)
+  assert.ok(shown.includes('NY'), 'a stale needs-you item must still be shown')
+  assert.ok(shown.includes('NY2'), 'a foreign needs-you item must still be shown')
+  assert.ok(!shown.includes('IF'), 'a stale item in another lane is still hidden by default')
+  // only the in-flight item was withheld — the two needs-you items count as shown, not hidden
+  assert.equal(hidden.stale, 1)
+  assert.equal(hidden.total, 1)
+})
+
+test('sourceChip: a healthy source (ok, no error) renders the ok class', () => {
+  const { cls, text, error } = sourceChip('jira', { ok: true, error: null, count: 12 })
+  assert.equal(cls, 'ok')
+  assert.equal(text, 'jira 12')
+  assert.equal(error, null)
+})
+
+test('sourceChip: ok:true with a non-null error is DEGRADED (warn), and the error text is real data, not only a title', () => {
+  const { cls, text, error } = sourceChip('slots', { ok: true, error: 'PY-1 is not a git repo', count: 5 })
+  assert.equal(cls, 'warn', 'a degraded source must not render identically to a healthy one')
+  assert.ok(text.includes('(degraded)'))
+  // The error string itself is returned as plain data the caller can render as visible
+  // text (e.g. into a .src-errors block) — not something only reachable via a title attr.
+  assert.equal(error, 'PY-1 is not a git repo')
+})
+
+test('sourceChip: ok:false renders the bad class regardless of error', () => {
+  const { cls, text } = sourceChip('github', { ok: false, error: '401 Unauthorized', count: 0 })
+  assert.equal(cls, 'bad')
+  assert.equal(text, 'github unavailable')
+})
+
+test('prChecksChip: known:false shows "check status unknown", never the confident "no required checks"', () => {
+  const { cls, text } = prChecksChip({ total: 0, failing: [], known: false })
+  assert.equal(cls, 'bad')
+  assert.equal(text, 'check status unknown')
+})
+
+test('prChecksChip: known:true with no checks configured is the real "no required checks"', () => {
+  const { cls, text } = prChecksChip({ total: 0, failing: [], pending: [], known: true })
+  assert.equal(cls, 'ok')
+  assert.equal(text, 'no required checks')
+})
+
+test('prChecksChip: a failing check wins over a pending one', () => {
+  const { cls, text } = prChecksChip({ total: 2, failing: ['Linting'], pending: ['Unit Tests'], known: true })
+  assert.equal(cls, 'bad')
+  assert.equal(text, 'required failing: Linting')
+})
+
+test('prChecksChip: a pending check with nothing failing is "running", not a failure', () => {
+  const { cls, text } = prChecksChip({ total: 1, failing: [], pending: ['Unit Tests'], known: true })
+  assert.equal(cls, 'warn')
+  assert.equal(text, 'required 1 running')
 })

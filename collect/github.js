@@ -18,6 +18,11 @@ export function summarizeChecks(rollup) {
   return out
 }
 
+// PENDING/QUEUED mean the check is still running, not that it failed. Every PR spends
+// a few minutes here after each push; counting that as "failing" would promote the
+// item to needs-you and paint the card red for CI that hasn't had a chance to finish.
+const PENDING_STATES = new Set(['PENDING', 'QUEUED'])
+
 // `known: true` means we actually read the list. An empty list with known:true is a
 // real "this repo requires nothing" (PerformYard/Logan is exactly that) and passes the
 // gate. Absence of knowledge is NOT absence of failures — see mergeGateFor.
@@ -25,7 +30,8 @@ export function parseRequiredChecks(arr) {
   const list = arr ?? []
   return {
     total: list.length,
-    failing: list.filter((c) => c.state !== 'SUCCESS').map((c) => c.name),
+    failing: list.filter((c) => c.state !== 'SUCCESS' && !PENDING_STATES.has(c.state)).map((c) => c.name),
+    pending: list.filter((c) => PENDING_STATES.has(c.state)).map((c) => c.name),
     known: true,
   }
 }
@@ -104,7 +110,7 @@ export async function fetchGithub(config, { run = defaultRun } = {}) {
       // If gh ever rewords this message the match fails and we fall through to the
       // branch below, which BLOCKS the merge gate with a reason. That is the safe
       // direction to break in.
-      pr.requiredChecks = { total: 0, failing: [], known: true }
+      pr.requiredChecks = { total: 0, failing: [], pending: [], known: true }
     } else if (r.code !== 0) {
       // A genuine gh failure: expired auth, no network, gh missing, rate limited.
       // requiredChecks stays known:false, so the merge gate refuses this PR.

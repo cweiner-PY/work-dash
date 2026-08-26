@@ -13,6 +13,10 @@ export function mergeGateFor(pr) {
   // An empty required-check list, once known, passes vacuously — some repos configure none.
   const failing = pr.requiredChecks?.failing ?? []
   if (failing.length) blockers.push(`required check failing: ${failing.join(', ')}`)
+  // Pending/queued checks are neither a failure nor a green light — the gate still
+  // blocks, but for a distinct, non-alarming reason: CI hasn't finished yet.
+  const pending = pr.requiredChecks?.pending ?? []
+  if (pending.length) blockers.push(`${pending.length} required check(s) still running`)
   return { allowed: blockers.length === 0, blockers }
 }
 

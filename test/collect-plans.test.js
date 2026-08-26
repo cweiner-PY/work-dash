@@ -57,9 +57,28 @@ test('records docsSubdir and an absolute dir', async () => {
   assert.equal(p.dir, join(root, 'PY', 'PY-13751:Report-Subject-Scoping'))
 })
 
-test('a missing subdirectory is not an error', async () => {
+test('a missing subdirectory is not an error, when the docsDir root itself is valid', async () => {
   const root = mkdtempSync(join(tmpdir(), 'work-dash-empty-'))
   const { plans, errors } = await collectPlans(config(root))
   assert.deepEqual(plans, [])
   assert.deepEqual(errors, [])
+})
+
+test('a missing docsDir root IS an error — silence here hides every card\'s plans and makes ready-to-start unreachable', async () => {
+  const missingRoot = join(tmpdir(), 'work-dash-does-not-exist-' + Date.now())
+  const { plans, errors } = await collectPlans(config(missingRoot))
+  assert.deepEqual(plans, [])
+  assert.equal(errors.length, 1)
+  assert.match(errors[0], /docsDir/)
+  assert.ok(errors[0].includes(missingRoot), 'the error must name the path')
+})
+
+test('a docsDir that exists but is a file, not a directory, is also an error', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'work-dash-file-'))
+  const filePath = join(root, 'not-a-directory')
+  writeFileSync(filePath, 'oops')
+  const { plans, errors } = await collectPlans(config(filePath))
+  assert.deepEqual(plans, [])
+  assert.equal(errors.length, 1)
+  assert.match(errors[0], /not a directory/)
 })

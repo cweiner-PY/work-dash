@@ -41,7 +41,28 @@ test('parseRequiredChecks on #7110 finds two failures', () => {
 
 test('parseRequiredChecks on an EMPTY list means zero total and nothing failing', () => {
   const r = parseRequiredChecks(fx('gh-checks-required-704.json'))
-  assert.deepEqual(r, { total: 0, failing: [], known: true })
+  assert.deepEqual(r, { total: 0, failing: [], pending: [], known: true })
+})
+
+test('parseRequiredChecks splits PENDING/QUEUED into pending, not failing', () => {
+  const r = parseRequiredChecks([
+    { name: 'Unit Tests', state: 'PENDING' },
+    { name: 'Build', state: 'QUEUED' },
+    { name: 'Linting', state: 'SUCCESS' },
+  ])
+  assert.equal(r.total, 3)
+  assert.deepEqual(r.failing, [])
+  assert.deepEqual(r.pending.sort(), ['Build', 'Unit Tests'])
+  assert.equal(r.known, true)
+})
+
+test('parseRequiredChecks: a genuinely failing check still lands in failing alongside a pending one', () => {
+  const r = parseRequiredChecks([
+    { name: 'Unit Tests', state: 'PENDING' },
+    { name: 'Linting', state: 'FAILURE' },
+  ])
+  assert.deepEqual(r.failing, ['Linting'])
+  assert.deepEqual(r.pending, ['Unit Tests'])
 })
 
 test('normalizePr maps the fields the board needs', () => {
@@ -106,7 +127,7 @@ test('fetchGithub calls gh per repo and attaches required checks', async () => {
   const p7230 = prs.find((p) => p.number === 7230)
   assert.deepEqual(p7230.requiredChecks.failing, ['QA Code Review'])
   const p704 = prs.find((p) => p.number === 704)
-  assert.deepEqual(p704.requiredChecks, { total: 0, failing: [], known: true })
+  assert.deepEqual(p704.requiredChecks, { total: 0, failing: [], pending: [], known: true })
   assert.ok(calls.some((c) => c.includes('--author @me')))
   assert.ok(calls.some((c) => c.includes('review-requested:@me')))
 })
@@ -129,7 +150,7 @@ test('gh reporting NO required checks is a known zero, not a failure', async () 
   }
   const config = { githubLogin: 'cweiner-PY', repos: { 'PerformYard/Logan': {} } }
   const { prs, errors } = await fetchGithub(config, { run })
-  assert.deepEqual(prs[0].requiredChecks, { total: 0, failing: [], known: true })
+  assert.deepEqual(prs[0].requiredChecks, { total: 0, failing: [], pending: [], known: true })
   assert.deepEqual(errors, [], 'a determined zero is not an error')
 })
 

@@ -50,6 +50,20 @@ test('merge gate blocks on not-approved, draft, and conflicting, listing all of 
 test('merge gate with no PR is not allowed', () => {
   assert.equal(mergeGateFor(undefined).allowed, false)
 })
+test('merge gate blocks on a pending required check with a distinct "still running" blocker, not a failure', () => {
+  const g = mergeGateFor(pr({ reviewDecision: 'APPROVED',
+    requiredChecks: { total: 1, failing: [], pending: ['Unit Tests'], known: true } }))
+  assert.equal(g.allowed, false)
+  assert.ok(g.blockers.some((b) => /still running/.test(b)))
+  assert.ok(!g.blockers.some((b) => /failing/.test(b)), 'a pending check must not be reported as failing')
+})
+test('a genuinely failing required check still blocks even alongside a pending one', () => {
+  const g = mergeGateFor(pr({ reviewDecision: 'APPROVED',
+    requiredChecks: { total: 2, failing: ['Linting'], pending: ['Unit Tests'], known: true } }))
+  assert.equal(g.allowed, false)
+  assert.ok(g.blockers.some((b) => b.includes('Linting')))
+  assert.ok(g.blockers.some((b) => /still running/.test(b)))
+})
 
 // --- lanes ---
 test('failing required check puts the item in needs-you', () => {

@@ -13,7 +13,10 @@ export function groupForDisplay(items, { showBacklog, showStale }) {
     const isBacklogish = i.lane === 'backlog' || i.lane === 'ready-to-start'
     const isStale = i.signals.stale || i.signals.foreign
     if (!showBacklog && isBacklogish) { hidden.backlog++; hidden.total++; return false }
-    if (!showStale && isStale) { hidden.stale++; hidden.total++; return false }
+    // A needs-you item is never hidden by the stale/foreign filter — "ticket is Done but
+    // the PR is still open" is precisely the cross-source insight this tool exists to
+    // surface, and it must not look identical to "nothing to do" by default.
+    if (!showStale && isStale && i.lane !== 'needs-you') { hidden.stale++; hidden.total++; return false }
     return true
   })
 
@@ -49,6 +52,29 @@ export function groupForDisplay(items, { showBacklog, showStale }) {
   return { lanes, hidden }
 }
 
+// board.js's source() can report three distinguishable states: ok:true/error:null,
+// ok:true/error:"..." (the collector returned data but recorded partial failures — a
+// degraded source, not a failed one), and ok:false. All three must look different on
+// screen; a degraded source rendering identically to a healthy one hides exactly the
+// kind of partial failure this dashboard exists to surface.
+export function sourceChip(name, s) {
+  const cls = s.ok ? (s.error ? 'warn' : 'ok') : 'bad'
+  const text = `${name} ${s.ok ? s.count : 'unavailable'}${s.ok && s.error ? ' (degraded)' : ''}`
+  return { cls, text, error: s.error ?? null }
+}
+
+// A PR whose required-check state could not be read (known !== true) must never render
+// as the confident "no required checks" — the merge gate already fails safe on this
+// case (see mergeGateFor), and the card must not contradict it. known is checked first,
+// before total/failing/pending, so that distinction survives to the last rendering step.
+export function prChecksChip(rc) {
+  if (rc.known !== true) return { cls: 'bad', text: 'check status unknown' }
+  if (rc.failing.length) return { cls: 'bad', text: `required failing: ${rc.failing.join(', ')}` }
+  if (rc.pending?.length) return { cls: 'warn', text: `required ${rc.pending.length} running` }
+  if (rc.total === 0) return { cls: 'ok', text: 'no required checks' }
+  return { cls: 'ok', text: `required ${rc.total}/${rc.total}` }
+}
+
 // --- appended to public/app.js ---
 // Guarded so the module stays importable by node --test (no document there).
 if (typeof document !== 'undefined') {
@@ -76,13 +102,18 @@ if (typeof document !== 'undefined') {
   }
 
   function sourceBar(sources) {
+    const wrap = el('div')
     const bar = el('div', 'sources')
+    const errorLines = []
     for (const [name, s] of Object.entries(sources)) {
-      const chip = el('span', `src ${s.ok ? 'ok' : 'bad'}`, `${name} ${s.ok ? s.count : 'unavailable'}`)
-      if (s.error) chip.title = s.error
+      const { cls, text, error } = sourceChip(name, s)
+      const chip = el('span', `src ${cls}`, text)
+      if (error) { chip.title = error; errorLines.push(`${name}: ${error}`) }
       bar.append(chip)
     }
-    return bar
+    wrap.append(bar)
+    if (errorLines.length) wrap.append(el('div', 'src-errors', errorLines.join(' · ')))
+    return wrap
   }
 
   function planPicker(item) {
@@ -125,9 +156,8 @@ if (typeof document !== 'undefined') {
       const a = el('a', 'pr-num', `#${pr.number}`); a.href = pr.url; a.target = '_blank'
       row.append(a, el('span', 'pr-repo', pr.repo))
       row.append(el('span', `pr-review ${pr.reviewDecision === 'APPROVED' ? 'ok' : 'warn'}`, pr.reviewDecision ?? 'no review'))
-      const rc = pr.requiredChecks
-      row.append(el('span', `pr-checks ${rc.failing.length ? 'bad' : 'ok'}`,
-        rc.total === 0 ? 'no required checks' : rc.failing.length ? `required failing: ${rc.failing.join(', ')}` : `required ${rc.total}/${rc.total}`))
+      const { cls, text } = prChecksChip(pr.requiredChecks)
+      row.append(el('span', `pr-checks ${cls}`, text))
       if (pr.isDraft) row.append(el('span', 'chip', 'draft'))
       c.append(row)
     }
