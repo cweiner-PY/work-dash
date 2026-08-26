@@ -48,6 +48,24 @@ test('in-flight subgroups are ordered by sortIndex with "no ticket" last', () =>
     ['In Progress', 'Ready To Test', 'Done', 'no ticket'])
 })
 
+test('an item with an unrecognised lane is SHOWN, never silently dropped', () => {
+  const odd = it({ id: 'ODD', lane: 'some-future-lane' })
+  const { lanes, hidden } = groupForDisplay([it({ id: 'A', lane: 'needs-you' }), odd],
+    { showBacklog: true, showStale: true })
+  const shown = lanes.flatMap((l) => l.items ?? l.subgroups.flatMap((s) => s.items)).map((i) => i.id)
+  assert.ok(shown.includes('ODD'), 'the orphan must appear somewhere')
+  assert.equal(shown.length + hidden.total, 2, 'every item is either shown or counted as hidden')
+  const other = lanes.find((l) => l.id === 'other')
+  assert.ok(other, 'a catch-all lane exists')
+  assert.equal(other.label, 'Other (unrecognised lane)')
+})
+
+test('the catch-all lane is absent when every lane is recognised', () => {
+  const { lanes } = groupForDisplay([it({ id: 'A', lane: 'needs-you' })],
+    { showBacklog: true, showStale: true })
+  assert.equal(lanes.find((l) => l.id === 'other'), undefined)
+})
+
 test('empty lanes are omitted', () => {
   const { lanes } = groupForDisplay([it({ id: 'A', lane: 'needs-you' })], { showBacklog: true, showStale: true })
   assert.deepEqual(lanes.map((l) => l.id), ['needs-you'])

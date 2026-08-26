@@ -20,14 +20,25 @@ h1 { margin: 0 0 6px; font-size: 16px; letter-spacing: .02em; }
 #controls { display: flex; gap: 14px; align-items: center; margin-top: 8px; font-size: 12px; }
 #hidden { margin: 6px 0 0; color: var(--muted); font-size: 12px; }
 main { padding: 12px 20px 60px; max-width: 1100px; }
+/* Last-resort guard: the page body must never scroll sideways even if some future
+   element escapes the wrapping rules above. */
+html, body { max-width: 100%; overflow-x: hidden; }
 .lane h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em;
   color: var(--muted); margin: 22px 0 8px; }
 .lane h3.subgroup { font-size: 12px; color: var(--muted); margin: 12px 0 6px 2px; font-weight: 500; }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: 8px;
-  padding: 10px 12px; margin-bottom: 8px; }
+  padding: 10px 12px; margin-bottom: 8px;
+  /* Real branch names here run to 96 unbroken characters, e.g.
+     PY-13925-Sometimes-in-Logan-all-my-menu-options-don-t-populate-and-I-have-to-log-out-and-back-in
+     With no break opportunity such a token widens the card, then the page. `anywhere`
+     lets it break mid-token; `break-word` alone would not, since there is no space. */
+  overflow-wrap: anywhere; }
 .card.lane-needs-you { border-left: 3px solid var(--bad); }
 .card.lane-waiting { border-left: 3px solid var(--warn); }
 .card header { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+/* Flex items default to min-width:auto and refuse to shrink below their content, which
+   defeats the wrapping above. Explicit min-width:0 lets them narrow to the container. */
+.card header > *, .pr > *, .slot > * { min-width: 0; }
 .key { font-weight: 600; text-decoration: none; color: var(--ink); }
 .title { flex: 1 1 320px; }
 .status, .chip { font-size: 11px; padding: 1px 6px; border: 1px solid var(--line); border-radius: 999px;

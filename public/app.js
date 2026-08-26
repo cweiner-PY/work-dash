@@ -17,6 +17,14 @@ export function groupForDisplay(items, { showBacklog, showStale }) {
     return true
   })
 
+  // Anything whose lane is not one of the five known ids still gets rendered, under a
+  // catch-all group. Dropping it would be a silent data loss, and this dashboard's whole
+  // value rests on the board being a complete picture of outstanding work. Unreachable
+  // today (lanes.js defaults to 'backlog'), but the failure direction must be "show
+  // something unexpected", never "quietly lose work".
+  const KNOWN = new Set(LANES.map((l) => l.id))
+  const orphans = visible.filter((i) => !KNOWN.has(i.lane))
+
   const lanes = []
   for (const lane of LANES) {
     const mine = visible.filter((i) => i.lane === lane.id)
@@ -34,6 +42,9 @@ export function groupForDisplay(items, { showBacklog, showStale }) {
       return a.label.localeCompare(b.label)
     })
     lanes.push({ ...lane, items: null, subgroups })
+  }
+  if (orphans.length) {
+    lanes.push({ id: 'other', label: 'Other (unrecognised lane)', items: orphans, subgroups: null })
   }
   return { lanes, hidden }
 }
