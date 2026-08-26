@@ -12,7 +12,29 @@ function staleBranchesOf(board) {
   return set
 }
 
+// A launch happens asynchronously in a Terminal window the server never waits on, so the
+// cached board cannot observe the new checkout for seconds — no re-poll can fix that.
+// Without a claim, two concurrent /api/open calls against the same cached board resolve
+// deterministically to the SAME slot (rank() prefers master/main every time, not
+// occasionally), and two Claude sessions then fight over one git checkout.
+const CLAIM_MS = 90_000
+
+// Exported and pure (aside from the pruning mutation) so it is directly testable without
+// a real clock or an HTTP round-trip: pass a Map and an optional `now`.
+export function liveClaimedDirs(claims, now = Date.now()) {
+  const live = new Set()
+  for (const [dir, expiry] of claims) {
+    if (expiry > now) live.add(dir)
+    else claims.delete(dir) // pruned lazily on read, not on a timer
+  }
+  return live
+}
+
 export function registerRoutes(routes, { getBoard, config, deps = {} }) {
+  // Scoped to this registerRoutes call (one per running server), not module-level — so
+  // repeated test registrations never leak claims into each other.
+  const claims = new Map()
+
   const find = async (id) => {
     const board = await getBoard()
     // `JSON.parse('null')` yields null, so callers may hand us a non-object body.
@@ -45,8 +67,12 @@ export function registerRoutes(routes, { getBoard, config, deps = {} }) {
     const result = await openItem({
       item, slots: board.slots ?? [], plans, skill: body.skill ?? null,
       config, chosenSlotDir: body.slotDir ?? null, staleBranches: staleBranchesOf(board),
+      claimedDirs: liveClaimedDirs(claims),
     }, deps)
-    if (result.ok) ctx.invalidate()
+    if (result.ok) {
+      ctx.invalidate()
+      if (result.slot) claims.set(result.slot, Date.now() + CLAIM_MS)
+    }
     return result
   }
 

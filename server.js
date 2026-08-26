@@ -5,6 +5,7 @@ import { join, extname, normalize } from 'node:path'
 import { loadConfig, ConfigError } from './config.js'
 import { buildBoard } from './board.js'
 import { registerRoutes } from './routes.js'
+import { isTrustedRequest } from './util/trusted-request.js'
 
 const PUBLIC = join(import.meta.dirname, 'public')
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json' }
@@ -46,6 +47,14 @@ registerRoutes(routes, { getBoard: () => board(), config, deps: { dry: process.e
 
 const server = createServer(async (req, res) => {
   try {
+    // Applies to EVERY route, not only the mutating ones: /api/items and /api/config are
+    // the whole board plus every docs/slot path, and a DNS-rebinding attacker only needs
+    // Host validation defeated to read them. "It binds to 127.0.0.1" defends against
+    // neither this nor the CORS-simple-request side-effect problem above.
+    if (!isTrustedRequest(req.headers, config.port)) {
+      return json(res, 403, { ok: false, message: 'forbidden: untrusted Host or Origin' })
+    }
+
     const url = new URL(req.url, 'http://127.0.0.1')
 
     if (req.method === 'GET' && url.pathname === '/api/items') return json(res, 200, await board())

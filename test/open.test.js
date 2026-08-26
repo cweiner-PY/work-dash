@@ -25,6 +25,15 @@ test('launcher cds, checks out, and starts claude with name, add-dir and system 
   assert.match(s, /plan\.md/)
 })
 
+test("buildLauncher never shows a colleague's review-requested PR as the item's PR", () => {
+  // Regression for the live PY-1 case: an item holding only a review-requested PR must not
+  // have that PR's branch checked out, nor its number/url quoted in the launch context.
+  const reviewOnly = { ...item, prs: [{ number: 9001, headRefName: 'PY-13888-bruce-branch', url: 'https://gh/9001', isMine: false }] }
+  const s = buildLauncher({ item: reviewOnly, slot: { ...slotA, branch: 'PY-13888-my-older-branch' }, plans, skill: null, config })
+  assert.ok(!/git checkout/.test(s), 'must not check out a colleague\'s branch')
+  assert.ok(!/PR: #9001/.test(s), 'must not present a colleague\'s PR as this item\'s PR')
+})
+
 test('Open does NOT include a positional prompt; Run does', () => {
   const open = buildLauncher({ item, slot: slotA, plans, skill: null, config })
   const run = buildLauncher({ item, slot: slotA, plans, skill: 'ticket-finisher', config })
@@ -94,6 +103,23 @@ test('fails CLOSED on ambiguous dirty state even when the slot is explicitly cho
     assert.equal(r.ok, false, `dirty=${JSON.stringify(dirty)} must be refused, not launched`)
     assert.match(r.message, /uncommitted/i)
   }
+})
+
+test('an explicit chosenSlotDir overrides a claim (a deliberate pick beats the server\'s guess)', async () => {
+  const r = await openItem(
+    { item, slots: [slotA], plans, skill: null, config, chosenSlotDir: '/w/A', claimedDirs: new Set(['/w/A']) },
+    { run: async () => ({ code: 0, stdout: '', stderr: '' }), writeFile: async () => {}, dry: true })
+  assert.equal(r.ok, true)
+})
+
+test('two opens of the same ticket use different launcher paths (no path collision)', async () => {
+  const paths = []
+  const writeFile = async (p) => { paths.push(p) }
+  const deps = { run: async () => ({ code: 0, stdout: '', stderr: '' }), writeFile, dry: false }
+  await openItem({ item, slots: [slotA], plans, skill: null, config }, deps)
+  await openItem({ item, slots: [slotA], plans, skill: null, config }, deps)
+  assert.equal(paths.length, 2)
+  assert.notEqual(paths[0], paths[1], 'a second open of the same ticket must not race the first on one file')
 })
 
 test('refuses a chosenSlotDir belonging to a different repo', async () => {

@@ -1,7 +1,7 @@
 // test/lanes.test.js
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { assignLanes, mergeGateFor } from '../lanes.js'
+import { assignLanes, mergeGateFor, myPrOf, isMinePr } from '../lanes.js'
 
 const config = {
   inFlightStatusOrder: ['In Progress', 'In Code Review', 'Ready To Test', 'In Testing', 'Ready To Merge'],
@@ -18,6 +18,24 @@ const pr = (o = {}) => ({
 })
 const jira = (o = {}) => ({ key: 'PY-1', summary: 's', status: 'In Progress', statusCategory: 'In Progress', assignee: 'Colt Weiner', isMine: true, ...o })
 const item = (o = {}) => ({ id: 'PY-1', key: 'PY-1', title: 's', repo: 'O/R', jira: null, prs: [], slot: null, plans: [], ...o })
+
+// --- myPrOf / isMinePr ---
+test('myPrOf returns the user\'s own PR when the item also carries a review request', () => {
+  const mine = pr({ number: 1, isMine: true })
+  const review = pr({ number: 2, isMine: false })
+  assert.equal(myPrOf(item({ prs: [review, mine] })).number, 1)
+})
+test('myPrOf returns null when the item\'s only PR is a review request', () => {
+  const review = pr({ number: 2, isMine: false })
+  assert.equal(myPrOf(item({ prs: [review] })), null)
+})
+test('myPrOf returns null for an item with no PRs at all', () => {
+  assert.equal(myPrOf(item({ prs: [] })), null)
+})
+test('isMinePr treats isMine: undefined as mine (no explicit false)', () => {
+  assert.equal(isMinePr({ number: 1 }), true)
+  assert.equal(isMinePr({ number: 1, isMine: false }), false)
+})
 
 // --- merge gate ---
 test('merge gate passes on approved, mergeable, non-draft, required checks green', () => {

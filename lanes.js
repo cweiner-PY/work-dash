@@ -20,13 +20,23 @@ export function mergeGateFor(pr) {
   return { allowed: blockers.length === 0, blockers }
 }
 
-const isOpenMine = (pr) => pr.isMine !== false
+// It never checked open/closed — there is no such field — only whose PR it is. Shared by
+// lanes.js, actions/merge.js, board.js's skillsForItem, actions/slot.js's branchFor, and
+// actions/open.js: an item can carry a colleague's review-requested PR alongside (or
+// instead of) the user's own, and every consumer of "the item's PR" must agree on which
+// one that is.
+export const isMinePr = (pr) => pr?.isMine !== false
+
+// The user's own PR on this item, or null if the item carries none (e.g. only a
+// colleague's review request). Never falls back to `prs[0]` — that would silently treat
+// a review-requested PR as if it belonged to the user.
+export const myPrOf = (item) => (item?.prs ?? []).find(isMinePr) ?? null
 
 export function assignLanes(items, config) {
   const order = config.inFlightStatusOrder ?? []
   return items.map((item) => {
     const reasons = []
-    const myPrs = item.prs.filter(isOpenMine)
+    const myPrs = item.prs.filter(isMinePr)
     const reviewPrs = item.prs.filter((p) => p.isMine === false)
     const pr = myPrs[0]
     const gate = mergeGateFor(pr)

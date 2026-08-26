@@ -1,7 +1,7 @@
 // test/routes.test.js
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { registerRoutes } from '../routes.js'
+import { registerRoutes, liveClaimedDirs } from '../routes.js'
 import { skillsForItem } from '../board.js'
 
 const config = {
@@ -35,6 +35,19 @@ test('an unparseable rule is skipped, not thrown', () => {
   const withSlot = { key: 'PY-1', repo: 'O/R', prs: [], slot: { dir: '/w/A', branch: 'b' }, plans: [], jira: null }
   const out = skillsForItem(withSlot, config)
   assert.ok(!out.includes('broken'))
+})
+
+test("skillsForItem on a review-request-only item does not offer pr-gated skills", () => {
+  // Regression for the live PY-1 case: an item carrying only a colleague's review-requested
+  // PR must not offer /pr-description, /ticket-finisher, etc. — those are gated on `pr`,
+  // and `pr` must be null here, not the raw first (foreign) PR.
+  const reviewOnly = {
+    key: 'PY-1', repo: 'O/R', slot: { dir: '/w/A', branch: 'PY-1-my-older-branch' }, plans: [], jira: null,
+    prs: [{ hasReviewComments: true, reviewDecision: 'REVIEW_REQUIRED', isMine: false }],
+  }
+  const out = skillsForItem(reviewOnly, config)
+  assert.ok(!out.includes('resolve-code-review'), 'a pr-gated skill must not appear for a PR that is not the user\'s own')
+  assert.deepEqual(out, ['critical-review'], 'only the slot-gated skill applies')
 })
 
 test('routes reject an unknown item id', async () => {
@@ -108,6 +121,39 @@ test('a body of literal null returns a clean refusal, not a throw, from every ro
     assert.equal(r.ok, false, `${path} with a null body must refuse cleanly`)
     assert.match(r.message, /JSON object body/)
   }
+})
+
+test('liveClaimedDirs prunes an expired claim and excludes it from the live set', () => {
+  const claims = new Map([['/w/A', Date.now() - 1000]])
+  const live = liveClaimedDirs(claims)
+  assert.equal(live.has('/w/A'), false)
+  assert.equal(claims.has('/w/A'), false, 'expired entries must be pruned on read')
+})
+
+test('liveClaimedDirs includes a claim that has not yet expired', () => {
+  const claims = new Map([['/w/A', Date.now() + 90_000]])
+  const live = liveClaimedDirs(claims)
+  assert.equal(live.has('/w/A'), true)
+  assert.equal(claims.has('/w/A'), true, 'a live claim is not pruned')
+})
+
+test('a successful open claims its slot so a concurrent open on the same board picks a different one', async () => {
+  const slotA = { dir: '/w/A', repo: 'O/R', branch: 'master', dirty: false, dirtyCount: 0 }
+  const slotB = { dir: '/w/B', repo: 'O/R', branch: 'master', dirty: false, dirtyCount: 0 }
+  const cfgTwoSlots = { ...config, repos: { 'O/R': { slots: ['/w/A', '/w/B'] } } }
+  const item1 = { id: 'PY-201', key: 'PY-201', repo: 'O/R', prs: [{ headRefName: 'PY-201-x' }], slot: null, plans: [], jira: null, skills: [] }
+  const item2 = { id: 'PY-202', key: 'PY-202', repo: 'O/R', prs: [{ headRefName: 'PY-202-x' }], slot: null, plans: [], jira: null, skills: [] }
+  const routes = new Map()
+  registerRoutes(routes, {
+    getBoard: async () => ({ items: [item1, item2], slots: [slotA, slotB] }),
+    config: cfgTwoSlots,
+    deps: { dry: true },
+  })
+  const r1 = await routes.get('POST /api/open')({ id: 'PY-201' }, { config: cfgTwoSlots, invalidate() {} })
+  const r2 = await routes.get('POST /api/open')({ id: 'PY-202' }, { config: cfgTwoSlots, invalidate() {} })
+  assert.equal(r1.ok, true)
+  assert.equal(r2.ok, true)
+  assert.notEqual(r1.slot, r2.slot, 'two concurrent opens must not collide on the same checkout')
 })
 
 test('a successful action invalidates the board cache', async () => {

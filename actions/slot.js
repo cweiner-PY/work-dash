@@ -1,9 +1,14 @@
 // actions/slot.js
+import { myPrOf } from '../lanes.js'
+
 export function branchFor(item) {
-  return item.prs[0]?.headRefName ?? item.slot?.branch ?? null
+  // Only the user's own PR names a branch to check out — a colleague's review-requested
+  // PR must never redirect this item's checkout to their branch. Falls back to the
+  // slot's own branch, which is how a review-request-only item still resolves correctly.
+  return myPrOf(item)?.headRefName ?? item.slot?.branch ?? null
 }
 
-export function resolveSlot(item, slots, config, { staleBranches = new Set() } = {}) {
+export function resolveSlot(item, slots, config, { staleBranches = new Set(), claimedDirs = new Set() } = {}) {
   const branch = branchFor(item)
   if (!item.repo || !branch) {
     return { needsPicker: true, candidates: [], message: 'No branch is known for this item — nothing to check out.' }
@@ -24,6 +29,14 @@ export function resolveSlot(item, slots, config, { staleBranches = new Set() } =
     if (s.dirty !== false || (s.dirtyCount ?? 0) > 0) {
       eligible = false
       why = `${s.dirtyCount ?? 'unknown'} uncommitted change(s)`
+    }
+    else if (claimedDirs.has(s.dir)) {
+      // A launch happens asynchronously in a Terminal window the server never waits on,
+      // so re-polling the board cannot observe the new checkout for seconds. Without this,
+      // two concurrent opens resolve deterministically to the SAME slot — rank() prefers
+      // master/main every time, not occasionally — and two sessions fight over one checkout.
+      eligible = false
+      why = 'recently claimed by another launch'
     }
     else if (s.branch === 'master' || s.branch === 'main') why = `on ${s.branch}`
     else if (staleBranches.has(s.branch)) why = 'holding a finished or reassigned ticket'

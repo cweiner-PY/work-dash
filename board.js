@@ -1,6 +1,6 @@
 // board.js
 import { join as joinItems } from './join.js'
-import { assignLanes } from './lanes.js'
+import { assignLanes, myPrOf } from './lanes.js'
 import { extractKey } from './util/key.js'
 import { fetchPrimary as jiraPrimary, fetchByKeys as jiraByKeys } from './collect/jira.js'
 import { fetchGithub as ghFetch } from './collect/github.js'
@@ -9,7 +9,9 @@ import { collectPlans as plansFetch } from './collect/plans.js'
 import { evalPredicate } from './util/predicate.js'
 
 export function skillsForItem(item, config) {
-  const pr = item.prs?.[0] ?? null
+  // The user's own PR, never a colleague's review request — a `pr`-gated skill (e.g.
+  // /pr-description, /ticket-finisher) must not appear for a PR the user doesn't own.
+  const pr = myPrOf(item)
   const ctx = {
     key: item.key,
     repo: item.repo,

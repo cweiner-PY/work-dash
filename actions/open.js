@@ -2,8 +2,10 @@
 import { writeFile as fsWriteFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { randomUUID } from 'node:crypto'
 import { run as defaultRun } from '../util/run.js'
 import { resolveSlot, branchFor } from './slot.js'
+import { myPrOf } from '../lanes.js'
 
 // Single-quote a value for bash: close, escape, reopen.
 const q = (s) => `'${String(s).replaceAll("'", "'\\''")}'`
@@ -12,13 +14,16 @@ export function buildLauncher({ item, slot, plans, skill, config }) {
   const branch = branchFor(item)
   const planDirs = [...new Set(plans.map((p) => p.dir))]
   const planFiles = plans.map((p) => `${p.dir}/${p.file}`)
+  // Only the user's own PR belongs in the launch context — a colleague's review-requested
+  // PR must not be presented to Claude as "the" PR for this ticket.
+  const myPr = myPrOf(item)
 
   const context = [
     `Active ticket: ${item.key ?? item.id} — ${item.title ?? ''}`.trim(),
     item.jira?.status ? `Jira status: ${item.jira.status}.` : null,
     item.jira?.url ? `Jira: ${item.jira.url}` : null,
     branch ? `Branch: ${branch}` : null,
-    item.prs.length ? `PR: #${item.prs[0].number} ${item.prs[0].url}` : null,
+    myPr ? `PR: #${myPr.number} ${myPr.url}` : null,
     planFiles.length ? `Plan files: ${planFiles.join(', ')}. Read them before acting.` : null,
   ].filter(Boolean).join('\n')
 
@@ -40,7 +45,7 @@ export function buildLauncher({ item, slot, plans, skill, config }) {
 }
 
 export async function openItem(
-  { item, slots, plans = [], skill = null, config, chosenSlotDir = null, staleBranches },
+  { item, slots, plans = [], skill = null, config, chosenSlotDir = null, staleBranches, claimedDirs },
   { run = defaultRun, writeFile = fsWriteFile, dry = false } = {}
 ) {
   let slot
@@ -52,19 +57,23 @@ export async function openItem(
     if (item.repo && slot.repo && slot.repo !== item.repo) {
       return { ok: false, message: `${slot.dir} belongs to ${slot.repo}, not ${item.repo}.` }
     }
-    // Explicit choice never overrides the dirty-tree rule.
+    // Explicit choice never overrides the dirty-tree rule. It DOES override a claim,
+    // though — the user picking a slot deliberately is a different act from the server
+    // guessing one, so claimedDirs is never consulted on this path.
     const looksDirty = slot.dirty !== false || (slot.dirty ?? 0) > 0 || (slot.dirtyCount ?? 0) > 0
     if (looksDirty && slot.branch !== branchFor(item)) {
       return { ok: false, message: `${slot.dir} has ${slot.dirtyCount ?? 'an unknown number of'} uncommitted change(s) — commit or stash first.` }
     }
   } else {
-    const r = resolveSlot(item, slots, config, { staleBranches })
+    const r = resolveSlot(item, slots, config, { staleBranches, claimedDirs })
     if (r.needsPicker) return { ok: false, message: r.message, candidates: r.candidates }
     slot = r.slot
   }
 
   const script = buildLauncher({ item, slot, plans, skill, config })
-  const path = join(tmpdir(), `work-dash-${(item.key ?? item.id).replaceAll(/[^\w.-]/g, '_')}.sh`)
+  // A per-invocation suffix: the old deterministic path meant two opens of the SAME ticket
+  // (e.g. a double-click, or /open then /run) raced on writing one file.
+  const path = join(tmpdir(), `work-dash-${(item.key ?? item.id).replaceAll(/[^\w.-]/g, '_')}-${randomUUID()}.sh`)
 
   if (dry) return { ok: true, message: `dry run — would launch in ${slot.dir}`, detail: script, slot: slot.dir }
 

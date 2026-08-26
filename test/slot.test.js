@@ -1,11 +1,23 @@
 // test/slot.test.js
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { resolveSlot } from '../actions/slot.js'
+import { resolveSlot, branchFor } from '../actions/slot.js'
 
 const config = { repos: { 'O/R': { slots: ['/w/A', '/w/B', '/w/C'] } } }
 const slot = (dir, o = {}) => ({ dir, repo: 'O/R', branch: 'other', dirty: false, dirtyCount: 0, behind: 0, ahead: 0, ...o })
 const item = (o = {}) => ({ id: 'PY-1', key: 'PY-1', repo: 'O/R', prs: [], slot: null, ...o })
+
+test("branchFor uses the item's own PR when a colleague's review request is also present", () => {
+  const mine = { headRefName: 'PY-1-my-branch', isMine: true }
+  const review = { headRefName: 'PY-1-bruce-branch', isMine: false }
+  assert.equal(branchFor(item({ prs: [review, mine] })), 'PY-1-my-branch')
+})
+
+test('branchFor falls back to the slot branch when the only PR is a review request', () => {
+  const review = { headRefName: 'PY-1-bruce-branch', isMine: false }
+  const s = { dir: '/w/A', branch: 'PY-1-my-older-branch' }
+  assert.equal(branchFor(item({ prs: [review], slot: s })), 'PY-1-my-older-branch')
+})
 
 test('uses the slot that already has the branch checked out', () => {
   const slots = [slot('/w/A'), slot('/w/B', { branch: 'PY-1-x' })]
@@ -54,6 +66,24 @@ test('an explicitly clean slot (dirty: false, dirtyCount: 0) is still auto-selec
   const r = resolveSlot(item({ prs: [{ headRefName: 'PY-1-x' }] }), slots, config, { staleBranches: new Set() })
   assert.equal(r.needsPicker, undefined)
   assert.equal(r.slot.dir, '/w/A')
+})
+
+test('a claimed dir is skipped, with a reason, even though it would otherwise be eligible', () => {
+  const slots = [slot('/w/A', { branch: 'master' }), slot('/w/B', { branch: 'master' })]
+  const r = resolveSlot(item({ prs: [{ headRefName: 'PY-1-x' }] }), slots, config,
+    { staleBranches: new Set(), claimedDirs: new Set(['/w/A']) })
+  assert.equal(r.needsPicker, undefined)
+  assert.equal(r.slot.dir, '/w/B', 'the claimed slot must be skipped in favor of the other eligible one')
+})
+
+test('every candidate claimed leaves no free slot, with the claimed reason surfaced', () => {
+  const slots = [slot('/w/A', { branch: 'master' })]
+  const r = resolveSlot(item({ prs: [{ headRefName: 'PY-1-x' }] }), slots, config,
+    { staleBranches: new Set(), claimedDirs: new Set(['/w/A']) })
+  assert.equal(r.needsPicker, true)
+  const c = r.candidates.find((x) => x.dir === '/w/A')
+  assert.equal(c.eligible, false)
+  assert.match(c.why, /recently claimed/i)
 })
 
 test('returns a picker with a reason per slot when none are eligible', () => {
