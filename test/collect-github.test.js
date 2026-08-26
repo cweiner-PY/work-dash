@@ -3,6 +3,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { summarizeChecks, parseRequiredChecks, normalizePr, fetchGithub, hasHumanReviewFeedback } from '../collect/github.js'
+import { mergeGateFor } from '../lanes.js'
 
 const fx = (n) => JSON.parse(readFileSync(new URL(`./fixtures/${n}`, import.meta.url), 'utf8'))
 
@@ -110,6 +111,37 @@ test('fetchGithub calls gh per repo and attaches required checks', async () => {
   assert.ok(calls.some((c) => c.includes('review-requested:@me')))
 })
 
+test('gh reporting NO required checks is a known zero, not a failure', async () => {
+  // Real gh 2.86.0 behaviour for PerformYard/Logan #704: exit 1, empty stdout, and
+  // "no required checks reported on the '<branch>' branch" on stderr. Treating that as
+  // a collection failure would make every Logan PR permanently unmergeable.
+  const run = async (cmd, args) => {
+    if (args.includes('checks')) {
+      return {
+        code: 1,
+        stdout: '',
+        stderr: "no required checks reported on the 'feat/salesforce-implementation-date-source-of-truth' branch",
+      }
+    }
+    if (args.some((a) => String(a).includes('review-requested'))) return { code: 0, stdout: '[]', stderr: '' }
+    const repo = args[args.indexOf('--repo') + 1]
+    return { code: 0, stdout: JSON.stringify(fx('gh-prs-' + repo.replace('/', '_') + '.json')), stderr: '' }
+  }
+  const config = { githubLogin: 'cweiner-PY', repos: { 'PerformYard/Logan': {} } }
+  const { prs, errors } = await fetchGithub(config, { run })
+  assert.deepEqual(prs[0].requiredChecks, { total: 0, failing: [], known: true })
+  assert.deepEqual(errors, [], 'a determined zero is not an error')
+})
+
+test('a determined zero is still MERGEABLE once approved', async () => {
+  // The whole point: Logan PRs must remain mergeable from the dashboard.
+  const gate = mergeGateFor({
+    reviewDecision: 'APPROVED', mergeable: 'MERGEABLE', isDraft: false,
+    requiredChecks: { total: 0, failing: [], known: true },
+  })
+  assert.equal(gate.allowed, true, gate.blockers.join('; '))
+})
+
 test('a genuine gh-checks failure is RECORDED and leaves the gate unknown', async () => {
   // The dangerous case: gh itself fails (expired auth, offline, gh missing). Empty
   // stdout must NOT be read as "no required checks are failing".
@@ -123,6 +155,7 @@ test('a genuine gh-checks failure is RECORDED and leaves the gate unknown', asyn
   const { prs, errors } = await fetchGithub(config, { run })
   assert.equal(prs.length, 1)
   assert.equal(prs[0].requiredChecks.known, false, 'gate must remain unknown')
+  assert.ok(!/no required checks/i.test(errors[0]), 'must not be confused with a determined zero')
   assert.equal(errors.length, 1, 'the failure must be surfaced, not swallowed')
   assert.match(errors[0], /could not fetch required checks/)
   assert.match(errors[0], /could not authenticate/)

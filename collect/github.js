@@ -3,6 +3,10 @@ import { run as defaultRun } from '../util/run.js'
 
 const PR_FIELDS = 'number,title,headRefName,reviewDecision,mergeable,isDraft,statusCheckRollup,updatedAt,url,reviews'
 
+// gh signals "this repo configures no required checks" via a non-zero exit and this
+// message on stderr, NOT via an empty JSON array on stdout.
+const NO_REQUIRED_CHECKS = /no required checks/i
+
 export function summarizeChecks(rollup) {
   const out = { pass: 0, fail: 0, pending: 0 }
   for (const c of rollup ?? []) {
@@ -90,6 +94,17 @@ export async function fetchGithub(config, { run = defaultRun } = {}) {
     if (r.stdout.trim()) {
       try { pr.requiredChecks = parseRequiredChecks(JSON.parse(r.stdout)) }
       catch { errors.push(`could not parse required checks for ${pr.repo}#${pr.number}`) }
+    } else if (NO_REQUIRED_CHECKS.test(r.stderr)) {
+      // `gh pr checks --required` EXITS 1 WITH EMPTY STDOUT when a repo has no required
+      // checks configured, reporting it on stderr as
+      //   "no required checks reported on the '<branch>' branch"
+      // That is a successful determination of zero, not a collection failure —
+      // PerformYard/Logan is exactly this case. Verified against the live CLI:
+      // gh 2.86.0 exits 1 here, while a repo WITH required checks exits 0.
+      // If gh ever rewords this message the match fails and we fall through to the
+      // branch below, which BLOCKS the merge gate with a reason. That is the safe
+      // direction to break in.
+      pr.requiredChecks = { total: 0, failing: [], known: true }
     } else if (r.code !== 0) {
       // A genuine gh failure: expired auth, no network, gh missing, rate limited.
       // requiredChecks stays known:false, so the merge gate refuses this PR.
