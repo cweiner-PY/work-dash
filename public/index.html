@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>work-dash</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header id="top">
+    <h1>work-dash</h1>
+    <div id="meta"></div>
+    <div id="controls">
+      <label><input type="checkbox" id="showBacklog"> show backlog</label>
+      <label><input type="checkbox" id="showStale"> show stale slots</label>
+      <button id="refresh">refresh</button>
+    </div>
+    <p id="hidden"></p>
+  </header>
+  <main id="board"></main>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
