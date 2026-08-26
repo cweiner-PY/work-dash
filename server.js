@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises'
 import { join, extname, normalize } from 'node:path'
 import { loadConfig, ConfigError } from './config.js'
 import { buildBoard } from './board.js'
+import { registerRoutes } from './routes.js'
 
 const PUBLIC = join(import.meta.dirname, 'public')
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json' }
@@ -41,6 +42,7 @@ async function readBody(req) {
 // Action handlers are registered in Task 14; this map keeps server.js from
 // growing a branch per endpoint.
 export const routes = new Map()
+registerRoutes(routes, { getBoard: () => board(), config, deps: { dry: process.env.WORK_DASH_DRY === '1' } })
 
 const server = createServer(async (req, res) => {
   try {

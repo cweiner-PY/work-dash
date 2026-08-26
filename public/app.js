@@ -150,9 +150,57 @@ if (typeof document !== 'undefined') {
 
     if (item.plans.length) c.append(planPicker(item))
 
-    // Actions are wired in Task 14; the container exists from here so the
-    // layout does not shift when they arrive.
-    c.append(el('div', 'actions'))
+    const actions = el('div', 'actions')
+    const msg = el('p', 'action-msg')
+
+    const post = async (path, body, btn) => {
+      btn.disabled = true
+      msg.className = 'action-msg'
+      msg.textContent = 'working…'
+      const res = await api(path, { id: item.id, plans: selectedPlans(c), ...body })
+      msg.className = `action-msg ${res.ok ? 'ok' : 'bad'}`
+      msg.textContent = res.message
+      if (res.candidates?.length) {
+        msg.append(document.createElement('br'))
+        for (const cand of res.candidates) {
+          const b = el('button', null, `${cand.dir.split('/').pop()} — ${cand.why}`)
+          b.addEventListener('click', () => post(path, { ...body, slotDir: cand.dir }, b))
+          msg.append(b)
+        }
+      }
+      btn.disabled = false
+      if (res.ok) setTimeout(() => load({ force: true }), 1200)
+    }
+
+    const open = el('button', null, 'open')
+    open.addEventListener('click', () => post('/api/open', {}, open))
+    actions.append(open)
+
+    for (const skill of item.skills ?? []) {
+      const b = el('button', null, `/${skill}`)
+      b.addEventListener('click', () => post('/api/run', { skill }, b))
+      actions.append(b)
+    }
+
+    if (item.slot) {
+      const u = el('button', null, item.slot.behind > 0 ? `update (${item.slot.behind} behind)` : 'update branch')
+      if (item.slot.dirty) { u.disabled = true; u.title = `${item.slot.dirtyCount} uncommitted change(s)` }
+      u.addEventListener('click', () => post('/api/update-branch', {}, u))
+      actions.append(u)
+    }
+
+    const mainPr = item.prs.find((p) => p.isMine !== false)
+    if (mainPr) {
+      const m = el('button', null, 'squash & merge')
+      if (!item.mergeGate.allowed) { m.disabled = true; m.title = item.mergeGate.blockers.join('; ') }
+      m.addEventListener('click', () => {
+        if (!confirm(`Squash-merge #${mainPr.number} "${mainPr.title}" into master?`)) return
+        post('/api/merge', { prNumber: mainPr.number, confirmed: true }, m)
+      })
+      actions.append(m)
+    }
+
+    c.append(actions, msg)
     c.dataset.id = item.id
     return c
   }

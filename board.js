@@ -6,6 +6,33 @@ import { fetchPrimary as jiraPrimary, fetchByKeys as jiraByKeys } from './collec
 import { fetchGithub as ghFetch } from './collect/github.js'
 import { collectSlots as slotsFetch } from './collect/slots.js'
 import { collectPlans as plansFetch } from './collect/plans.js'
+import { evalPredicate } from './util/predicate.js'
+
+export function skillsForItem(item, config) {
+  const pr = item.prs?.[0] ?? null
+  const ctx = {
+    key: item.key,
+    repo: item.repo,
+    slot: item.slot,
+    branch: item.slot?.branch ?? pr?.headRefName ?? null,
+    plans: item.plans ?? [],
+    jira: item.jira,
+    pr: pr && {
+      ...pr,
+      changesRequested: pr.reviewDecision === 'CHANGES_REQUESTED',
+      hasReviewComments: Boolean(pr.hasReviewComments),
+    },
+  }
+  const out = []
+  for (const rule of config.skills ?? []) {
+    try {
+      if (evalPredicate(rule.when, ctx)) out.push(rule.name)
+    } catch (e) {
+      console.warn(`skill rule "${rule.name}" is not a valid predicate (${rule.when}): ${e.message}`)
+    }
+  }
+  return out
+}
 
 async function guarded(fn, fallback) {
   try {
@@ -69,11 +96,12 @@ export async function buildBoard(config, deps = {}) {
   const items = assignLanes(
     joinItems({ jira, enrichment: enrichR.value, prs, slots, plans, config }),
     config
-  )
+  ).map((i) => ({ ...i, skills: skillsForItem(i, config) }))
 
   return {
     generatedAt: now().toISOString(),
     items,
+    slots,
     sources: {
       jira: source({ ok: jiraR.ok && enrichR.ok, error: jiraR.error ?? enrichR.error },
                    jira.length + enrichR.value.length),
