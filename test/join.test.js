@@ -139,3 +139,27 @@ test('handles a key with two PRs', () => {
 test('empty inputs produce an empty board, not a throw', () => {
   assert.deepEqual(joinItems({ jira: [], enrichment: [], prs: [], slots: [], plans: [], config }), [])
 })
+
+// append to test/join.test.js
+import { assignLanes } from '../lanes.js'
+
+test('the whole fixture set produces the expected board', () => {
+  const laned = assignLanes(
+    joinItems({ jira: fx('jira-primary.json'), enrichment: fx('jira-enrichment.json'), prs, slots, plans: fx('plans.json'), config }),
+    { ...config, inFlightStatusOrder: ['In Progress', 'In Code Review', 'Ready To Test', 'In Testing', 'Ready To Merge'] }
+  )
+  const byLane = (l) => laned.filter((i) => i.lane === l).map((i) => i.id).sort()
+
+  assert.deepEqual(byLane('needs-you'), ['PY-12275', 'PY-12746', 'PY-13751'])
+  assert.deepEqual(byLane('waiting'),
+    ['PerformYard/Logan:feat/salesforce-implementation-date-source-of-truth'])
+  assert.deepEqual(byLane('in-flight'),
+    ['PY-13044', 'PY-13888', 'PY-13925', 'PerformYard/Logan:update-churn-agent-prompt'])
+  // Only PY-13247 is both To Do and has a plan folder on disk.
+  assert.deepEqual(byLane('ready-to-start'), ['PY-13247'])
+  assert.deepEqual(byLane('backlog'),
+    ['PY-11672', 'PY-12576', 'PY-13076', 'PY-13088', 'PY-13181'])
+
+  // three of five occupied slots are reclaimable
+  assert.equal(laned.filter((i) => i.signals.reclaimable).length, 3)
+})
