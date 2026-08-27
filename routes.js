@@ -4,6 +4,7 @@ import { myPrOf } from './lanes.js'
 import { updateBranch } from './actions/update-branch.js'
 import { mergePr } from './actions/merge.js'
 import { openEditor } from './actions/editor.js'
+import { pickReviewPr, reviewTarget } from './actions/review.js'
 
 // Branches whose ticket is finished or reassigned — a slot holding one is fair game.
 function staleBranchesOf(board) {
@@ -108,6 +109,39 @@ export function registerRoutes(routes, { getBoard, config, deps = {} }) {
       defaultBranch: config.repos[item.repo]?.defaultBranch ?? 'master',
     }, deps)
     if (result.ok) ctx.invalidate()
+    return result
+  })
+
+  // Reviews a colleague's PR: their branch, checked out detached in a slot, with a reviewer's
+  // system prompt and the configured review skill.
+  //
+  // No skill-applicability gate, and that is safe for a specific reason: the skill name comes
+  // from config.reviewSkill, never from the request. /api/run needs that gate precisely
+  // because its skill IS client-supplied.
+  routes.set('POST /api/review', async (body, ctx) => {
+    if (!body || typeof body !== 'object') return { ok: false, message: 'Expected a JSON object body.' }
+    const { item, board } = await find(body.id)
+    if (!item) return { ok: false, message: `Unknown item: ${body.id}` }
+
+    const picked = pickReviewPr(item, typeof body.prNumber === 'number' ? body.prNumber : null)
+    if (picked.error) return { ok: false, message: picked.error }
+    const target = reviewTarget(picked.pr)
+    if (target.error) return { ok: false, message: target.error }
+
+    // Same allowlist as /api/open: plans become --add-dir arguments, so an unvalidated list
+    // would hand Claude filesystem access anywhere.
+    const allowed = new Map((item.plans ?? []).map((p) => [p.dir, new Set(p.files ?? [])]))
+    const plans = (body.plans ?? []).filter((p) => allowed.get(p?.dir)?.has(p?.file))
+
+    const result = await openItem({
+      item, slots: board.slots ?? [], plans, skill: config.reviewSkill ?? null,
+      config, chosenSlotDir: body.slotDir ?? null, staleBranches: staleBranchesOf(board),
+      claimedDirs: liveClaimedDirs(claims), review: target.review,
+    }, deps)
+    if (result.ok) {
+      ctx.invalidate()
+      if (result.slot) claims.set(result.slot, Date.now() + CLAIM_MS)
+    }
     return result
   })
 

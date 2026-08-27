@@ -54,6 +54,7 @@ files, and Jira subtasks.
 |---|---|
 | **open** | New Terminal, `cd` to the checkout, check out the branch if needed, start `claude` with the ticket, branch, PR and selected plan paths in its system prompt — then waits for you to type |
 | **`/skill-name`** | The same, but submits `/skill-name TICKET-KEY` immediately. Only skills the server computed as applicable are accepted |
+| **review #N** | Appears where a PR awaits **your** review. Resolves a slot, `git fetch` + `git checkout --detach origin/<their-branch>`, and runs `reviewSkill` (default `/critical-review`) with a system prompt stating you are the reviewer, not the author, and must change nothing. Detached on purpose: an accidental commit lands on no branch and cannot reach their PR. One button per reviewable PR, so you pick |
 | **update branch (N behind)** | `gh pr update-branch`, then a local `git pull --ff-only` if the branch is checked out. With no PR, `git fetch` + `git merge origin/<base>` locally |
 | **resolve conflicts** | Replaces the update button when the PR conflicts, which GitHub can't fix server-side. Opens a Terminal, runs the merge, and hands Claude an instruction based on whether it actually conflicted |
 | **squash & merge** | `gh pr merge --squash`, gated (below) |
@@ -92,6 +93,7 @@ can't guess; `doctor` validates the rest.
 | `githubLogin` | | Distinguishes your own PR comments from a teammate's review feedback |
 | `port` | | Default 4200 |
 | `checkoutMode` | | `slots` (default) or `worktrees` — see below |
+| `reviewSkill` | | The skill a **review #N** launch submits. Default `critical-review`. Read from config, never from the request — which is why that route needs no applicability gate |
 | `terminalMode` | | `window` (default) or `tab`. Tab opens the session as a tab of the front Terminal window — it needs Accessibility granted to Terminal, and falls back to a window (saying so) if refused |
 | `worktreeRoot` | | Where worktrees live. Default `~/.cache/work-dash-worktrees` |
 | `humanGateChecks` | | Required checks that are human gates, not CI — they explain a card but never claim to be your move. Default `["QA Code Review"]` |

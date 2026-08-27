@@ -15,13 +15,51 @@ const q = (s) => `'${String(s).replaceAll("'", "'\\''")}'`
 // "resolve conflicts" action. The merge runs HERE, in the Terminal the user is watching,
 // rather than server-side: the output is visible, and /api/open never mutates a checkout
 // as an invisible side effect.
-export function buildLauncher({ item, slot, plans, skill, config, mergeBase = null, worktree = null }) {
+export function buildLauncher({ item, slot, plans, skill, config, mergeBase = null, worktree = null, review = null }) {
   const branch = branchFor(item)
   const planDirs = [...new Set(plans.map((p) => p.dir))]
   const planFiles = plans.map((p) => `${p.dir}/${p.file}`)
   // Only the user's own PR belongs in the launch context — a colleague's review-requested
   // PR must not be presented to Claude as "the" PR for this ticket.
   const myPr = myPrOf(item)
+
+  // Reviewing someone else's PR is a different job from working your own ticket, so it gets
+  // its own context rather than a line appended to the author's one. Stated flatly and up
+  // front, because this is the one launch where the wrong assumption edits a colleague's work.
+  if (review) {
+    const lines = [
+      `You are REVIEWING a pull request. You are the reviewer, NOT the author.`,
+      `Do not modify, stage, commit, push, revert or rebase anything in this checkout.`,
+      `Read the code, form a judgement, and report it. Making changes is out of scope.`,
+      `PR #${review.number}${review.author ? ` by ${review.author}` : ''} — ${review.title ?? ''}`.trim(),
+      review.url ? `PR: ${review.url}` : null,
+      `Repo: ${review.repo}. Branch under review: ${review.headRefName}.`,
+      // Detached on purpose, and said so: a commit made by mistake lands on no branch and
+      // cannot reach the author's PR without deliberate effort.
+      `This checkout is DETACHED at origin/${review.headRefName} — there is no local branch,`,
+      `which is intentional: nothing you do here can land on the author's branch.`,
+      item.key ? `Related Jira ticket: ${item.key} — ${item.title ?? ''}`.trim() : null,
+      item.jira?.url ? `Jira: ${item.jira.url}` : null,
+      planFiles.length ? `Reference material: ${planFiles.join(', ')}.` : null,
+    ].filter(Boolean).join('\n')
+
+    const claudeReview = [
+      'claude', '-n', q(`review-${review.number}`),
+      ...planDirs.flatMap((d) => ['--add-dir', q(d)]),
+      '--append-system-prompt', q(lines),
+      ...(skill ? [q(`/${skill} #${review.number}`)] : []),
+    ].join(' ')
+
+    return [
+      '#!/usr/bin/env bash',
+      'set -euo pipefail',
+      `cd ${q(slot.dir)}`,
+      `git fetch origin ${q(review.headRefName)}`,
+      `git checkout --detach ${q(`origin/${review.headRefName}`)}`,
+      claudeReview,
+      '',
+    ].join('\n')
+  }
 
   const context = [
     `Active ticket: ${item.key ?? item.id} — ${item.title ?? ''}`.trim(),
@@ -151,7 +189,7 @@ export function terminalArgs(path, mode) {
 }
 
 export async function openItem(
-  { item, slots, plans = [], skill = null, config, chosenSlotDir = null, staleBranches, claimedDirs, repo = null, mergeBase = null },
+  { item, slots, plans = [], skill = null, config, chosenSlotDir = null, staleBranches, claimedDirs, repo = null, mergeBase = null, review = null },
   { run = defaultRun, writeFile = fsWriteFile, dry = false } = {}
 ) {
   // Worktree mode accumulates one worktree per branch ever launched on, so old ones are
@@ -175,11 +213,16 @@ export async function openItem(
     // though — the user picking a slot deliberately is a different act from the server
     // guessing one, so claimedDirs is never consulted on this path.
     const looksDirty = slot.dirty !== false || (slot.dirty ?? 0) > 0 || (slot.dirtyCount ?? 0) > 0
-    if (looksDirty && slot.branch !== branchFor(item)) {
+    const wanted = review?.headRefName ?? branchFor(item)
+    if (looksDirty && slot.branch !== wanted) {
       return { ok: false, message: `${slot.dir} has ${slot.dirtyCount ?? 'an unknown number of'} uncommitted change(s) — commit or stash first.` }
     }
   } else {
-    const r = resolveSlot(item, slots, config, { staleBranches, claimedDirs, repo })
+    const r = resolveSlot(item, slots, config, {
+      staleBranches, claimedDirs, repo,
+      // A review needs the author's branch, which branchFor will not supply.
+      branch: review?.headRefName ?? null,
+    })
     if (r.needsPicker) return { ok: false, message: r.message, candidates: r.candidates, needsRepo: r.needsRepo }
     // Worktree mode can fail for a reason no slot picker can fix — no clone to create the
     // worktree from — so it reports a message rather than a list of candidates.
@@ -188,7 +231,7 @@ export async function openItem(
     worktree = r.create ? { create: true, root: r.root, base: r.base } : null
   }
 
-  const script = buildLauncher({ item, slot, plans, skill, config, mergeBase, worktree })
+  const script = buildLauncher({ item, slot, plans, skill, config, mergeBase, worktree, review })
   // A per-invocation suffix: the old deterministic path meant two opens of the SAME ticket
   // (e.g. a double-click, or /open then /run) raced on writing one file.
   const path = join(tmpdir(), `work-dash-${(item.key ?? item.id).replaceAll(/[^\w.-]/g, '_')}-${randomUUID()}.sh`)

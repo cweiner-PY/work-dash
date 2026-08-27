@@ -18,6 +18,7 @@ fragment pr on PullRequest {
   number title url isDraft mergeable reviewDecision mergeStateStatus updatedAt
   headRefName baseRefName
   repository { nameWithOwner }
+  author { login }
   reviews(last:50){ nodes{ state submittedAt author{ login } authorAssociation } }
   commits(last:1){ nodes{ commit{ committedDate } } }
   reviewThreads(first:100){ nodes{ isResolved comments(last:1){ nodes{ author{ login } } } } }
@@ -138,6 +139,7 @@ export function normalizePr(node, { mine, myLogin }) {
     reviewDecision: node.reviewDecision ?? null,
     mergeable: node.mergeable ?? null,
     isDraft: Boolean(node.isDraft),
+    author: node.author?.login ?? null,
     // Starts UNKNOWN, not "zero required checks". fetchGithub replaces this with a
     // known:true result on a successful read; if the read fails it stays unknown and
     // the merge gate refuses rather than mistaking silence for a clean bill of health.

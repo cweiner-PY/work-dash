@@ -198,6 +198,21 @@ export function summarizeSubtasks(subtasks) {
   return { open: openList.length, done: doneList.length, total: subtasks.length, openList, doneList }
 }
 
+// One button per PR awaiting YOUR review. Returns [] for everything else, so the button only
+// appears where the user is the reviewer. The label carries the PR number because an item can
+// legitimately have more than one, and the user picks which.
+export function reviewSpecs(item, config) {
+  const skill = config?.reviewSkill ?? 'critical-review'
+  return (item.prs ?? [])
+    .filter((p) => p.isMine === false && p.headRefName)
+    .map((p) => ({
+      prNumber: p.number,
+      label: `review #${p.number}`,
+      title: `Check out ${p.headRefName} detached in a slot and run /${skill} as reviewer` +
+             `${p.author ? ` \u2014 ${p.author}'s PR` : ''}. Makes no changes.`,
+    }))
+}
+
 // The checkout directory on the slot row, made clickable to open it in the editor —
 // following the two affordances already on the card, where the ticket key opens Jira and
 // the PR number opens GitHub. The identifier IS the control; there is no separate button.
@@ -520,6 +535,15 @@ if (typeof document !== 'undefined') {
       const open = el('button', null, 'open')
       open.addEventListener('click', () => post('/api/open', {}, open))
       actions.append(open)
+    }
+
+    // Reviewing a colleague's PR is a different job from the skills below, which all act on
+    // the user's own work — so it sits next to open rather than among them.
+    for (const rv of reviewSpecs(item, state.config)) {
+      const b = el('button', null, rv.label)
+      b.title = rv.title
+      b.addEventListener('click', () => post('/api/review', { prNumber: rv.prNumber }, b))
+      actions.append(b)
     }
 
     for (const skill of item.skills ?? []) {

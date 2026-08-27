@@ -6,6 +6,8 @@ export class ConfigError extends Error {}
 
 const DEFAULTS = {
   port: 4200,
+  // The skill a review launch submits. Read from config, never from the request.
+  reviewSkill: 'critical-review',
   // 'window' (default) or 'tab'. Tab needs an Accessibility grant per machine, so it is
   // opt-in — see terminalMode in actions/open.js.
   terminalMode: 'window',

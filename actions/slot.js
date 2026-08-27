@@ -28,7 +28,7 @@ function eligibility(s, { claimedDirs }) {
 
 export function resolveSlot(
   item, slots, config,
-  { staleBranches = new Set(), claimedDirs = new Set(), repo = null } = {}
+  { staleBranches = new Set(), claimedDirs = new Set(), repo = null, branch: branchOverride = null } = {}
 ) {
   // Jira carries nothing identifying the repo — a To Do ticket's title mentioning
   // "Logan" is prose, not data. item.repo (known from a PR or an existing slot) always
@@ -41,7 +41,9 @@ export function resolveSlot(
     }
   }
 
-  const branch = branchFor(item)
+  // branchFor deliberately ignores a colleague's review-requested PR, so reviewing one
+  // requires saying which branch out loud. Nothing else passes an override.
+  const branch = branchOverride ?? branchFor(item)
 
   // Worktree mode resolves a path instead of competing for a pool. Nothing to rank and no
   // claim check: the path is derived from the branch, so two different items can never
