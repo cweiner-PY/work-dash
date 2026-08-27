@@ -133,11 +133,18 @@ always counted, e.g. "6 backlog · 3 stale", so nothing disappears silently.
   starts `claude` there with the ticket key, Jira status/URL, branch, PR
   link, and any attached plan file paths written into its system prompt (and
   granted as `--add-dir` for the plan directories).
-- **cursor** (or whatever `editor` names) — opens the item's existing checkout in
-  your editor, and appears only on cards that have one. Runs
-  `open -a <editor> <dir>` and nothing else: no git, no checkout, no slot
-  resolution, no board re-collection. Because it mutates nothing it is the one
-  action safe to fire at a dirty checkout — which is exactly when you want it.
+- **the checkout name on the slot row** (`PY-2`, `Logan3`) — click it to open
+  that folder in your editor. It follows the card's two other clickable
+  identifiers: the ticket key opens Jira, the PR number opens GitHub, the
+  checkout opens the editor. A `<button>` styled as text rather than an `<a>`,
+  since it performs an action instead of navigating.
+
+  Runs `open -a <editor> <dir>` and nothing else: no git, no checkout, no slot
+  resolution, and no board refresh afterwards — opening a folder changes nothing
+  the board reports, so re-collecting would cost ~6s of live API calls for
+  nothing. Because it mutates nothing it is the one action safe to fire at a
+  dirty checkout, which is exactly when you want it.
+
   `open -a` rather than a `cursor`/`code` CLI shim, since those are optional
   installs while the .app is what actually exists; macOS resolves the name, so
   `"editor": "Zed"` in `config.json` is the whole change needed to switch.

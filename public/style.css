@@ -450,6 +450,19 @@ main { padding: 4px 22px 80px; max-width: 1560px; }
 .pr-num { color: var(--ink); text-decoration: none; font-weight: 700; }
 .pr-num:hover { color: var(--signal); }
 .pr-repo, .slot-dir { color: var(--ink-3); }
+
+/* The checkout directory as a control. Reset to look like the text it replaces — the
+   affordance is the hover, matching .key and .pr-num, which are the card's other two
+   clickable identifiers. Dotted underline so it reads as actionable before hover, without
+   claiming to be a link (it opens an editor; it does not navigate). */
+button.slot-open {
+  font: inherit; padding: 0; border: 0; background: none;
+  color: var(--ink-3); cursor: pointer;
+  border-bottom: 1px dotted var(--rule-2);
+  transition: color .12s, border-color .12s;
+}
+button.slot-open:hover { color: var(--signal); border-bottom-color: var(--signal); }
+button.slot-open[disabled] { cursor: progress; opacity: .6; }
 .slot-branch { color: var(--ink); }
 .pr-review, .pr-checks {
   text-transform: uppercase; letter-spacing: .08em; font-size: 10px;

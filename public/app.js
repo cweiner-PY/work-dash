@@ -176,16 +176,18 @@ export function summarizeSubtasks(subtasks) {
   return { open: openList.length, done: doneList.length, total: subtasks.length, openList, doneList }
 }
 
-// The editor button, shown only when the item HAS a local checkout — "if it's on a local
-// repo". Returns null otherwise rather than a disabled button: there is nothing to enable
-// it for, and a To Do ticket with no checkout is the ordinary case, not a problem.
-// The label carries the directory so a glance says which slot it lands in.
+// The checkout directory on the slot row, made clickable to open it in the editor —
+// following the two affordances already on the card, where the ticket key opens Jira and
+// the PR number opens GitHub. The identifier IS the control; there is no separate button.
+// Returns null when the item has no local checkout, in which case there is no slot row to
+// click at all — a To Do ticket without one is the ordinary case, not a problem to flag.
 export function editorSpec(item, config) {
   if (!item.slot?.dir) return null
   const editor = config?.editor ?? 'Cursor'
   return {
-    label: editor.toLowerCase(),
     dir: item.slot.dir,
+    name: item.slot.dir.split('/').pop(),   // the same short name the slot row always showed
+    editor,
     title: `Open ${item.slot.dir} in ${editor}`,
   }
 }
@@ -403,7 +405,19 @@ if (typeof document !== 'undefined') {
 
     if (item.slot) {
       const s = el('div', 'slot')
-      s.append(el('span', 'slot-dir', item.slot.dir.split('/').pop()))
+      // A <button>, not an <a>: this performs an action rather than navigating, so it must
+      // not pretend to be a link. Styled as text, and keyboard-operable for free.
+      // No refresh afterwards — opening an editor changes nothing the board reports, and
+      // the route deliberately does not invalidate it either.
+      const ed = editorSpec(item, state.config)
+      if (ed) {
+        const b = el('button', 'slot-dir slot-open', ed.name)
+        b.title = ed.title
+        b.addEventListener('click', () => post('/api/open-editor', {}, b, { refresh: false }))
+        s.append(b)
+      } else {
+        s.append(el('span', 'slot-dir', item.slot.dir.split('/').pop()))
+      }
       s.append(el('span', 'slot-branch', item.slot.branch ?? 'detached'))
       if (item.slot.dirty) s.append(el('span', 'chip bad', `${item.slot.dirtyCount} uncommitted`))
       if (item.slot.behind > 0) s.append(el('span', 'chip warn', `${item.slot.behind} behind (as of last fetch)`))
@@ -425,7 +439,9 @@ if (typeof document !== 'undefined') {
     const actions = el('div', 'actions')
     const msg = el('p', 'action-msg')
 
-    const post = async (path, body, btn) => {
+    // refresh:false for actions that change nothing the board reports. A forced refresh is
+    // ~6s of live Jira and GitHub calls, so firing one after "open my editor" is pure cost.
+    const post = async (path, body, btn, { refresh = true } = {}) => {
       btn.disabled = true
       msg.className = 'action-msg'
       msg.textContent = 'working…'
@@ -441,7 +457,7 @@ if (typeof document !== 'undefined') {
         }
       }
       btn.disabled = false
-      if (res.ok) setTimeout(() => load({ force: true }), 1200)
+      if (res.ok && refresh) setTimeout(() => load({ force: true }), 1200)
     }
 
     // The user's own PR (never a colleague's review-requested one) — drives both the
@@ -465,15 +481,6 @@ if (typeof document !== 'undefined') {
       const open = el('button', null, 'open')
       open.addEventListener('click', () => post('/api/open', {}, open))
       actions.append(open)
-    }
-
-    // Sits beside open: same "get me into this work" intent, different destination.
-    const ed = editorSpec(item, state.config)
-    if (ed) {
-      const b = el('button', null, ed.label)
-      b.title = ed.title
-      b.addEventListener('click', () => post('/api/open-editor', {}, b))
-      actions.append(b)
     }
 
     for (const skill of item.skills ?? []) {

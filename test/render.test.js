@@ -401,11 +401,21 @@ test('refreshLabel: never returns an empty string, busy or not, at any elapsed t
 
 // --- editorSpec: the open-in-editor button ---------------------------------------------
 
-test('editorSpec: an item with a local checkout gets a button naming the editor', () => {
+test('editorSpec: the visible text is the checkout name, not the editor name', () => {
+  // The directory itself is the control, the way the ticket key and PR number are. The
+  // editor belongs in the tooltip; putting it in the text would replace information the
+  // slot row already earns its space with.
   const spec = editorSpec({ slot: { dir: '/Users/x/Work/PY-2' } }, { editor: 'Cursor' })
-  assert.equal(spec.label, 'cursor')
+  assert.equal(spec.name, 'PY-2')
   assert.equal(spec.dir, '/Users/x/Work/PY-2')
+  assert.equal(spec.editor, 'Cursor')
   assert.match(spec.title, /\/Users\/x\/Work\/PY-2/, 'the tooltip must say which folder opens')
+  assert.match(spec.title, /Cursor/, 'and which editor it opens in')
+})
+
+test('editorSpec: the name is the last path segment, with no trailing-slash surprise', () => {
+  assert.equal(editorSpec({ slot: { dir: '/w/Logan3' } }, {}).name, 'Logan3')
+  assert.equal(editorSpec({ slot: { dir: 'PY-2' } }, {}).name, 'PY-2')
 })
 
 test('editorSpec: no local checkout means no button at all, not a disabled one', () => {
@@ -418,12 +428,14 @@ test('editorSpec: no local checkout means no button at all, not a disabled one',
 
 test('editorSpec: falls back to Cursor before config has loaded', () => {
   // state.config is null until /api/config returns; the first render must not crash or
-  // print "undefined" on the button.
+  // put "undefined" in the tooltip.
   for (const config of [null, undefined, {}]) {
-    assert.equal(editorSpec({ slot: { dir: '/w/PY-2' } }, config).label, 'cursor')
+    const spec = editorSpec({ slot: { dir: '/w/PY-2' } }, config)
+    assert.equal(spec.editor, 'Cursor')
+    assert.match(spec.title, /in Cursor$/)
   }
 })
 
-test('editorSpec: a configured editor name drives the label', () => {
-  assert.equal(editorSpec({ slot: { dir: '/w/PY-2' } }, { editor: 'Zed' }).label, 'zed')
+test('editorSpec: a configured editor name reaches the tooltip', () => {
+  assert.match(editorSpec({ slot: { dir: '/w/PY-2' } }, { editor: 'Zed' }).title, /in Zed$/)
 })
