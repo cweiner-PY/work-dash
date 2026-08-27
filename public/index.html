@@ -1,19 +1,37 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-palette="ledger">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>work-dash</title>
   <link rel="stylesheet" href="/style.css">
+  <script>
+    // Runs before first paint: a stored palette is applied here rather than waiting for
+    // app.js, which would show the default ground for a frame first. Deliberately not a
+    // module (modules are deferred) and deliberately tiny — app.js owns everything else
+    // about the picker, including validating this value against the known palette list.
+    try {
+      const p = localStorage.getItem('work-dash:palette')
+      if (p) document.documentElement.dataset.palette = p
+    } catch (e) { /* storage unavailable: the markup default stands */ }
+  </script>
+  <!-- Inline so the tab icon costs no request and no file: the wordmark's signal slash
+       on the board's own ground. Also silences a 404 the page has always logged. -->
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23141210'/%3E%3Cpath d='M9 26 L17 6 M15 26 L23 6' stroke='%23ff5324' stroke-width='4.5' stroke-linecap='square'/%3E%3C/svg%3E">
 </head>
 <body>
+  <div class="grain" aria-hidden="true"></div>
   <header id="top">
-    <h1>work-dash</h1>
-    <div id="meta"></div>
+    <div class="masthead">
+      <h1>Work<span class="slash">//</span>Dash</h1>
+      <div id="meta"></div>
+    </div>
+    <div class="rule-ticks" aria-hidden="true"></div>
     <div id="controls">
-      <label><input type="checkbox" id="showBacklog"> show backlog</label>
-      <label><input type="checkbox" id="showStale"> show stale slots</label>
+      <label class="switch"><input type="checkbox" id="showBacklog"><span>backlog</span></label>
+      <label class="switch"><input type="checkbox" id="showStale"><span>stale slots</span></label>
       <button id="refresh">refresh</button>
+      <div class="palette" id="palette" role="group" aria-label="Colour palette"></div>
     </div>
     <p id="hidden"></p>
   </header>

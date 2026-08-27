@@ -308,9 +308,11 @@ if (typeof document !== 'undefined') {
   // Not a lane: the user's own open subtasks whose parent is NOT on the board. Rendered
   // as one group after the lanes, outside groupForDisplay entirely, so it never affects
   // LANES, the lane list, or the hidden counts.
-  function orphanSubtasksSection(orphans) {
+  function orphanSubtasksSection(orphans, index) {
     const sec = el('section', 'lane')
-    sec.append(el('h2', null, `My subtasks elsewhere (${orphans.length})`))
+    sec.dataset.lane = 'other-subtasks'
+    sec.append(laneHeading(index, 'My subtasks elsewhere', orphans.length))
+    const grid = el('div', 'lane-grid')
     for (const s of orphans) {
       const row = el('div', 'orphan-subtask')
       const a = el('a', 'key', s.key)
@@ -319,8 +321,9 @@ if (typeof document !== 'undefined') {
       row.append(el('span', 'chip', s.issuetype ?? ''))
       row.append(el('span', 'chip', s.status ?? ''))
       row.append(el('span', 'subtask-parent', `↳ parent ${s.parentKey ?? '?'} · ${s.parentSummary ?? ''}`))
-      sec.append(row)
+      grid.append(row)
     }
+    sec.append(grid)
     return sec
   }
 
@@ -452,6 +455,18 @@ if (typeof document !== 'undefined') {
     return c
   }
 
+  // Lane header: an index plate, the lane name, a hairline running out to the margin,
+  // then the tally. Built here rather than as CSS pseudo-elements because the index and
+  // the count are real data a stylesheet cannot know.
+  function laneHeading(index, label, count) {
+    const h = el('h2')
+    h.append(el('span', 'lane-index', String(index).padStart(2, '0')))
+    h.append(el('span', 'lane-name', label))
+    h.append(el('span', 'lane-rule'))
+    h.append(el('span', 'lane-count', String(count)))
+    return h
+  }
+
   function render() {
     const b = state.board
     const root = $('#board')
@@ -461,24 +476,87 @@ if (typeof document !== 'undefined') {
       sourceBar(b.sources)
     )
     const { lanes, hidden } = groupForDisplay(b.items, state)
-    for (const lane of lanes) {
+    // One running index across the whole board (not per lane) so the entrance stagger
+    // reads as a single sweep down the page. The CSS caps the delay, so a long board
+    // still finishes arriving promptly.
+    let seq = 0
+    const place = (sec, item) => {
+      const c = card(item)
+      c.style.setProperty('--i', seq++)
+      sec.append(c)
+    }
+    lanes.forEach((lane, n) => {
       const sec = el('section', 'lane')
-      sec.append(el('h2', null, `${lane.label} (${lane.items?.length ?? lane.subgroups.reduce((n, s) => n + s.items.length, 0)})`))
+      sec.dataset.lane = lane.id
+      const count = lane.items?.length ?? lane.subgroups.reduce((t, s) => t + s.items.length, 0)
+      sec.append(laneHeading(n + 1, lane.label, count))
+      // Each group gets its own grid container rather than the whole lane being one
+      // grid. A subgroup holding a single card can then span its full width, which a
+      // lane-wide grid could not express: "only card in this subgroup" is invisible to
+      // CSS once every card in the lane is a sibling.
       if (lane.items) {
-        for (const i of lane.items) sec.append(card(i))
+        const grid = el('div', 'lane-grid')
+        for (const i of lane.items) place(grid, i)
+        sec.append(grid)
       } else {
         for (const sg of lane.subgroups) {
-          sec.append(el('h3', 'subgroup', `${sg.label} (${sg.items.length})`))
-          for (const i of sg.items) sec.append(card(i))
+          sec.append(el('h3', 'subgroup', `${sg.label} · ${sg.items.length}`))
+          const grid = el('div', 'lane-grid')
+          for (const i of sg.items) place(grid, i)
+          sec.append(grid)
         }
       }
       root.append(sec)
+    })
+    if (b.orphanSubtasks?.length) {
+      root.append(orphanSubtasksSection(b.orphanSubtasks, lanes.length + 1))
     }
-    if (b.orphanSubtasks?.length) root.append(orphanSubtasksSection(b.orphanSubtasks))
     $('#hidden').textContent = hidden.total
       ? `${hidden.backlog} backlog · ${hidden.stale} stale — use the toggles above`
       : ''
   }
+
+  // Palette names live here, not in the HTML: the stylesheet defines one token block per
+  // name (:root[data-palette=...]) and the picker is generated from this list, so adding
+  // a fifth palette is a CSS block plus one string.
+  // Each name has one complete token block in style.css. Lights first, since a palette
+  // is now an explicit choice rather than something the OS decides.
+  const PALETTES = ['ledger', 'clay', 'linen', 'sage', 'manifest', 'phosphor']
+  const PALETTE_KEY = 'work-dash:palette'
+  // Fixed, not derived from prefers-color-scheme: that signal moves with the macOS
+  // appearance schedule AND Chrome's own theme setting, neither of which is a statement
+  // about this board. The palette changes when the user clicks a swatch, and not before.
+  const DEFAULT_PALETTE = 'ledger'
+
+  function applyPalette(name) {
+    document.documentElement.dataset.palette = name
+    // localStorage throws outright in some privacy configurations rather than returning
+    // null, and a failed *preference* write must never take the board down with it.
+    try { localStorage.setItem(PALETTE_KEY, name) } catch { /* preference is best-effort */ }
+    for (const b of document.querySelectorAll('#palette button')) {
+      b.setAttribute('aria-pressed', String(b.dataset.palette === name))
+    }
+  }
+
+  function buildPalettePicker() {
+    const box = $('#palette')
+    for (const name of PALETTES) {
+      const b = el('button')
+      b.type = 'button'
+      b.dataset.palette = name
+      b.title = `${name} palette`
+      b.setAttribute('aria-label', `${name} palette`)
+      b.addEventListener('click', () => applyPalette(name))
+      box.append(b)
+    }
+    let saved = null
+    try { saved = localStorage.getItem(PALETTE_KEY) } catch { /* fall through to default */ }
+    // An unknown or absent stored value falls back to the OS-appropriate default rather
+    // than setting data-palette to something no CSS block matches.
+    applyPalette(PALETTES.includes(saved) ? saved : DEFAULT_PALETTE)
+  }
+
+  buildPalettePicker()
 
   $('#refresh').addEventListener('click', () => load({ force: true }))
   $('#showBacklog').addEventListener('change', (e) => { state.showBacklog = e.target.checked; render() })
@@ -486,7 +564,7 @@ if (typeof document !== 'undefined') {
 
   // The first load is as slow as a forced one (~6s, uncached) — a blank board for that
   // whole stretch reads as broken. render() replaces this the moment real data lands.
-  $('#board').textContent = 'loading…'
+  $('#board').append(el('p', 'boot', 'collecting — jira · github · checkouts'))
 
   loadConfig().then(load)
   setInterval(() => load(), 60_000)

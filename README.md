@@ -94,6 +94,21 @@ work-dash
 
 Then open `http://127.0.0.1:<port>` (the port from `config.json`).
 
+### Appearance
+
+Six palettes, picked with the swatches at the right of the controls row: four light
+grounds (`ledger` tan, `clay` rose-grey, `linen` putty, `sage` green-grey) and two dark
+(`manifest` charcoal, `phosphor` CRT). The choice is stored per browser in
+`localStorage` under `work-dash:palette`; `ledger` is the default.
+
+The palette is deliberately NOT derived from `prefers-color-scheme`. That signal answers
+to both the macOS appearance schedule and Chrome's own theme setting, so a board keyed
+to it changes look on its own for reasons that have nothing to do with the board.
+
+Each palette is one token block in `public/style.css`; every rule in that file reads
+tokens rather than colour literals, so adding a seventh is a block plus one string in
+`PALETTES` in `public/app.js`.
+
 ## Lanes
 
 The board sorts every item into exactly one of five lanes:

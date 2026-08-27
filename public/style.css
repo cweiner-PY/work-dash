@@ -1,92 +1,615 @@
-/* public/style.css */
+/* public/style.css — "operations manifest"
+ *
+ * Aesthetic: an industrial job board. Transit-signage headers, warm ledger-paper
+ * ground, hard 0-radius edges, hairline rules. Nothing is a rounded pill.
+ *
+ * Three type voices, assigned by MEANING rather than decoration — the typeface
+ * tells you what kind of information you are looking at:
+ *   DIN Condensed  structure   masthead, lane names, counts (signage)
+ *   Athelas        human text  ticket titles, subtask summaries (prose)
+ *   PT Mono        machine     keys, branches, PRs, statuses, chips (data)
+ * All three ship with macOS, so the board renders offline with no webfont fetch.
+ *
+ * Colour carries exactly three semantics plus one structural accent:
+ *   --signal  attention / failure   (needs-you, failing checks, dirty)
+ *   --amber   waiting / partial     (waiting lane, degraded source, running)
+ *   --oxide   good / cleared        (approved, checks green)
+ *   --ion     in motion             (in-flight lane) — structural, not a verdict
+ */
+
+/* ── palettes ───────────────────────────────────────────────────────────────
+ * Every rule in this file reads tokens only, never a literal colour, so a palette is
+ * a self-contained swap. Each one is a COMPLETE theme — light palettes are real
+ * choices, not a prefers-color-scheme fallback of a dark one. data-palette on <html>
+ * selects it (see buildPalettePicker in app.js). The default is 'ledger' outright —
+ * NOT derived from prefers-color-scheme, because that signal answers to both the OS
+ * appearance schedule and Chrome's own theme setting, so a board keyed to it changes
+ * look on its own for reasons that have nothing to do with the board.
+ *
+ * Shared roles, so a palette changes the mood without changing the meaning:
+ *   paper/paper-2/paper-3   ground, card, raised
+ *   ink/ink-2/ink-3         primary, muted, faint
+ *   rule/rule-2             hairline, stronger hairline
+ *   wash                    the ledger rules ruled across the ground
+ *   bloom                   the soft light behind the masthead
+ *   drop                    the sticky header's shadow
+ *   signal                  attention / failure
+ *   amber                   waiting / partial
+ *   oxide                   good / cleared
+ *   ion                     in motion (structural, never a verdict)
+ *
+ * The light grounds all sit around #e2-#e9 rather than #fff. A white ground next to
+ * this much small mono type glares; a tinted stock at that value keeps the contrast
+ * with the ink well past 12:1 while staying comfortable to read for an hour.
+ */
+
 :root {
-  --bg: #f7f7f8; --card: #fff; --ink: #1a1a1c; --muted: #6b6b73;
-  --line: #e3e3e7; --ok: #1a7f4b; --warn: #9a6400; --bad: #b3261e;
+  --din: 'DIN Condensed', 'DIN Alternate', 'Avenir Next Condensed', Impact, sans-serif;
+  --serif: Athelas, 'Iowan Old Style', Charter, Georgia, serif;
+  --mono: 'PT Mono', 'SF Mono', Menlo, ui-monospace, monospace;
 }
-@media (prefers-color-scheme: dark) {
-  :root { --bg: #16161a; --card: #1f1f24; --ink: #ececed; --muted: #9a9aa3;
-          --line: #2e2e36; --ok: #4ec98a; --warn: #e0b050; --bad: #ff6b5e; }
+
+/* ledger — warm tan stock. Accounting paper; the softest yellow-warm of the lights.
+   Also the bare :root, so the very first paint is already the default palette: an
+   unattributed <html> must never flash a different ground before app.js runs. */
+:root, :root[data-palette='ledger'] {
+  color-scheme: light;
+  --paper: #e8e0cd; --paper-2: #f1ebdb; --paper-3: #f8f3e7;
+  --ink: #211d16; --ink-2: #675e4d; --ink-3: #948a75;
+  --rule: #d4c9b2; --rule-2: #b8aa8e;
+  --wash: rgba(60, 45, 15, .05); --bloom: rgba(120, 85, 30, .05);
+  --drop: rgba(70, 55, 25, .14);
+  --signal: #bf3a0c; --amber: #8a6009; --oxide: #0e6d57; --ion: #2a55a5;
 }
+
+/* clay — warm rose-grey. The same warmth as ledger pulled off yellow towards red. */
+:root[data-palette='clay'] {
+  color-scheme: light;
+  --paper: #e9dedb; --paper-2: #f2eae7; --paper-3: #f8f3f1;
+  --ink: #201b1a; --ink-2: #6a5c59; --ink-3: #998985;
+  --rule: #dccdc9; --rule-2: #c2aea9;
+  --wash: rgba(70, 35, 30, .05); --bloom: rgba(130, 70, 55, .05);
+  --drop: rgba(70, 40, 35, .14);
+  --signal: #b83a2c; --amber: #8a5e12; --oxide: #146a5c; --ion: #3a53a0;
+}
+
+/* linen — neutral putty. No hue to speak of; the quietest of the lights. */
+:root[data-palette='linen'] {
+  color-scheme: light;
+  --paper: #e6e4de; --paper-2: #efeeea; --paper-3: #f6f5f2;
+  --ink: #1c1c19; --ink-2: #605f59; --ink-3: #8e8d86;
+  --rule: #d5d3cb; --rule-2: #bab8ae;
+  --wash: rgba(30, 30, 20, .05); --bloom: rgba(70, 70, 50, .045);
+  --drop: rgba(40, 40, 30, .14);
+  --signal: #bb3a1c; --amber: #7f6108; --oxide: #0f6b52; --ion: #2b52a2;
+}
+
+/* sage — soft green-grey. Coolest light ground without going blue. */
+:root[data-palette='sage'] {
+  color-scheme: light;
+  --paper: #e1e7de; --paper-2: #ebefe8; --paper-3: #f4f7f2;
+  --ink: #181d18; --ink-2: #586055; --ink-3: #878f80;
+  --rule: #cdd6c9; --rule-2: #b0bcab;
+  --wash: rgba(20, 50, 20, .05); --bloom: rgba(40, 90, 45, .05);
+  --drop: rgba(25, 50, 30, .14);
+  --signal: #b5341f; --amber: #7a5c06; --oxide: #0d6647; --ion: #23528f;
+}
+
+/* manifest — warm charcoal and safety orange. */
+:root[data-palette='manifest'] {
+  color-scheme: dark;
+  --paper: #141210; --paper-2: #1c1815; --paper-3: #241f1a;
+  --ink: #ece4d6; --ink-2: #a69c89; --ink-3: #6f6657;
+  --rule: #302a23; --rule-2: #453c31;
+  --wash: rgba(255, 255, 255, .022); --bloom: rgba(255, 110, 50, .055);
+  --drop: rgba(0, 0, 0, .8);
+  --signal: #ff5324; --amber: #e2a534; --oxide: #3fc3a1; --ion: #6fa5ff;
+}
+
+/* phosphor — amber-and-green CRT. The loudest; everything glows a little. */
+:root[data-palette='phosphor'] {
+  color-scheme: dark;
+  --paper: #080b09; --paper-2: #0e130f; --paper-3: #141c16;
+  --ink: #d6ecd8; --ink-2: #85a889; --ink-3: #566f5a;
+  --rule: #1c261e; --rule-2: #2c3b2f;
+  --wash: rgba(120, 255, 150, .03); --bloom: rgba(80, 255, 140, .05);
+  --drop: rgba(0, 0, 0, .85);
+  --signal: #ff5f56; --amber: #ffb000; --oxide: #4ef08a; --ion: #56d8d8;
+}
+
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--ink);
-  font: 14px/1.45 ui-sans-serif, -apple-system, system-ui, sans-serif; }
-#top { padding: 16px 20px; border-bottom: 1px solid var(--line); position: sticky; top: 0;
-  background: var(--bg); z-index: 2; }
-h1 { margin: 0 0 6px; font-size: 16px; letter-spacing: .02em; }
-#meta { display: flex; gap: 12px; align-items: center; color: var(--muted); font-size: 12px; }
-.sources { display: flex; gap: 6px; }
-.src { padding: 1px 6px; border: 1px solid var(--line); border-radius: 999px; }
-.src.warn { color: var(--warn); border-color: var(--warn); }
-.src.bad { color: var(--bad); border-color: var(--bad); }
-.src-errors { color: var(--muted); font-size: 12px; margin-top: 4px; }
-#controls { display: flex; gap: 14px; align-items: center; margin-top: 8px; font-size: 12px; }
-#refresh[disabled] { opacity: .6; cursor: not-allowed; }
-#hidden { margin: 6px 0 0; color: var(--muted); font-size: 12px; }
-main { padding: 12px 20px 60px; max-width: 1100px; }
+
+body {
+  margin: 0;
+  color: var(--ink);
+  font: 12px/1.5 var(--mono);
+  background-color: var(--paper);
+  /* Atmosphere, bottom to top: a warm bloom behind the masthead, then 28px ledger
+     rules the whole board sits on. Fixed so the rules stay put while content scrolls
+     past them — paper, not wallpaper. */
+  background-image:
+    radial-gradient(140% 60% at 50% 0%, var(--bloom), transparent 60%),
+    repeating-linear-gradient(to bottom, var(--wash) 0 1px, transparent 1px 28px);
+  background-attachment: fixed;
+}
+
 /* Last-resort guard: the page body must never scroll sideways even if some future
-   element escapes the wrapping rules above. */
+   element escapes the wrapping rules below. */
 html, body { max-width: 100%; overflow-x: hidden; }
-.lane h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em;
-  color: var(--muted); margin: 22px 0 8px; }
-.lane h3.subgroup { font-size: 12px; color: var(--muted); margin: 12px 0 6px 2px; font-weight: 500; }
-.card { background: var(--card); border: 1px solid var(--line); border-radius: 8px;
-  padding: 10px 12px; margin-bottom: 8px;
+
+::selection { background: var(--signal); color: #fff; }
+:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+
+/* Film-grain overlay. Static, cheap, and the one thing that keeps large flat fields
+   of --paper from looking like a screenshot of a CSS reset. */
+.grain {
+  position: fixed; inset: 0; z-index: 9; pointer-events: none;
+  opacity: .04; mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ── masthead ─────────────────────────────────────────────────────────────── */
+
+#top {
+  position: sticky; top: 0; z-index: 3;
+  padding: 14px 22px 10px;
+  background: var(--paper);
+  border-bottom: 1px solid var(--rule-2);
+  box-shadow: 0 14px 22px -18px var(--drop);
+}
+
+/* Masthead furniture is set to the same measure as the board (main's 1560px cap less
+   its 44px of padding) so the wordmark, the tick rule and the source ledger line up
+   with the card grid's edges. The band itself stays full-bleed. */
+#top > * { max-width: 1516px; }
+
+.masthead { display: flex; align-items: flex-end; gap: 20px; flex-wrap: wrap; }
+
+h1 {
+  margin: 0;
+  font: 700 38px/.82 var(--din);
+  text-transform: uppercase;
+  letter-spacing: .045em;
+  white-space: nowrap;
+}
+h1 .slash { color: var(--signal); margin: 0 .04em; }
+
+/* Pushes the source ledger to the far right of the masthead and lets it drop below
+   the wordmark rather than crushing it on a narrow window. */
+#meta {
+  display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+  margin-left: auto; padding-bottom: 3px;
+  color: var(--ink-3); font-size: 10.5px;
+  text-transform: uppercase; letter-spacing: .1em;
+}
+
+.sources { display: flex; gap: 5px; flex-wrap: wrap; }
+
+/* Tally boxes, not pills: each source is a stamped panel whose left edge carries
+   its verdict. A degraded source (ok with errors) must not read as a healthy one. */
+.src {
+  padding: 2px 7px 2px 6px;
+  border: 1px solid var(--rule-2);
+  border-left-width: 3px;
+  border-left-color: var(--ink-3);
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.src.ok   { border-left-color: var(--oxide); }
+.src.warn { border-left-color: var(--amber);  color: var(--amber); }
+.src.bad  { border-left-color: var(--signal); color: var(--signal); }
+
+.src-errors {
+  margin-top: 6px; color: var(--amber); font-size: 11px;
+  text-transform: none; letter-spacing: 0;
+}
+
+/* Ruler / film-leader rule: short ticks every 9px, taller ones every 45px. Reads as
+   a measuring edge and separates the masthead from its controls without a slab. */
+.rule-ticks {
+  height: 8px; margin: 11px 0 9px;
+  border-top: 1px solid var(--rule-2);
+  background-image:
+    repeating-linear-gradient(90deg, var(--rule-2) 0 1px, transparent 1px 9px),
+    repeating-linear-gradient(90deg, var(--ink-3) 0 1px, transparent 1px 45px);
+  background-size: 100% 3px, 100% 7px;
+  background-repeat: repeat-x, repeat-x;
+  position: relative; overflow: hidden;
+}
+
+/* Indeterminate progress sweep, driven entirely by the refresh button's own disabled
+   state — the JS already sets that during a forced collection, so this costs no new
+   state. A ~6s live refresh should look like a machine working, not a frozen page. */
+body:has(#refresh[disabled]) .rule-ticks::after {
+  content: ''; position: absolute; inset: 0 auto 0 0; width: 34%;
+  background: linear-gradient(90deg, transparent, var(--signal), transparent);
+  animation: sweep 1.1s linear infinite;
+}
+@keyframes sweep { from { transform: translateX(-100%); } to { transform: translateX(390%); } }
+
+#controls {
+  display: flex; gap: 18px; align-items: center; flex-wrap: wrap;
+  font-size: 10.5px; text-transform: uppercase; letter-spacing: .11em;
+  color: var(--ink-2);
+}
+
+/* The native checkbox restyled in place rather than hidden behind a fake one: keyboard
+   focus, :checked and screen-reader semantics all stay real. */
+.switch { display: inline-flex; align-items: center; gap: 7px; cursor: pointer; }
+.switch input {
+  appearance: none; margin: 0; width: 12px; height: 12px;
+  border: 1px solid var(--rule-2); background: var(--paper-2); cursor: pointer;
+}
+.switch input:checked { background: var(--signal); border-color: var(--signal); }
+.switch:hover { color: var(--ink); }
+
+#refresh {
+  font: 700 10.5px/1 var(--mono);
+  text-transform: uppercase; letter-spacing: .14em;
+  padding: 7px 13px;
+  color: var(--ink); background: var(--paper-2);
+  border: 1px solid var(--rule-2); cursor: pointer;
+  transition: background .12s, border-color .12s, color .12s;
+}
+#refresh:hover { background: var(--paper-3); border-color: var(--ink-3); }
+#refresh[disabled] { cursor: progress; color: var(--signal); border-color: var(--signal); }
+/* Blinking block caret while collecting — the elapsed counter in the label already
+   ticks; this makes the button itself read as live between those one-second updates. */
+#refresh[disabled]::after {
+  content: '\2588'; margin-left: 6px; animation: blink 1s steps(1) infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+
+/* Palette swatches. Each button previews its own palette's ground / signal / cleared
+   colours, which means these three literals per palette are the one place in the file
+   that cannot read from tokens — an inactive palette's colours are by definition not
+   the ones currently in scope. Kept in sync with the palette blocks at the top. */
+.palette { display: flex; gap: 5px; margin-left: auto; }
+.palette button {
+  width: 30px; height: 15px; padding: 0; cursor: pointer;
+  border: 1px solid var(--rule-2); background: none;
+  transition: transform .12s, border-color .12s;
+}
+.palette button:hover { transform: translateY(-1px); border-color: var(--ink-3); }
+.palette button[aria-pressed='true'] {
+  border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink);
+}
+.palette button[data-palette='ledger'] {
+  background: linear-gradient(90deg, #e8e0cd 0 40%, #bf3a0c 40% 74%, #0e6d57 74%);
+}
+.palette button[data-palette='clay'] {
+  background: linear-gradient(90deg, #e9dedb 0 40%, #b83a2c 40% 74%, #146a5c 74%);
+}
+.palette button[data-palette='linen'] {
+  background: linear-gradient(90deg, #e6e4de 0 40%, #bb3a1c 40% 74%, #0f6b52 74%);
+}
+.palette button[data-palette='sage'] {
+  background: linear-gradient(90deg, #e1e7de 0 40%, #b5341f 40% 74%, #0d6647 74%);
+}
+.palette button[data-palette='manifest'] {
+  background: linear-gradient(90deg, #141210 0 40%, #ff5324 40% 74%, #3fc3a1 74%);
+}
+.palette button[data-palette='phosphor'] {
+  background: linear-gradient(90deg, #080b09 0 40%, #ffb000 40% 74%, #4ef08a 74%);
+}
+
+#hidden { margin: 8px 0 0; color: var(--ink-3); font-size: 11px; }
+#refresh-error { color: var(--signal); }
+
+/* ── board ────────────────────────────────────────────────────────────────── */
+
+/* Capped so auto-fill can never resolve to a third column: at 1560px the two tracks
+   are ~750px each, and three would need ~1690px of room. Two columns of dense cards
+   stay scannable; four do not. */
+main { padding: 4px 22px 80px; max-width: 1560px; }
+
+/* Lanes stay full-bleed and stacked — their order is a priority ranking, so the read
+   must run straight down the page. It is the CARDS inside a group that tile, since items
+   within one group are peers and left-to-right between them costs nothing.
+   Below ~1150px of room the grid collapses to a single column on its own. */
+.lane-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 560px), 1fr));
+  gap: 7px;
+  align-items: start;   /* cards keep their natural height instead of stretching to
+                           match the tallest in the row */
+}
+/* A group holding exactly one card gives it the full width — "Needs you (1)" should
+   read as a banner, not a half-width fragment stranded beside dead space. */
+.lane-grid > :only-child { grid-column: 1 / -1; }
+.lane-grid + h3.subgroup { margin-top: 19px; }
+
+/* First-load placeholder. The initial collection is as slow as a forced refresh
+   (~6s, uncached); a bare "loading…" reads as a stalled page, so this carries the same
+   live block caret as the refresh button. */
+.boot {
+  margin: 42px 0; color: var(--ink-3); font-size: 10.5px;
+  text-transform: uppercase; letter-spacing: .18em;
+}
+.boot::after { content: '\2588'; margin-left: 7px; animation: blink 1s steps(1) infinite; }
+
+/* Lane header as a printed section rule: an index plate in the lane's own colour,
+   the name in signage type, a hairline running out to the margin, then the tally. */
+.lane h2 {
+  display: flex; align-items: center; gap: 12px;
+  margin: 30px 0 9px;
+  font: 700 21px/1 var(--din);
+  text-transform: uppercase; letter-spacing: .07em;
+  color: var(--ink);
+}
+.lane-index {
+  flex: none;
+  font: 700 12px/1 var(--mono);
+  padding: 4px 5px;
+  color: var(--paper); background: var(--ink-2);
+}
+.lane-rule { flex: 1 1 auto; height: 1px; background: var(--rule-2); }
+.lane-count {
+  flex: none; font: 700 15px/1 var(--din); letter-spacing: .06em;
+  color: var(--ink-3);
+}
+.lane[data-lane='needs-you'] .lane-index { background: var(--signal); color: #fff; }
+.lane[data-lane='waiting'] .lane-index { background: var(--amber); color: var(--paper); }
+.lane[data-lane='in-flight'] .lane-index { background: var(--ion); color: var(--paper); }
+.lane[data-lane='backlog'] .lane-index { background: var(--ink-3); }
+.lane[data-lane='other'] .lane-index { background: var(--signal); color: #fff; }
+
+/* Status subgroups inside "in flight" — indented, mono, a step quieter than a lane. */
+.lane h3.subgroup {
+  display: flex; align-items: center; gap: 9px;
+  margin: 16px 0 6px; font: 400 10.5px/1 var(--mono); font-weight: 700;
+  text-transform: uppercase; letter-spacing: .13em; color: var(--ink-2);
+}
+.lane h3.subgroup::before { content: ''; width: 10px; height: 1px; background: var(--ink-3); }
+.lane h3.subgroup::after { content: ''; flex: 1 1 auto; height: 1px; background: var(--rule); }
+
+/* ── card ─────────────────────────────────────────────────────────────────── */
+
+.card {
+  position: relative;
+  background: var(--paper-2);
+  border: 1px solid var(--rule);
+  border-left: 4px solid var(--ink-3);
+  padding: 11px 14px 12px;
   /* Real branch names here run to 96 unbroken characters, e.g.
      PY-13925-Sometimes-in-Logan-all-my-menu-options-don-t-populate-and-I-have-to-log-out-and-back-in
      With no break opportunity such a token widens the card, then the page. `anywhere`
      lets it break mid-token; `break-word` alone would not, since there is no space. */
-  overflow-wrap: anywhere; }
-.card.lane-needs-you { border-left: 3px solid var(--bad); }
-.card.lane-waiting { border-left: 3px solid var(--warn); }
-.card header { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+  overflow-wrap: anywhere;
+  /* Staggered entrance. --i is the card's board-wide index, set in render(); the cap
+     keeps a 40-item board from taking a second to finish arriving. */
+  animation: rise .34s cubic-bezier(.2, .7, .3, 1) both;
+  animation-delay: calc(min(var(--i, 0), 24) * 22ms);
+  transition: background .12s, border-color .12s, transform .12s;
+}
+@keyframes rise { from { opacity: 0; transform: translateY(7px); } }
+
+.card:hover { background: var(--paper-3); border-color: var(--rule-2); }
+
+.card.lane-needs-you { border-left-color: var(--signal); }
+/* Hazard stripes on the attention lane only. It is the one state that means "stop
+   scrolling", and caution tape is the honest visual idiom for it. */
+.card.lane-needs-you::before {
+  content: ''; position: absolute; top: -1px; bottom: -1px; left: -4px; width: 4px;
+  background: repeating-linear-gradient(
+    -45deg, var(--signal) 0 3px, rgba(0, 0, 0, .45) 3px 6px);
+}
+.card.lane-waiting { border-left-color: var(--amber); }
+.card.lane-in-flight { border-left-color: var(--ion); }
+.card.lane-ready-to-start { border-left-color: var(--ink-2); }
+.card.lane-backlog { border-left-color: var(--ink-3); }
+
+.card header { display: flex; gap: 9px; align-items: baseline; flex-wrap: wrap; }
 /* Flex items default to min-width:auto and refuse to shrink below their content, which
    defeats the wrapping above. Explicit min-width:0 lets them narrow to the container. */
 .card header > *, .pr > *, .slot > * { min-width: 0; }
-.key { font-weight: 600; text-decoration: none; color: var(--ink); }
-.title { flex: 1 1 320px; }
-.status, .chip { font-size: 11px; padding: 1px 6px; border: 1px solid var(--line); border-radius: 999px;
-  color: var(--muted); white-space: nowrap; }
-.chip.bad { color: var(--bad); border-color: var(--bad); }
-.chip.warn { color: var(--warn); border-color: var(--warn); }
-.pr, .slot { display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
-  margin-top: 6px; font-size: 12px; color: var(--muted); }
-.pr-num { color: var(--ink); text-decoration: none; font-weight: 600; }
-.pr-review.ok, .pr-checks.ok { color: var(--ok); }
-.pr-review.warn { color: var(--warn); }
-.pr-checks.bad { color: var(--bad); }
-.reasons { margin: 8px 0 0; padding-left: 18px; color: var(--muted); font-size: 12px; }
-.plans { margin-top: 8px; display: flex; gap: 16px; flex-wrap: wrap; }
-.plan-folder-name { font-size: 11px; color: var(--muted); margin-bottom: 2px; }
-.plan-file { display: block; font-size: 12px; }
-.actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
-.actions button { font: inherit; font-size: 12px; padding: 3px 9px; border: 1px solid var(--line);
-  border-radius: 6px; background: var(--card); color: var(--ink); cursor: pointer; }
-.actions button[disabled] { opacity: .45; cursor: not-allowed; }
-.action-msg { font-size: 12px; margin-top: 6px; }
-.action-msg.bad { color: var(--bad); }
-.action-msg.ok { color: var(--ok); }
 
-/* Subtasks nested under a card's own <details> — collapsed by default (no [open]
-   attribute set), native disclosure triangle. */
-.subtasks { margin-top: 8px; font-size: 12px; }
-.subtasks summary { cursor: pointer; color: var(--ink); }
+/* Ticket key as a stamped part number. */
+.key {
+  flex: none;
+  font: 700 11px/1 var(--mono); letter-spacing: .04em;
+  padding: 3px 5px;
+  color: var(--ink); text-decoration: none;
+  border: 1px solid var(--rule-2); background: var(--paper);
+}
+.key:hover { border-color: var(--signal); color: var(--signal); }
+
+/* The human line: the only prose on the card, so the only serif on the card. */
+.title {
+  flex: 1 1 320px;
+  font: 400 14.5px/1.35 var(--serif);
+  color: var(--ink);
+}
+
+.status {
+  flex: none; font-size: 10px; text-transform: uppercase; letter-spacing: .1em;
+  padding: 3px 6px; color: var(--ink-2); border: 1px solid var(--rule-2);
+  white-space: nowrap;
+}
+
+.chip {
+  font-size: 10px; text-transform: uppercase; letter-spacing: .09em;
+  padding: 2px 5px; color: var(--ink-2); border: 1px solid var(--rule);
+  white-space: nowrap;
+}
+.chip.bad  { color: var(--signal); border-color: var(--signal); }
+.chip.warn { color: var(--amber);  border-color: var(--amber); }
+
+/* Machine rows: PR state and local checkout state. Same rhythm, different left mark. */
+.pr, .slot {
+  display: flex; gap: 9px; align-items: center; flex-wrap: wrap;
+  margin-top: 7px; padding-left: 13px; position: relative;
+  font-size: 11px; color: var(--ink-2);
+}
+.pr::before, .slot::before {
+  position: absolute; left: 0; top: 0; color: var(--ink-3); font-size: 10px;
+}
+.pr::before { content: '\2387'; }    /* branch/merge mark */
+.slot::before { content: '\25A0'; }  /* filled square: a physical checkout on disk */
+
+.pr-num { color: var(--ink); text-decoration: none; font-weight: 700; }
+.pr-num:hover { color: var(--signal); }
+.pr-repo, .slot-dir { color: var(--ink-3); }
+.slot-branch { color: var(--ink); }
+.pr-review, .pr-checks {
+  text-transform: uppercase; letter-spacing: .08em; font-size: 10px;
+}
+.pr-review.ok, .pr-checks.ok { color: var(--oxide); }
+.pr-review.warn { color: var(--amber); }
+.pr-checks.bad { color: var(--signal); }
+
+/* Why this card is in this lane. Marked with signal arrows rather than bullets — these
+   are the actionable lines, and they should be the first thing the eye lands on after
+   the title. */
+.reasons { margin: 10px 0 0; padding: 0; list-style: none; }
+.reasons li {
+  position: relative; padding-left: 15px; margin-top: 3px;
+  font-size: 11px; color: var(--ink);
+}
+.reasons li::before {
+  content: '\25B8'; position: absolute; left: 0; top: 0; color: var(--signal);
+}
+.card.lane-waiting .reasons li::before { color: var(--amber); }
+.card.lane-in-flight .reasons li::before,
+.card.lane-ready-to-start .reasons li::before,
+.card.lane-backlog .reasons li::before { color: var(--ink-3); }
+
+/* ── plans ────────────────────────────────────────────────────────────────── */
+
+.plans {
+  margin-top: 11px; display: flex; gap: 22px; flex-wrap: wrap;
+  padding: 8px 10px; background: var(--paper); border: 1px dashed var(--rule-2);
+}
+.plan-folder-name {
+  font-size: 9.5px; text-transform: uppercase; letter-spacing: .13em;
+  color: var(--ink-3); margin-bottom: 4px;
+}
+.plan-file {
+  display: flex; align-items: baseline; gap: 6px;
+  font-size: 11px; color: var(--ink-2); cursor: pointer;
+}
+.plan-file:hover { color: var(--ink); }
+.plan-file input {
+  appearance: none; margin: 0; flex: none; width: 10px; height: 10px;
+  border: 1px solid var(--rule-2); background: var(--paper-2); cursor: pointer;
+}
+.plan-file input:checked { background: var(--oxide); border-color: var(--oxide); }
+
+/* ── actions ──────────────────────────────────────────────────────────────── */
+
+.actions {
+  display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
+  margin-top: 12px; padding-top: 11px; border-top: 1px solid var(--rule);
+}
+.actions button {
+  font: 700 10px/1 var(--mono);
+  text-transform: uppercase; letter-spacing: .12em;
+  padding: 6px 10px;
+  border: 1px solid var(--rule-2); background: var(--paper);
+  color: var(--ink); cursor: pointer;
+  transition: background .12s, border-color .12s, color .12s;
+}
+.actions button:hover:not([disabled]) {
+  background: var(--signal); border-color: var(--signal); color: #fff;
+}
+/* Disabled is dashed, not merely faded: "this action is unavailable and there is a
+   reason in the tooltip" should be legible at a glance, not a contrast judgement. */
+.actions button[disabled] {
+  opacity: .5; cursor: not-allowed; border-style: dashed; color: var(--ink-2);
+}
+.repo-choice-label {
+  font-size: 9.5px; text-transform: uppercase; letter-spacing: .13em;
+  color: var(--ink-3); margin-left: 4px;
+}
+.repo-choice-label:first-child { margin-left: 0; }
+
+.action-msg { margin: 8px 0 0; font-size: 11px; color: var(--ink-2); }
+.action-msg:empty { display: none; }
+.action-msg.bad { color: var(--signal); }
+.action-msg.ok { color: var(--oxide); }
+/* Slot-candidate buttons rendered into the message line by post(). */
+.action-msg button {
+  font: 400 10px/1 var(--mono); margin: 6px 6px 0 0; padding: 5px 8px;
+  border: 1px solid var(--rule-2); background: var(--paper); color: var(--ink);
+  cursor: pointer;
+}
+.action-msg button:hover { border-color: var(--signal); color: var(--signal); }
+
+/* ── subtasks ─────────────────────────────────────────────────────────────── */
+
+/* Nested under the card's own <details> — collapsed by default (no [open] attribute
+   set). The native triangle is replaced by a mono caret that rotates on open. */
+.subtasks { margin-top: 11px; font-size: 11px; }
+.subtasks summary {
+  cursor: pointer; list-style: none;
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 9.5px; text-transform: uppercase; letter-spacing: .13em;
+  color: var(--ink-2); padding: 3px 0;
+}
+.subtasks summary::-webkit-details-marker { display: none; }
+.subtasks summary::before {
+  content: '\25B8'; color: var(--ink-3); transition: transform .14s;
+}
+.subtasks[open] summary::before { transform: rotate(90deg); }
 .subtasks summary:hover { color: var(--ink); }
-.subtask { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap;
-  margin-top: 6px; padding-left: 14px; color: var(--muted); }
+
+.subtask {
+  display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap;
+  margin-top: 5px; padding: 4px 0 4px 14px;
+  border-left: 1px solid var(--rule); color: var(--ink-2);
+}
 .subtask > * { min-width: 0; }
-.subtask-key { font-weight: 600; text-decoration: none; color: var(--ink); }
+.subtask-key {
+  flex: none; font-weight: 700; text-decoration: none; color: var(--ink);
+}
+.subtask-key:hover { color: var(--signal); }
 /* Real subtask summaries run long. overflow-wrap is inherited from .card's own rule
    in the nested case, but stated explicitly here too since .subtask-summary is reused
    verbatim by nothing else that guarantees it — cheap insurance against the class
    someday being used outside a .card. */
-.subtask-summary { flex: 1 1 240px; overflow-wrap: anywhere; }
-.subtask-divider { margin: 6px 0 2px 14px; color: var(--muted); font-size: 11px; }
-.subtask-done { opacity: .7; }
-.subtask-done .subtask-key { color: var(--muted); }
+.subtask-summary {
+  flex: 1 1 240px; overflow-wrap: anywhere;
+  font: 400 12.5px/1.35 var(--serif); color: var(--ink);
+}
+.subtask-assignee { font-size: 10px; color: var(--ink-3); }
+.subtask-divider {
+  margin: 9px 0 2px; font-size: 9.5px; text-transform: uppercase;
+  letter-spacing: .16em; color: var(--ink-3);
+}
+.subtask-done { opacity: .55; }
+.subtask-done .subtask-key, .subtask-done .subtask-summary { color: var(--ink-2); }
 
 /* The "My subtasks elsewhere" group — not a lane, rendered once after the lanes. */
-.orphan-subtask { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap;
-  padding: 6px 2px; border-bottom: 1px solid var(--line); font-size: 12px;
-  overflow-wrap: anywhere; }
+.orphan-subtask {
+  display: flex; gap: 9px; align-items: baseline; flex-wrap: wrap;
+  padding: 8px 10px;
+  background: var(--paper-2); border: 1px solid var(--rule);
+  border-left: 4px solid var(--rule-2);
+  font-size: 11px; overflow-wrap: anywhere;
+}
 .orphan-subtask > * { min-width: 0; }
-.subtask-parent { color: var(--muted); flex: 1 1 240px; overflow-wrap: anywhere; }
+.orphan-subtask:hover { border-color: var(--rule-2); background: var(--paper-3); }
+.subtask-parent {
+  color: var(--ink-3); flex: 1 1 240px; overflow-wrap: anywhere; font-size: 10.5px;
+}
+
+/* ── chrome ───────────────────────────────────────────────────────────────── */
+
+::-webkit-scrollbar { width: 11px; height: 11px; }
+::-webkit-scrollbar-track { background: var(--paper); }
+::-webkit-scrollbar-thumb { background: var(--rule-2); border: 3px solid var(--paper); }
+::-webkit-scrollbar-thumb:hover { background: var(--ink-3); }
+
+@media (prefers-reduced-motion: reduce) {
+  .card { animation: none; }
+  .boot::after,
+  #refresh[disabled]::after,
+  body:has(#refresh[disabled]) .rule-ticks::after { animation: none; }
+  .subtasks summary::before { transition: none; }
+}
+
+@media (max-width: 620px) {
+  h1 { font-size: 30px; }
+  #meta { margin-left: 0; }
+  main, #top { padding-left: 14px; padding-right: 14px; }
+}
