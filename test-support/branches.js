@@ -6,6 +6,8 @@
 // in the terms they are ABOUT — a PR, a checkout — so the branches are derived here the same
 // way join.js derives them. That keeps each test's intent legible while still exercising the
 // real, branch-shaped code path.
+import { orderBranches } from '../join.js'
+
 export function branchesFrom({ prs = [], slot = null, repo = null, branches }) {
   if (branches) return branches
   const out = []
@@ -17,7 +19,8 @@ export function branchesFrom({ prs = [], slot = null, repo = null, branches }) {
   for (const p of prs) at(p.headRefName ?? null).pr = p
   if (slot) at(slot.branch ?? null).slot = slot
   if (!out.length) out.push({ name: null, repo, pr: null, slot: null, detached: false })
-  return out
+  // The real comparator, not a copy: creation order is part of what these tests exercise.
+  return orderBranches(out)
 }
 
 export const withBranches = (item) => ({ ...item, branches: branchesFrom(item) })

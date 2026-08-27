@@ -349,3 +349,55 @@ test('a second checked-out branch is no longer lost to the scalar slot', () => {
   })
   assert.deepEqual(items[0].branches.map((b) => b.slot.dir).sort(), ['/w/A', '/w/B'])
 })
+
+// --- branch blocks stay in creation order ----------------------------------------------
+//
+// Never sorted by urgency. The branches of one feature are sequential — pr3 builds on pr2 —
+// so floating the urgent one to the top would show pr3 above pr2 and lie about the shape of
+// the work. Urgency is flagged on the block instead (see branchExpanded in public/app.js).
+
+test('branches are ordered by PR number ascending, which IS creation order', () => {
+  // Deliberately fed in the reverse of the intended order: `prs` arrives from a GraphQL
+  // `search` with no `sort`, so GitHub's relevance order is what this has to correct.
+  const items = joinItems({
+    prs: [
+      prAt(7266, 'PY-9-pr4-audit-log', 'd', { isMine: true }),
+      prAt(7110, 'PY-9-catalog', 'a', { isMine: true }),
+      prAt(7240, 'PY-9-pr3-bulk-import', 'c', { isMine: true }),
+      prAt(7211, 'PY-9-pr2-scoring', 'b', { isMine: true }),
+    ],
+    config: cfg,
+  })
+  assert.deepEqual(items[0].branches.map((b) => b.pr.number), [7110, 7211, 7240, 7266])
+})
+
+test('a branch with no PR yet sorts last — nothing has been submitted for it', () => {
+  const items = joinItems({
+    prs: [prAt(7110, 'PY-9-catalog', 'a', { isMine: true })],
+    slots: [slotAt('/w/A', 'PY-9-pr2-agent-suggestions', 'b')],
+    config: cfg,
+  })
+  assert.deepEqual(items[0].branches.map((b) => b.name), ['PY-9-catalog', 'PY-9-pr2-agent-suggestions'])
+})
+
+test('the order is stable whatever order the collectors happened to return', () => {
+  const build = (prs) => joinItems({ prs, config: cfg })[0].branches.map((b) => b.pr.number)
+  const a = prAt(7110, 'PY-9-a', 'a', { isMine: true })
+  const b = prAt(7211, 'PY-9-b', 'b', { isMine: true })
+  const c = prAt(7240, 'PY-9-c', 'c', { isMine: true })
+  assert.deepEqual(build([a, b, c]), [7110, 7211, 7240])
+  assert.deepEqual(build([c, a, b]), [7110, 7211, 7240])
+  assert.deepEqual(build([b, c, a]), [7110, 7211, 7240])
+})
+
+test('PR numbers from different repos are grouped by repo, not interleaved', () => {
+  // Numbers are monotonic PER repository, so comparing across repos would be meaningless.
+  const items = joinItems({
+    prs: [
+      { number: 900, repo: 'O/Zed', headRefName: 'PY-9-z', isMine: true, title: 't' },
+      { number: 7110, repo: 'O/Alpha', headRefName: 'PY-9-a', isMine: true, title: 't' },
+    ],
+    config: cfg,
+  })
+  assert.deepEqual(items[0].branches.map((b) => b.repo), ['O/Alpha', 'O/Zed'])
+})

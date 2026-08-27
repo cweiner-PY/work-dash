@@ -49,6 +49,18 @@ ticket's card: its own PR state, its own checkout, its own reasons, and its own
 buttons. A ticket with one branch renders flat, exactly as before — the blocks
 only appear when there is something to tell apart.
 
+Blocks stay in **creation order**, first branch to last, ordered by PR number
+(monotonic per repo, so ascending number *is* creation order; a branch with no PR
+yet sorts last). They are never sorted by urgency: the branches of one feature are
+sequential, and showing `pr3` above `pr2` would lie about the shape of the work.
+Urgency is **flagged** instead — each block's left edge carries its own lane
+colour, the same vocabulary the card's edge already uses.
+
+A block **folds to one line** unless it is why the card sits in the lane it does,
+so a five-branch ticket is ~610px rather than ~950px. The folded line names the
+branch, its checkout, and the first thing it has to say. Click to unfold. The plan
+picker folds the same way, with the selected file count in its summary.
+
 Each block carries: that branch's PR state and required checks, how far behind
 its base it is, an `idle Nd` chip once a PR has gone a day without activity
 (amber at 3, red at 7), its local checkout, and why it is in its lane. Plan

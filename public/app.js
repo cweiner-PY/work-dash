@@ -200,13 +200,56 @@ export function shortBranchName(item, branch) {
 // item, where the PR row and the checkout row already say everything and labelling the only
 // branch is pure noise. That is what keeps a one-branch card looking exactly as it did.
 //
-// A branch with a PR is identified by its PR number, already rendered; it only needs its name
-// when it has no checkout row to carry it.
+// On a multi-branch card it is the block's TITLE, so it always has content: this used to
+// return null for a branch that had both a PR and a checkout (on the grounds that the
+// checkout row repeats the name), which left the expanded block headed by a bare fold
+// chevron and nothing else.
 export function branchLabel(item, branch, branchCount) {
   if (branchCount < 2) return null
   const name = shortBranchName(item, branch)
-  if (branch.pr) return branch.slot ? null : name
+  if (branch.pr) return name ?? `#${branch.pr.number}`
   return name ? `no PR yet · ${name}` : 'not started'
+}
+
+// Which branch blocks open on first render. A block earns its full height when it is WHY the
+// card sits in the lane it does — so on a needs-you card the branches that need you are open
+// and the rest fold to one line. This NEVER reorders anything: blocks stay in creation order
+// (see orderBranches in join.js), because pr3 reading above pr2 would lie about the shape of
+// the work. Urgency is flagged on the block, not promoted to the top.
+export function branchExpanded(item, branch, index = 0) {
+  const branches = item.branches ?? []
+  // A lone branch IS the card. Nothing to fold, and nothing to tell apart.
+  if (branches.length < 2) return true
+  if (branch.lane === item.lane) return true
+  // The item's lane can come from the TICKET rather than from any branch (ready-to-start,
+  // backlog), in which case nothing matches and the card would be nothing but one-liners.
+  // Open the first — in creation order, that is where the work started.
+  return index === 0 && !branches.some((b) => b.lane === item.lane)
+}
+
+// What a FOLDED branch says in its single line. Enough to decide whether to unfold it: which
+// branch, where it is checked out, and the first thing it has to say. A fold that showed only
+// names would cost more than it saved.
+export function branchSummary(item, branch) {
+  const reasons = branch?.reasons ?? []
+  return {
+    pr: branch?.pr?.number ?? null,
+    name: shortBranchName(item, branch),
+    slot: branch?.slot ? branch.slot.dir.split('/').pop() : null,
+    lane: branch?.lane ?? null,
+    note: reasons[0] ?? null,
+    more: Math.max(0, reasons.length - 1),
+  }
+}
+
+// Plans fold away like subtasks do — a column of checkboxes is worth the space at launch time
+// and never otherwise. The summary carries the SELECTED count, not just the total: folding
+// something that quietly feeds --add-dir arguments to Claude must not also hide how many.
+export function plansSummary(plans = [], selected = null) {
+  const files = plans.reduce((n, f) => n + (f.files?.length ?? 0), 0)
+  const n = selected ?? files
+  return `plans — ${n} of ${files} file${files === 1 ? '' : 's'} · ` +
+         `${plans.length} folder${plans.length === 1 ? '' : 's'}`
 }
 
 export function hasBranch(branch) {
@@ -425,6 +468,8 @@ if (typeof document !== 'undefined') {
   }
 
   function planPicker(item) {
+    const details = el('details', 'plans-fold')
+    const summary = el('summary', null, plansSummary(item.plans))
     const box = el('div', 'plans')
     for (const folder of item.plans) {
       const group = el('div', 'plan-folder')
@@ -439,7 +484,14 @@ if (typeof document !== 'undefined') {
       }
       box.append(group)
     }
-    return box
+    // Keep the summary honest while it is folded: it states how many files are being handed to
+    // Claude, so it must not go stale the moment one is unchecked behind the fold.
+    box.addEventListener('change', () => {
+      const sel = box.querySelectorAll('input[type=checkbox]:checked').length
+      summary.textContent = plansSummary(item.plans, sel)
+    })
+    details.append(summary, box)
+    return details
   }
 
   function selectedPlans(card) {
@@ -548,10 +600,41 @@ if (typeof document !== 'undefined') {
     return s
   }
 
-  function branchBlock(item, branch, c, branchCount) {
-    const box = el('section', branchCount > 1 ? 'branch branch-many' : 'branch')
+  // The one line a folded block shows. Built as separate spans so the fold can be styled, and
+  // so the note reads as prose next to the identifiers rather than merging into them.
+  function foldLine(item, branch) {
+    const s = branchSummary(item, branch)
+    const line = el('span', 'branch-fold-only')
+    if (s.pr) line.append(el('span', 'fold-pr', `#${s.pr}`))
+    if (s.name) line.append(el('span', 'fold-name', s.name))
+    if (s.slot) line.append(el('span', 'fold-slot', s.slot))
+    if (s.note) line.append(el('span', 'fold-note', s.note))
+    if (s.more) line.append(el('span', 'fold-more', `+${s.more} more`))
+    return line
+  }
+
+  function branchBlock(item, branch, c, branchCount, index) {
+    // The lane flag: an urgent branch is made VISIBLE where it sits rather than moved to the
+    // top, reusing the card's own lane vocabulary (signal / amber / ion) instead of inventing
+    // a second one.
+    const laneCls = branch.lane ? ` branch-lane-${branch.lane}` : ''
+    const box = el('section', branchCount > 1 ? `branch branch-many${laneCls}` : 'branch')
     const label = branchLabel(item, branch, branchCount)
-    if (label) box.append(el('span', 'branch-label', label))
+
+    // One branch: flat, exactly as it has always been — no fold, no summary, no chrome.
+    // Several: each folds, and the ones that are why the card is in its lane start open.
+    const many = branchCount > 1
+    const body = many ? el('details', 'branch-fold') : box
+    if (many) {
+      body.open = branchExpanded(item, branch, index)
+      const summary = el('summary', 'branch-summary')
+      if (label) summary.append(el('span', 'branch-label', label))
+      summary.append(foldLine(item, branch))
+      body.append(summary)
+      box.append(body)
+    } else if (label) {
+      box.append(el('span', 'branch-label', label))
+    }
 
     const msg = el('p', 'action-msg')
 
@@ -590,9 +673,9 @@ if (typeof document !== 'undefined') {
       if (res.ok && refresh) setTimeout(() => load({ force: true }), 1200)
     }
 
-    if (branch.pr) box.append(prRow(branch.pr))
-    if (branch.slot) box.append(slotRow(branch, post))
-    if (branch.reasons?.length) box.append(reasonList(branch.reasons))
+    if (branch.pr) body.append(prRow(branch.pr))
+    if (branch.slot) body.append(slotRow(branch, post))
+    if (branch.reasons?.length) body.append(reasonList(branch.reasons))
 
     const actions = el('div', 'actions')
 
@@ -672,7 +755,7 @@ if (typeof document !== 'undefined') {
       actions.append(m)
     }
 
-    box.append(actions, msg)
+    body.append(actions, msg)
     return box
   }
 
@@ -694,8 +777,9 @@ if (typeof document !== 'undefined') {
     const ticketReasons = item.ticketReasons ?? item.reasons
     if (ticketReasons.length) c.append(reasonList(ticketReasons))
 
+    // In creation order, always — join.js orders them and the card does not second-guess it.
     const branches = item.branches ?? []
-    for (const branch of branches) c.append(branchBlock(item, branch, c, branches.length))
+    branches.forEach((branch, i) => c.append(branchBlock(item, branch, c, branches.length, i)))
 
     if (item.plans.length) c.append(planPicker(item))
 

@@ -24,6 +24,29 @@ const branchOf = (it, repo, name) => {
   return b
 }
 
+// CREATION ORDER, first branch to last. The blocks on a card must never be sorted by urgency:
+// the branches of one feature are sequential — pr3 builds on pr2 — so floating the urgent one
+// to the top would show pr3 above pr2 and lie about the shape of the work. Urgency is flagged
+// on the block instead.
+//
+// PR number ascending IS creation order: numbers are monotonic per repository, so this needs no
+// extra collection. The order it replaces was arbitrary — `prs` arrives from a GraphQL `search`
+// with no `sort`, so GitHub returns relevance order and it could change between refreshes: the
+// same root cause as the `prs[0]` bug this whole structure exists to fix.
+//
+// A branch with no PR sorts last: nothing has been submitted for it, so it is the newest thing
+// here. The case that rule gets wrong — a branch started first that never got a PR — is accepted
+// deliberately. There is no cheap, reliable creation time for a bare branch, and inventing one
+// from a checkout's mtime would mix two unrelated clocks.
+//
+// Exported so the tests order their inputs with the real comparator rather than a copy of it.
+export function orderBranches(branches) {
+  return [...branches].sort((a, b) =>
+    String(a.repo ?? '').localeCompare(String(b.repo ?? '')) ||
+    (a.pr?.number ?? Infinity) - (b.pr?.number ?? Infinity) ||
+    String(a.name ?? '').localeCompare(String(b.name ?? '')))
+}
+
 export function join({ jira = [], enrichment = [], prs = [], slots = [], plans = [], subtasks = [], config }) {
   const byId = new Map()
   const get = (id, key = null) => {
@@ -138,6 +161,7 @@ export function join({ jira = [], enrichment = [], prs = [], slots = [], plans =
   // it did when `slot` was scalar, which is why converting the consumers stayed safe.
   for (const it of byId.values()) {
     if (it.branches.length === 0) it.branches.push({ name: null, repo: it.repo, pr: null, slot: null, detached: false })
+    it.branches = orderBranches(it.branches)
   }
 
   return [...byId.values()]

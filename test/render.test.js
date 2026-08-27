@@ -2,7 +2,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { groupForDisplay, sourceChip, prChecksChip, prBehindChip, summarizeSubtasks, updateBranchSpec, hasBranch, needsRepoChoice, repoLabel, refreshLabel, editorSpec, idleChip, shouldCollect,
-         slotHolding, idleSlotsLine, branchLabel, shortBranchName, checkoutNameOf, ownPrOf, reviewSpecOf } from '../public/app.js'
+         slotHolding, idleSlotsLine, branchLabel, shortBranchName, checkoutNameOf, ownPrOf, reviewSpecOf,
+         branchExpanded, branchSummary, plansSummary } from '../public/app.js'
 
 const it = (o) => ({ id: o.id, lane: o.lane, statusGroup: o.statusGroup ?? 'no ticket',
   sortIndex: o.sortIndex ?? Infinity, signals: { foreign: false, stale: false, reclaimable: false, ...o.signals },
@@ -376,14 +377,16 @@ test('branchLabel says nothing at all for a single-branch item', () => {
   assert.equal(branchLabel(item, br({ name: 'PY-1-x', slot: { dir: '/w/A' } }), 1), null)
 })
 
-test('branchLabel identifies each branch of a multi-branch item', () => {
+test('branchLabel titles every branch of a multi-branch item', () => {
+  // It is the block's title on a folding card, so it always has content. Returning null for
+  // a branch that had both a PR and a checkout left that block headed by a bare chevron.
   const item = { key: 'PY-12746' }
-  // A branch with a PR is identified by its PR number, already on screen — it needs its name
-  // only when it has no checkout row to carry it.
-  assert.equal(branchLabel(item, br({ name: 'PY-12746-catalog', pr: { number: 7110 }, slot: { dir: '/w/A' } }), 2), null)
+  assert.equal(branchLabel(item, br({ name: 'PY-12746-catalog', pr: { number: 7110 }, slot: { dir: '/w/A' } }), 2), 'catalog')
   assert.equal(branchLabel(item, br({ name: 'PY-12746-catalog', pr: { number: 7110 } }), 2), 'catalog')
   assert.equal(branchLabel(item, br({ name: 'PY-12746-pr2', slot: { dir: '/w/B' } }), 2), 'no PR yet · pr2')
   assert.equal(branchLabel(item, br(), 2), 'not started')
+  // A nameless branch that somehow carries a PR falls back to the number rather than nothing.
+  assert.equal(branchLabel(item, br({ name: null, pr: { number: 7110 } }), 2), '#7110')
 })
 
 test('ownPrOf ignores a colleague\'s PR', () => {
@@ -613,4 +616,68 @@ test('idleSlotsLine lists spare checkouts compactly, with their state', () => {
 test('idleSlotsLine says nothing when every checkout is claimed', () => {
   assert.equal(idleSlotsLine([], null), null)
   assert.equal(idleSlotsLine(undefined, null), null)
+})
+
+// --- folding quiet branches, and flagging urgent ones ----------------------------------
+//
+// Half of a five-branch card was blocks that needed nothing: 472px of 946px, measured. A block
+// folds to one line unless it is why the card sits in the lane it does. Nothing is REORDERED to
+// achieve this — the blocks stay in creation order, because pr3 reading above pr2 would lie
+// about the shape of the work, so urgency is flagged where the block already sits.
+
+const brl = (lane, o = {}) => ({ name: 'PY-1-x', repo: 'O/R', pr: null, slot: null, detached: false, lane, reasons: [], ...o })
+
+test('a lone branch is always expanded — there is nothing to fold', () => {
+  const item = { lane: 'backlog', branches: [brl('backlog')] }
+  assert.equal(branchExpanded(item, item.branches[0], 0), true)
+})
+
+test('branches that explain the card\'s lane are open; the rest fold', () => {
+  const branches = [brl('waiting', { name: 'PY-1-a' }), brl('in-flight', { name: 'PY-1-b' }), brl('needs-you', { name: 'PY-1-c' })]
+  const item = { lane: 'needs-you', branches }
+  assert.deepEqual(branches.map((b, i) => branchExpanded(item, b, i)), [false, false, true])
+})
+
+test('several branches can be open at once when several need you', () => {
+  const branches = [brl('needs-you', { name: 'PY-1-a' }), brl('in-flight', { name: 'PY-1-b' }), brl('needs-you', { name: 'PY-1-c' })]
+  const item = { lane: 'needs-you', branches }
+  assert.deepEqual(branches.map((b, i) => branchExpanded(item, b, i)), [true, false, true])
+})
+
+test('when the LANE comes from the ticket, the first branch opens rather than none', () => {
+  // ready-to-start and backlog are decided by the Jira status, not by any branch — so no
+  // branch's lane matches, and a card of nothing but one-liners would say nothing at all.
+  const branches = [brl('in-flight', { name: 'PY-1-a' }), brl('in-flight', { name: 'PY-1-b' })]
+  const item = { lane: 'ready-to-start', branches }
+  assert.deepEqual(branches.map((b, i) => branchExpanded(item, b, i)), [true, false])
+})
+
+test('branchSummary carries enough to decide whether to unfold', () => {
+  const s = branchSummary({ key: 'PY-12746' }, {
+    name: 'PY-12746-catalog-pr3-scoring-rules', lane: 'needs-you',
+    pr: { number: 7211 }, slot: { dir: '/Users/cweiner/Work/PY-3' },
+    reasons: ['required check failing: Linting', 'changes requested', '3 open review threads on #7211'],
+  })
+  assert.deepEqual(s, {
+    pr: 7211, name: 'catalog-pr3-scoring-rules', slot: 'PY-3', lane: 'needs-you',
+    note: 'required check failing: Linting', more: 2,
+  })
+})
+
+test('branchSummary on a branch with nothing to say says nothing, not undefined', () => {
+  const s = branchSummary({ key: 'PY-1' }, { name: 'PY-1-quiet', lane: 'in-flight', pr: null, slot: null, reasons: [] })
+  assert.equal(s.note, null)
+  assert.equal(s.more, 0)
+  assert.equal(s.pr, null)
+  assert.equal(s.slot, null)
+})
+
+test('plansSummary states how many files are SELECTED, not just how many exist', () => {
+  // Folding something that quietly feeds --add-dir arguments to Claude must not also hide
+  // how many it is feeding.
+  const plans = [{ folder: 'A', files: ['plan.md'] }, { folder: 'B', files: ['a.md', 'b.md', 'c.md'] }]
+  assert.equal(plansSummary(plans), 'plans — 4 of 4 files · 2 folders')
+  assert.equal(plansSummary(plans, 1), 'plans — 1 of 4 files · 2 folders')
+  assert.equal(plansSummary([{ folder: 'A', files: ['only.md'] }]), 'plans — 1 of 1 file · 1 folder')
+  assert.equal(plansSummary([]), 'plans — 0 of 0 files · 0 folders')
 })
