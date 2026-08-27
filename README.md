@@ -164,13 +164,6 @@ cause, rather than showing a blank board.
 first. "Check status unknown" usually means `gh` auth expired — an unreadable
 check list blocks the gate rather than being assumed clean.
 
-## Before making this repo public
-
-Don't, without work first. No credential is in any revision, but
-`test/fixtures/` are **recorded live Jira and GitHub responses** — real ticket
-keys and summaries, sprint names, a teammate's login. They're real on purpose;
-several genuine bugs were caught only because they weren't invented. `docs/` and
-the commit messages carry internal detail too. Add collaborators instead.
 
 ## Development
 
