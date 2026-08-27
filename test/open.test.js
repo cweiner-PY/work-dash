@@ -6,7 +6,7 @@ import { existsSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
-import { buildLauncher, openItem } from '../actions/open.js'
+import { buildLauncher, openItem, terminalMode, terminalArgs, tabHint } from '../actions/open.js'
 
 const config = { docsDir: '/docs', repos: { 'O/R': { slots: ['/w/A'] } } }
 const item = {
@@ -293,4 +293,123 @@ test('openItem passes mergeBase through to the launcher', async () => {
       writeFile: async (_p, c) => { script = c } })
   assert.equal(r.ok, true, r.message)
   assert.match(script, /git merge 'origin\/master'/)
+})
+
+
+// --- terminal mode: a new window, or a tab of the front window -------------------------
+//
+// Asserted against the generated AppleScript, never by launching. Testing this by opening
+// terminals leaves windows on the user's screen, which is how NOT to answer the question.
+
+test('terminalMode defaults to window, and only the exact string "tab" opts in', () => {
+  // A shared tool must not silently depend on an Accessibility grant nobody was asked for.
+  assert.equal(terminalMode({}), 'window')
+  assert.equal(terminalMode(undefined), 'window')
+  assert.equal(terminalMode({ terminalMode: 'tab' }), 'tab')
+  for (const bad of ['Tab', 'TAB', 'tabs', 'window', '', null, true, 1]) {
+    assert.equal(terminalMode({ terminalMode: bad }), 'window', JSON.stringify(bad))
+  }
+})
+
+test('window mode is exactly the old two-statement script', () => {
+  const args = terminalArgs('/tmp/x.sh', 'window')
+  assert.deepEqual(args, [
+    '-e', 'tell application "Terminal" to do script "bash /tmp/x.sh"',
+    '-e', 'tell application "Terminal" to activate',
+  ])
+})
+
+test('tab mode sends Cmd+T and then targets the FRONT window', () => {
+  // Terminal cannot make a tab from its own dictionary (`make new tab` -> -10000), so the
+  // keystroke is the only route, and `do script ... in front window` lands in the new tab.
+  const script = terminalArgs('/tmp/x.sh', 'tab').join(' ')
+  assert.match(script, /keystroke "t" using command down/)
+  assert.match(script, /do script "bash \/tmp\/x.sh" in front window/)
+})
+
+test('tab mode guards on Terminal already running', () => {
+  // Cmd+T against a Terminal that is not running would leave an empty window plus a tab.
+  const args = terminalArgs('/tmp/x.sh', 'tab')
+  assert.equal(args[1], 'if application "Terminal" is running then')
+  assert.ok(args.includes('else'), 'and has a not-running branch')
+  assert.ok(args.includes('end if'))
+  // The not-running branch opens a plain window, with no keystroke in it.
+  const elseIdx = args.indexOf('else')
+  const tail = args.slice(elseIdx).join(' ')
+  assert.match(tail, /do script "bash \/tmp\/x.sh"/)
+  assert.ok(!/keystroke/.test(tail))
+})
+
+test('tab mode keeps the delays the keystroke needs', () => {
+  // The keystroke is asynchronous and `do script` needs the tab to exist first. Without
+  // these the command lands in the wrong tab, or nowhere.
+  const args = terminalArgs('/tmp/x.sh', 'tab')
+  assert.ok(args.filter((a) => /^delay /.test(a)).length >= 2)
+})
+
+test('tabHint names the Accessibility grant for the opaque keystroke error', () => {
+  assert.match(tabHint('osascript is not allowed to send keystrokes. (1002)'), /Accessibility/)
+  assert.match(tabHint('System Events got an error: 1002'), /Accessibility/)
+  // Anything else is passed through rather than mislabelled as a permissions problem.
+  assert.equal(tabHint('some other failure'), 'some other failure')
+  assert.equal(tabHint(''), 'the tab attempt failed')
+  assert.equal(tabHint(undefined), 'the tab attempt failed')
+})
+
+test('a refused tab falls back to a window, and SAYS it did', async () => {
+  // The user must not be left wondering why they got a window, nor left with nothing.
+  const calls = []
+  const r = await openItem(
+    { item, slots: [slotA], plans, config: { ...config, terminalMode: 'tab' },
+      staleBranches: new Set(), claimedDirs: new Set() },
+    { run: async (cmd, args) => {
+        const tab = args.some((a) => /keystroke/.test(String(a)))
+        calls.push(tab ? 'tab' : 'window')
+        return tab
+          ? { code: 1, stdout: '', stderr: 'osascript is not allowed to send keystrokes. (1002)' }
+          : { code: 0, stdout: '', stderr: '' }
+      },
+      writeFile: async () => {} })
+  assert.equal(r.ok, true, 'a refused tab must still launch')
+  assert.deepEqual(calls, ['tab', 'window'], 'tab attempted first, window as the fallback')
+  assert.match(r.message, /new WINDOW, not a tab/)
+  assert.match(r.message, /Accessibility/)
+})
+
+test('a successful tab does not also open a window', async () => {
+  const calls = []
+  const r = await openItem(
+    { item, slots: [slotA], plans, config: { ...config, terminalMode: 'tab' },
+      staleBranches: new Set(), claimedDirs: new Set() },
+    { run: async (cmd, args) => {
+        calls.push(args.some((a) => /keystroke/.test(String(a))) ? 'tab' : 'window')
+        return { code: 0, stdout: '', stderr: '' }
+      },
+      writeFile: async () => {} })
+  assert.equal(r.ok, true)
+  assert.deepEqual(calls, ['tab'], 'exactly one launch')
+  assert.ok(!/WINDOW/.test(r.message))
+})
+
+test('window mode never attempts a keystroke at all', async () => {
+  const calls = []
+  await openItem(
+    { item, slots: [slotA], plans, config, staleBranches: new Set(), claimedDirs: new Set() },
+    { run: async (cmd, args) => {
+        calls.push(args.some((a) => /keystroke/.test(String(a))) ? 'tab' : 'window')
+        return { code: 0, stdout: '', stderr: '' }
+      },
+      writeFile: async () => {} })
+  assert.deepEqual(calls, ['window'])
+})
+
+test('both modes fail loudly when Terminal cannot be driven at all', async () => {
+  for (const terminalMode of ['window', 'tab']) {
+    const r = await openItem(
+      { item, slots: [slotA], plans, config: { ...config, terminalMode },
+        staleBranches: new Set(), claimedDirs: new Set() },
+      { run: async () => ({ code: 1, stdout: '', stderr: 'no Terminal' }), writeFile: async () => {} })
+    assert.equal(r.ok, false, terminalMode)
+    assert.match(r.message, /Could not open Terminal/)
+  }
 })

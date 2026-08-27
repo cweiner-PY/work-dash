@@ -6,6 +6,7 @@
   "jiraProject": "PY",
   "docsDir": "/Users/YOU/Work/docs",
   "checkoutMode": "slots",
+  "terminalMode": "window",
   "editor": "Cursor",
   "notifications": true,
   "jiraSprintField": "customfield_10020",

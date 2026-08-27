@@ -6,6 +6,9 @@ export class ConfigError extends Error {}
 
 const DEFAULTS = {
   port: 4200,
+  // 'window' (default) or 'tab'. Tab needs an Accessibility grant per machine, so it is
+  // opt-in — see terminalMode in actions/open.js.
+  terminalMode: 'window',
   // Required checks that are HUMAN gates rather than CI. These stay FAILURE until a person
   // acts, so they must not be read as "you broke something" — see lanes.js. Set to [] at an
   // organisation that has none.

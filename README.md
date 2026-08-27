@@ -92,6 +92,7 @@ can't guess; `doctor` validates the rest.
 | `githubLogin` | | Distinguishes your own PR comments from a teammate's review feedback |
 | `port` | | Default 4200 |
 | `checkoutMode` | | `slots` (default) or `worktrees` — see below |
+| `terminalMode` | | `window` (default) or `tab`. Tab opens the session as a tab of the front Terminal window — it needs Accessibility granted to Terminal, and falls back to a window (saying so) if refused |
 | `worktreeRoot` | | Where worktrees live. Default `~/.cache/work-dash-worktrees` |
 | `humanGateChecks` | | Required checks that are human gates, not CI — they explain a card but never claim to be your move. Default `["QA Code Review"]` |
 | `editor` | | Any installed app name, resolved by `open -a`. Default `Cursor` |

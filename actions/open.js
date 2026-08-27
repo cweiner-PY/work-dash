@@ -105,6 +105,51 @@ export function buildLauncher({ item, slot, plans, skill, config, mergeBase = nu
   return lines.join('\n')
 }
 
+// 'tab' opens the session as a tab of the frontmost Terminal window; anything else opens a
+// new window. Window is the default: tab needs an Accessibility grant on each machine, and a
+// shared tool must not depend on a permission the user has not been asked for.
+export function terminalMode(config) {
+  return config?.terminalMode === 'tab' ? 'tab' : 'window'
+}
+
+const launchedMessage = (skill, slot) =>
+  skill ? `Running /${skill} in ${slot.dir.split('/').pop()}` : `Opened ${slot.dir.split('/').pop()}`
+
+// The failure that matters is the un-granted keystroke, and its message is opaque
+// ("osascript is not allowed to send keystrokes. (1002)"), so it gets named.
+export function tabHint(stderr) {
+  return /not allowed to send keystrokes|1002/.test(String(stderr ?? ''))
+    ? 'grant Accessibility to Terminal in System Settings → Privacy & Security → Accessibility'
+    : (String(stderr ?? '').trim() || 'the tab attempt failed')
+}
+
+// Pure, and exported, so the AppleScript can be asserted without running it — the one thing
+// in this file that must never be tested by launching something.
+//
+// Terminal.app cannot create a tab from its own dictionary (`make new tab` fails with
+// -10000), so a tab means sending Cmd+T through System Events and then targeting the front
+// window. The delays are unavoidable: the keystroke is asynchronous, and `do script` needs
+// the new tab to exist before it can be addressed.
+//
+// `is running` guards it because Cmd+T against a Terminal that is not running would produce
+// an empty window plus a tab. That query does not launch the app.
+export function terminalArgs(path, mode) {
+  if (mode !== 'tab') {
+    return ['-e', `tell application "Terminal" to do script "bash ${path}"`,
+            '-e', 'tell application "Terminal" to activate']
+  }
+  return ['-e', 'if application "Terminal" is running then',
+          '-e', 'tell application "Terminal" to activate',
+          '-e', 'delay 0.2',
+          '-e', 'tell application "System Events" to keystroke "t" using command down',
+          '-e', 'delay 0.4',
+          '-e', `tell application "Terminal" to do script "bash ${path}" in front window`,
+          '-e', 'else',
+          '-e', `tell application "Terminal" to do script "bash ${path}"`,
+          '-e', 'tell application "Terminal" to activate',
+          '-e', 'end if']
+}
+
 export async function openItem(
   { item, slots, plans = [], skill = null, config, chosenSlotDir = null, staleBranches, claimedDirs, repo = null, mergeBase = null },
   { run = defaultRun, writeFile = fsWriteFile, dry = false } = {}
@@ -158,12 +203,31 @@ export async function openItem(
     return { ok: false, message: `Refusing to launch: unsafe launcher path ${path}` }
   }
   await writeFile(path, script, { mode: 0o700 })
-  const applescript = `tell application "Terminal" to do script "bash ${path}"`
-  const r = await run('osascript', ['-e', applescript, '-e', 'tell application "Terminal" to activate'])
-  if (r.code !== 0) return { ok: false, message: `Could not open Terminal: ${r.stderr.trim()}` }
-  return {
-    ok: true,
-    message: skill ? `Running /${skill} in ${slot.dir.split('/').pop()}` : `Opened ${slot.dir.split('/').pop()}`,
-    detail: script, slot: slot.dir,
+
+  // Tab mode first when configured, falling back to a new window. Ordered this way, not
+  // guarded by a permission check, because there is no reliable way to ask: reading process
+  // names through System Events is allowed while SENDING a keystroke is a separate grant, so
+  // the permissive-looking read told us nothing. Attempting it and falling back is the only
+  // honest test, and the fallback is exactly today's behaviour.
+  let r = null
+  if (terminalMode(config) === 'tab') {
+    r = await run('osascript', terminalArgs(path, 'tab'))
+    if (r.code !== 0) {
+      // Nothing has launched at this point: both the keystroke and the `do script` come
+      // before anything runs, so retrying as a window cannot double-launch.
+      const why = r.stderr.trim()
+      r = await run('osascript', terminalArgs(path, 'window'))
+      if (r.code === 0) {
+        return {
+          ok: true,
+          message: `${launchedMessage(skill, slot)} — in a new WINDOW, not a tab: ${tabHint(why)}`,
+          detail: script, slot: slot.dir,
+        }
+      }
+    }
+  } else {
+    r = await run('osascript', terminalArgs(path, 'window'))
   }
+  if (r.code !== 0) return { ok: false, message: `Could not open Terminal: ${r.stderr.trim()}` }
+  return { ok: true, message: launchedMessage(skill, slot), detail: script, slot: slot.dir }
 }
