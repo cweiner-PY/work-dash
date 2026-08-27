@@ -118,9 +118,12 @@ export function prChecksChip(rc) {
 // branch protection requires branches be up to date. An earlier version of this function
 // read CLEAN/BLOCKED/UNSTABLE as "up to date" and told the user a PR 24 commits behind
 // master had nothing to do. See BASE_COMPARE_QUERY in collect/github.js.
-// Pure and exported so it is testable without a DOM, same as prChecksChip. `mainPr` is
-// the item's OWN PR (never a colleague's review request) or null.
-export function updateBranchSpec(item, mainPr) {
+// Pure and exported so it is testable without a DOM, same as prChecksChip. The first
+// argument is ONE BRANCH of an item — the thing that has at most one PR and at most one
+// checkout. It used to be the item, whose scalar `slot` and first PR could describe two
+// different branches, so the label came off one and the action ran against the other.
+// `mainPr` is that branch's OWN PR (never a colleague's review request) or null.
+export function updateBranchSpec(branch, mainPr) {
   if (mainPr) {
     const base = mainPr.baseRefName ?? 'the base branch'
     // Conflicts come first and outrank the behind count: however far behind the branch
@@ -158,28 +161,63 @@ export function updateBranchSpec(item, mainPr) {
   }
   // No PR: fall back to the old local-only signal. The count is only as fresh as the
   // user's last manual fetch, so it must never be presented as current.
-  if (!item.slot) return null
+  if (!branch.slot) return null
   return {
-    label: item.slot.behind > 0 ? `update (${item.slot.behind} behind, as of last fetch)` : 'update branch',
-    disabled: item.slot.dirty,
+    label: branch.slot.behind > 0 ? `update (${branch.slot.behind} behind, as of last fetch)` : 'update branch',
+    disabled: branch.slot.dirty,
     action: 'update-branch',
-    title: item.slot.dirty ? `${item.slot.dirtyCount} uncommitted change(s)` : null,
+    title: branch.slot.dirty ? `${branch.slot.dirtyCount} uncommitted change(s)` : null,
   }
 }
 
-// Mirrors actions/slot.js's branchFor without importing it: public/app.js runs in the
-// browser as a static file, and server.js's static-file guard deliberately will not
+// These three mirror actions/slot.js and lanes.js without importing them: public/app.js runs
+// in the browser as a static file, and server.js's static-file guard deliberately will not
 // serve anything outside public/ (lanes.js/actions/ included) to a client.
-export function hasBranch(item) {
-  const mainPr = item.prs.find((p) => p.isMine !== false)
-  return Boolean(mainPr?.headRefName ?? item.slot?.branch)
+
+// The branch's own PR, and only when it is the user's. A colleague's review-requested PR must
+// never drive this branch's buttons.
+export const ownPrOf = (branch) => (branch?.pr && branch.pr.isMine !== false ? branch.pr : null)
+
+// The branch name a plain `open` would check out — null when the branch exists only because a
+// colleague asked for a review, since /api/review is the action for that and it checks out
+// detached. Mirrors checkoutBranchOf in actions/slot.js, which is the authority.
+export function checkoutNameOf(branch) {
+  if (!branch) return null
+  const colleaguesPr = branch.pr && branch.pr.isMine === false
+  const ownCheckout = branch.slot && !branch.detached
+  if (colleaguesPr && !ownCheckout) return null
+  return branch.name ?? null
+}
+
+// The branch name minus the ticket key the card already shows. Mirrors shortBranch in lanes.js.
+export function shortBranchName(item, branch) {
+  const name = branch?.name
+  if (!name) return null
+  return item?.key && name.startsWith(`${item.key}-`) ? name.slice(item.key.length + 1) : name
+}
+
+// What identifies one branch block among an item's others — and NOTHING for a single-branch
+// item, where the PR row and the checkout row already say everything and labelling the only
+// branch is pure noise. That is what keeps a one-branch card looking exactly as it did.
+//
+// A branch with a PR is identified by its PR number, already rendered; it only needs its name
+// when it has no checkout row to carry it.
+export function branchLabel(item, branch, branchCount) {
+  if (branchCount < 2) return null
+  const name = shortBranchName(item, branch)
+  if (branch.pr) return branch.slot ? null : name
+  return name ? `no PR yet · ${name}` : 'not started'
+}
+
+export function hasBranch(branch) {
+  return Boolean(checkoutNameOf(branch))
 }
 
 // A branchless, repo-less item (a To Do ticket Jira never identifies a repo for) cannot
-// resolve a slot pool on its own — the user must say which repo. An item that already
-// has a repo or a branch keeps today's single-button rendering.
-export function needsRepoChoice(item) {
-  return !hasBranch(item) && !item.repo
+// resolve a slot pool on its own — the user must say which repo. A branch that already has a
+// name, or an item that knows its repo, keeps today's single-button rendering.
+export function needsRepoChoice(item, branch) {
+  return !hasBranch(branch) && !item.repo
 }
 
 // docsSubdir is already the short name PerformYard uses for this repo elsewhere (see
@@ -225,19 +263,19 @@ export function idleSlotsLine(idleSlots, config) {
   return `free checkouts: ${parts.join(' · ')}`
 }
 
-// One button per PR awaiting YOUR review. Returns [] for everything else, so the button only
-// appears where the user is the reviewer. The label carries the PR number because an item can
-// legitimately have more than one, and the user picks which.
-export function reviewSpecs(item, config) {
+// The review button for ONE branch, or null when that branch is not somebody else's PR
+// awaiting your review. Per branch rather than per item because the branch is where the PR
+// lives; the label still carries the PR number, since an item can legitimately have several.
+export function reviewSpecOf(branch, config) {
+  const p = branch?.pr
+  if (!p || p.isMine !== false || !p.headRefName) return null
   const skill = config?.reviewSkill ?? 'critical-review'
-  return (item.prs ?? [])
-    .filter((p) => p.isMine === false && p.headRefName)
-    .map((p) => ({
-      prNumber: p.number,
-      label: `review #${p.number}`,
-      title: `Check out ${p.headRefName} detached in a slot and run /${skill} as reviewer` +
-             `${p.author ? ` \u2014 ${p.author}'s PR` : ''}. Makes no changes.`,
-    }))
+  return {
+    prNumber: p.number,
+    label: `review #${p.number}`,
+    title: `Check out ${p.headRefName} detached in a slot and run /${skill} as reviewer` +
+           `${p.author ? ` \u2014 ${p.author}'s PR` : ''}. Makes no changes.`,
+  }
 }
 
 // The checkout directory on the slot row, made clickable to open it in the editor —
@@ -245,14 +283,14 @@ export function reviewSpecs(item, config) {
 // the PR number opens GitHub. The identifier IS the control; there is no separate button.
 // Returns null when the item has no local checkout, in which case there is no slot row to
 // click at all — a To Do ticket without one is the ordinary case, not a problem to flag.
-export function editorSpec(item, config) {
-  if (!item.slot?.dir) return null
+export function editorSpec(branch, config) {
+  if (!branch?.slot?.dir) return null
   const editor = config?.editor ?? 'Cursor'
   return {
-    dir: item.slot.dir,
-    name: item.slot.dir.split('/').pop(),   // the same short name the slot row always showed
+    dir: branch.slot.dir,
+    name: branch.slot.dir.split('/').pop(),   // the same short name the slot row always showed
     editor,
-    title: `Open ${item.slot.dir} in ${editor}`,
+    title: `Open ${branch.slot.dir} in ${editor}`,
   }
 }
 
@@ -457,77 +495,77 @@ if (typeof document !== 'undefined') {
     return sec
   }
 
-  function card(item) {
-    const c = el('article', `card lane-${item.lane}`)
-    const head = el('header')
-    if (item.key) {
-      const a = el('a', 'key', item.key)
-      a.href = item.jira?.url ?? '#'; a.target = '_blank'
-      head.append(a)
+  // --- one block per branch ---------------------------------------------------------------
+  //
+  // A card is a TICKET; its blocks are BRANCHES. A big feature gets split into separately
+  // reviewable branches that all carry the same Jira key, and each has its own PR, its own
+  // checkout, its own reasons and its own buttons. Before this the card offered ONE set of
+  // buttons that acted on whichever branch came first, and its PR row and its checkout row
+  // could describe two different branches with nothing on screen saying so.
+
+  const reasonList = (reasons) => {
+    const ul = el('ul', 'reasons')
+    for (const r of reasons) ul.append(el('li', null, r))
+    return ul
+  }
+
+  function prRow(pr) {
+    const row = el('div', 'pr')
+    const a = el('a', 'pr-num', `#${pr.number}`); a.href = pr.url; a.target = '_blank'
+    row.append(a, el('span', 'pr-repo', pr.repo))
+    row.append(el('span', `pr-review ${pr.reviewDecision === 'APPROVED' ? 'ok' : 'warn'}`, pr.reviewDecision ?? 'no review'))
+    const { cls, text } = prChecksChip(pr.requiredChecks)
+    row.append(el('span', `pr-checks ${cls}`, text))
+    const behind = prBehindChip(pr)
+    if (behind) row.append(el('span', `chip ${behind.cls}`, behind.text))
+    const idle = idleChip(pr)
+    if (idle) row.append(el('span', `chip ${idle.cls}`, idle.text))
+    if (pr.isDraft) row.append(el('span', 'chip', 'draft'))
+    return row
+  }
+
+  function slotRow(branch, post) {
+    const slot = branch.slot
+    const s = el('div', 'slot')
+    // A <button>, not an <a>: this performs an action rather than navigating, so it must
+    // not pretend to be a link. Styled as text, and keyboard-operable for free.
+    // No refresh afterwards — opening an editor changes nothing the board reports, and
+    // the route deliberately does not invalidate it either.
+    const ed = editorSpec(branch, state.config)
+    if (ed) {
+      const b = el('button', 'slot-dir slot-open', ed.name)
+      b.title = ed.title
+      b.addEventListener('click', () => post('/api/open-editor', {}, b, { refresh: false }))
+      s.append(b)
+    } else {
+      s.append(el('span', 'slot-dir', slot.dir.split('/').pop()))
     }
-    head.append(el('span', 'title', item.title ?? item.id))
-    if (item.jira?.status) head.append(el('span', 'status', item.jira.status))
-    c.append(head)
+    const holding = slotHolding(slot)
+    if (holding) s.append(el('span', holding.cls, holding.text))
+    if (slot.dirty) s.append(el('span', 'chip bad', `${slot.dirtyCount} uncommitted`))
+    if (slot.behind > 0) s.append(el('span', 'chip warn', `${slot.behind} behind (as of last fetch)`))
+    if (branch.reclaimable) s.append(el('span', 'chip', 'reclaimable'))
+    return s
+  }
 
-    for (const pr of item.prs) {
-      const row = el('div', 'pr')
-      const a = el('a', 'pr-num', `#${pr.number}`); a.href = pr.url; a.target = '_blank'
-      row.append(a, el('span', 'pr-repo', pr.repo))
-      row.append(el('span', `pr-review ${pr.reviewDecision === 'APPROVED' ? 'ok' : 'warn'}`, pr.reviewDecision ?? 'no review'))
-      const { cls, text } = prChecksChip(pr.requiredChecks)
-      row.append(el('span', `pr-checks ${cls}`, text))
-      const behind = prBehindChip(pr)
-      if (behind) row.append(el('span', `chip ${behind.cls}`, behind.text))
-      const idle = idleChip(pr)
-      if (idle) row.append(el('span', `chip ${idle.cls}`, idle.text))
-      if (pr.isDraft) row.append(el('span', 'chip', 'draft'))
-      c.append(row)
-    }
+  function branchBlock(item, branch, c, branchCount) {
+    const box = el('section', branchCount > 1 ? 'branch branch-many' : 'branch')
+    const label = branchLabel(item, branch, branchCount)
+    if (label) box.append(el('span', 'branch-label', label))
 
-    if (item.slot) {
-      const s = el('div', 'slot')
-      // A <button>, not an <a>: this performs an action rather than navigating, so it must
-      // not pretend to be a link. Styled as text, and keyboard-operable for free.
-      // No refresh afterwards — opening an editor changes nothing the board reports, and
-      // the route deliberately does not invalidate it either.
-      const ed = editorSpec(item, state.config)
-      if (ed) {
-        const b = el('button', 'slot-dir slot-open', ed.name)
-        b.title = ed.title
-        b.addEventListener('click', () => post('/api/open-editor', {}, b, { refresh: false }))
-        s.append(b)
-      } else {
-        s.append(el('span', 'slot-dir', item.slot.dir.split('/').pop()))
-      }
-      const holding = slotHolding(item.slot)
-      if (holding) s.append(el('span', holding.cls, holding.text))
-      if (item.slot.dirty) s.append(el('span', 'chip bad', `${item.slot.dirtyCount} uncommitted`))
-      if (item.slot.behind > 0) s.append(el('span', 'chip warn', `${item.slot.behind} behind (as of last fetch)`))
-      if (item.signals.reclaimable) s.append(el('span', 'chip', 'reclaimable'))
-      c.append(s)
-    }
-
-    if (item.reasons.length) {
-      const ul = el('ul', 'reasons')
-      for (const r of item.reasons) ul.append(el('li', null, r))
-      c.append(ul)
-    }
-
-    if (item.plans.length) c.append(planPicker(item))
-
-    // Empty is rendered as nothing at all — no empty <details>, no zero-count line.
-    if (item.subtasks.length > 0) c.append(subtasksDetails(item))
-
-    const actions = el('div', 'actions')
     const msg = el('p', 'action-msg')
 
     // refresh:false for actions that change nothing the board reports. A forced refresh is
     // ~6s of live Jira and GitHub calls, so firing one after "open my editor" is pure cost.
+    //
+    // Every request names the branch it is for. The server refuses to guess when an item has
+    // more than one (see pickBranch in routes.js), so this is not a nicety — it is what makes
+    // the button work at all on a multi-branch ticket.
     const post = async (path, body, btn, { refresh = true } = {}) => {
       btn.disabled = true
       msg.className = 'action-msg'
       msg.textContent = 'working…'
-      const res = await api(path, { id: item.id, plans: selectedPlans(c), ...body })
+      const res = await api(path, { id: item.id, branch: branch.name, plans: selectedPlans(c), ...body })
       msg.className = `action-msg ${res.ok ? 'ok' : 'bad'}`
       msg.textContent = res.message
       if (res.candidates?.length) {
@@ -538,19 +576,35 @@ if (typeof document !== 'undefined') {
           msg.append(b)
         }
       }
+      // Should not happen from this UI, which always names the branch — but if the server ever
+      // does refuse to choose, offering the choices beats leaving a dead end on screen.
+      if (res.needsBranch && res.branches?.length) {
+        msg.append(document.createElement('br'))
+        for (const b of res.branches) {
+          const btn2 = el('button', null, b.name ?? '(no branch)')
+          btn2.addEventListener('click', () => post(path, { ...body, branch: b.name }, btn2))
+          msg.append(btn2)
+        }
+      }
       btn.disabled = false
       if (res.ok && refresh) setTimeout(() => load({ force: true }), 1200)
     }
 
-    // The user's own PR (never a colleague's review-requested one) — drives both the
-    // update-branch button below and the merge button.
-    const mainPr = item.prs.find((p) => p.isMine !== false)
+    if (branch.pr) box.append(prRow(branch.pr))
+    if (branch.slot) box.append(slotRow(branch, post))
+    if (branch.reasons?.length) box.append(reasonList(branch.reasons))
+
+    const actions = el('div', 'actions')
+
+    // This branch's OWN PR, never a colleague's review-requested one — it drives both the
+    // update-branch button and the merge button.
+    const mainPr = ownPrOf(branch)
 
     // A branchless, repo-less item can't resolve a slot pool on its own — offer one
     // button per configured repo instead of guessing which one. Falls back to the plain
     // single-button rendering if config hasn't loaded yet or has no repos.
     const repoKeys = Object.keys(state.config?.repos ?? {})
-    const offerRepoChoice = needsRepoChoice(item) && repoKeys.length > 0
+    const offerRepoChoice = needsRepoChoice(item, branch) && repoKeys.length > 0
 
     if (offerRepoChoice) {
       actions.append(el('span', 'repo-choice-label', 'open in:'))
@@ -567,14 +621,17 @@ if (typeof document !== 'undefined') {
 
     // Reviewing a colleague's PR is a different job from the skills below, which all act on
     // the user's own work — so it sits next to open rather than among them.
-    for (const rv of reviewSpecs(item, state.config)) {
+    const rv = reviewSpecOf(branch, state.config)
+    if (rv) {
       const b = el('button', null, rv.label)
       b.title = rv.title
       b.addEventListener('click', () => post('/api/review', { prNumber: rv.prNumber }, b))
       actions.append(b)
     }
 
-    for (const skill of item.skills ?? []) {
+    // THIS branch's skills. A rule like `slot.dirty` can be true of one branch and false of
+    // another, so the buttons belong to the branch that satisfies the rule.
+    for (const skill of branch.skills ?? []) {
       if (offerRepoChoice) {
         actions.append(el('span', 'repo-choice-label', `/${skill} in:`))
         for (const key of repoKeys) {
@@ -589,7 +646,7 @@ if (typeof document !== 'undefined') {
       }
     }
 
-    const spec = updateBranchSpec(item, mainPr)
+    const spec = updateBranchSpec(branch, mainPr)
     if (spec) {
       const u = el('button', null, spec.label)
       u.disabled = spec.disabled
@@ -604,15 +661,47 @@ if (typeof document !== 'undefined') {
 
     if (mainPr) {
       const m = el('button', null, 'squash & merge')
-      if (!item.mergeGate.allowed) { m.disabled = true; m.title = item.mergeGate.blockers.join('; ') }
+      // This branch's gate. An item with two PRs has two, and one being mergeable says
+      // nothing about the other.
+      const gate = branch.mergeGate ?? { allowed: false, blockers: ['merge gate not evaluated'] }
+      if (!gate.allowed) { m.disabled = true; m.title = gate.blockers.join('; ') }
       m.addEventListener('click', () => {
-        if (!confirm(`Squash-merge #${mainPr.number} "${mainPr.title}" into master?`)) return
+        if (!confirm(`Squash-merge #${mainPr.number} "${mainPr.title}" into ${mainPr.baseRefName ?? 'master'}?`)) return
         post('/api/merge', { prNumber: mainPr.number, confirmed: true }, m)
       })
       actions.append(m)
     }
 
-    c.append(actions, msg)
+    box.append(actions, msg)
+    return box
+  }
+
+  function card(item) {
+    const c = el('article', `card lane-${item.lane}`)
+    const head = el('header')
+    if (item.key) {
+      const a = el('a', 'key', item.key)
+      a.href = item.jira?.url ?? '#'; a.target = '_blank'
+      head.append(a)
+    }
+    head.append(el('span', 'title', item.title ?? item.id))
+    if (item.jira?.status) head.append(el('span', 'status', item.jira.status))
+    c.append(head)
+
+    // Ticket-level reasons only — true of the ticket whatever branch you look at. Each
+    // branch's own reasons render inside its block, which already says which branch they
+    // are about, so they need no "#7200:" prefix there.
+    const ticketReasons = item.ticketReasons ?? item.reasons
+    if (ticketReasons.length) c.append(reasonList(ticketReasons))
+
+    const branches = item.branches ?? []
+    for (const branch of branches) c.append(branchBlock(item, branch, c, branches.length))
+
+    if (item.plans.length) c.append(planPicker(item))
+
+    // Empty is rendered as nothing at all — no empty <details>, no zero-count line.
+    if (item.subtasks.length > 0) c.append(subtasksDetails(item))
+
     c.dataset.id = item.id
     return c
   }

@@ -2,7 +2,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { groupForDisplay, sourceChip, prChecksChip, prBehindChip, summarizeSubtasks, updateBranchSpec, hasBranch, needsRepoChoice, repoLabel, refreshLabel, editorSpec, idleChip, shouldCollect,
-         slotHolding, idleSlotsLine } from '../public/app.js'
+         slotHolding, idleSlotsLine, branchLabel, shortBranchName, checkoutNameOf, ownPrOf, reviewSpecOf } from '../public/app.js'
 
 const it = (o) => ({ id: o.id, lane: o.lane, statusGroup: o.statusGroup ?? 'no ticket',
   sortIndex: o.sortIndex ?? Infinity, signals: { foreign: false, stale: false, reclaimable: false, ...o.signals },
@@ -329,27 +329,81 @@ test('updateBranchSpec: no PR and a dirty slot is disabled with the uncommitted-
 })
 
 // --- hasBranch / needsRepoChoice / repoLabel ---
+//
+// These take ONE BRANCH of an item now, not the item: `{ name, pr, slot, detached }`.
 
-test('hasBranch: true from the user\'s own PR headRefName', () => {
-  assert.equal(hasBranch({ prs: [{ isMine: true, headRefName: 'PY-1-x' }], slot: null }), true)
+const br = (o = {}) => ({ name: null, repo: 'O/R', pr: null, slot: null, detached: false, ...o })
+
+test('hasBranch: true from the branch\'s own name', () => {
+  assert.equal(hasBranch(br({ name: 'PY-1-x', pr: { isMine: true, headRefName: 'PY-1-x' } })), true)
 })
 
 test('hasBranch: a colleague\'s review-requested PR does not count', () => {
-  assert.equal(hasBranch({ prs: [{ isMine: false, headRefName: 'PY-1-bruce' }], slot: null }), false)
+  // A plain open must never redirect onto their branch — /api/review does that, detached.
+  assert.equal(hasBranch(br({ name: 'PY-1-bruce', pr: { isMine: false, headRefName: 'PY-1-bruce' } })), false)
 })
 
-test('hasBranch: falls back to the slot\'s branch', () => {
-  assert.equal(hasBranch({ prs: [], slot: { branch: 'PY-1-x' } }), true)
+test('hasBranch: a branch we have checked out ourselves counts', () => {
+  assert.equal(hasBranch(br({ name: 'PY-1-x', slot: { dir: '/w/A', branch: 'PY-1-x' } })), true)
 })
 
-test('hasBranch: false with no PR of the user\'s and no slot', () => {
-  assert.equal(hasBranch({ prs: [], slot: null }), false)
+test('hasBranch: false for a branch with no name at all', () => {
+  assert.equal(hasBranch(br()), false)
+  assert.equal(hasBranch(null), false)
 })
 
 test('needsRepoChoice: true only when both branchless AND repo-less', () => {
-  assert.equal(needsRepoChoice({ prs: [], slot: null, repo: null }), true)
-  assert.equal(needsRepoChoice({ prs: [], slot: null, repo: 'O/R' }), false, 'a known repo keeps today\'s single button')
-  assert.equal(needsRepoChoice({ prs: [{ isMine: true, headRefName: 'b' }], slot: null, repo: null }), false, 'a known branch keeps today\'s single button')
+  assert.equal(needsRepoChoice({ repo: null }, br()), true)
+  assert.equal(needsRepoChoice({ repo: 'O/R' }, br()), false, 'a known repo keeps today\'s single button')
+  assert.equal(needsRepoChoice({ repo: null }, br({ name: 'b', pr: { isMine: true } })), false,
+    'a known branch keeps today\'s single button')
+})
+
+// --- branch identity on the card ---
+
+test('shortBranchName drops the ticket key the card already shows', () => {
+  assert.equal(shortBranchName({ key: 'PY-12746' }, br({ name: 'PY-12746-catalog-pr2' })), 'catalog-pr2')
+  assert.equal(shortBranchName({ key: 'PY-12746' }, br({ name: 'feat/other' })), 'feat/other')
+  assert.equal(shortBranchName({ key: null }, br({ name: 'feat/x' })), 'feat/x')
+  assert.equal(shortBranchName({ key: 'PY-1' }, br()), null)
+})
+
+test('branchLabel says nothing at all for a single-branch item', () => {
+  // What keeps a one-branch card looking exactly as it did: there is nothing to tell apart,
+  // and labelling the only branch is pure noise.
+  const item = { key: 'PY-1' }
+  assert.equal(branchLabel(item, br({ name: 'PY-1-x', pr: { number: 1 } }), 1), null)
+  assert.equal(branchLabel(item, br({ name: 'PY-1-x', slot: { dir: '/w/A' } }), 1), null)
+})
+
+test('branchLabel identifies each branch of a multi-branch item', () => {
+  const item = { key: 'PY-12746' }
+  // A branch with a PR is identified by its PR number, already on screen — it needs its name
+  // only when it has no checkout row to carry it.
+  assert.equal(branchLabel(item, br({ name: 'PY-12746-catalog', pr: { number: 7110 }, slot: { dir: '/w/A' } }), 2), null)
+  assert.equal(branchLabel(item, br({ name: 'PY-12746-catalog', pr: { number: 7110 } }), 2), 'catalog')
+  assert.equal(branchLabel(item, br({ name: 'PY-12746-pr2', slot: { dir: '/w/B' } }), 2), 'no PR yet · pr2')
+  assert.equal(branchLabel(item, br(), 2), 'not started')
+})
+
+test('ownPrOf ignores a colleague\'s PR', () => {
+  assert.equal(ownPrOf(br({ pr: { number: 1, isMine: true } })).number, 1)
+  assert.equal(ownPrOf(br({ pr: { number: 2 } })).number, 2, 'isMine undefined means mine')
+  assert.equal(ownPrOf(br({ pr: { number: 3, isMine: false } })), null)
+  assert.equal(ownPrOf(br()), null)
+})
+
+test('checkoutNameOf refuses a detached checkout of a colleague\'s PR', () => {
+  assert.equal(checkoutNameOf(br({ name: 'theirs', pr: { isMine: false }, slot: { dir: '/w/A' }, detached: true })), null)
+  assert.equal(checkoutNameOf(br({ name: 'theirs', pr: { isMine: false }, slot: { dir: '/w/A' } })), 'theirs')
+})
+
+test('reviewSpecOf offers the button only for somebody else\'s PR', () => {
+  const cfg = { reviewSkill: 'critical-review' }
+  assert.equal(reviewSpecOf(br({ pr: { number: 7353, isMine: false, headRefName: 'theirs', author: 'bruce' } }), cfg).label,
+    'review #7353')
+  assert.equal(reviewSpecOf(br({ pr: { number: 1, isMine: true, headRefName: 'mine' } }), cfg), null)
+  assert.equal(reviewSpecOf(br(), cfg), null)
 })
 
 test('repoLabel: uses docsSubdir when configured', () => {

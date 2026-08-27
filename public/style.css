@@ -491,6 +491,45 @@ button.slot-open[disabled] { cursor: progress; opacity: .6; }
 .card.lane-ready-to-start .reasons li::before,
 .card.lane-backlog .reasons li::before { color: var(--ink-3); }
 
+/* ── branch blocks ──────────────────────────────────────────────────────────
+   A card is a TICKET; its blocks are BRANCHES. A big feature gets split into
+   separately reviewable branches carrying one Jira key, and each has its own PR,
+   its own checkout and its own buttons.
+
+   A LONE branch renders completely flat — no box, no bracket, no extra spacing —
+   so a single-branch card is pixel-for-pixel what it always was. Only a ticket
+   that actually carries several gets each one bracketed off, because only then is
+   there anything to tell apart. */
+.branch-many {
+  margin-top: 11px;
+  padding: 1px 0 1px 11px;
+  border-left: 1px solid var(--rule-2);
+}
+/* The block's own left padding is the separation; its first machine row must not
+   also add the 7px the flat layout wants above a .pr / .slot. */
+.branch-many > .pr:first-child,
+.branch-many > .slot:first-child { margin-top: 0; }
+
+/* A branch's name, shown only when its PR number is not enough to tell it apart.
+   Set as a tab on a folder rather than a heading — dashed, because it labels a
+   division of the work rather than stating a fact about it. */
+.branch-label {
+  display: inline-block;
+  font: 700 9px/1 var(--mono);
+  text-transform: uppercase; letter-spacing: .11em;
+  color: var(--ink-3);
+  padding: 3px 5px;
+  border: 1px dashed var(--rule-2);
+}
+.branch-label + .pr, .branch-label + .slot, .branch-label + .reasons { margin-top: 6px; }
+
+/* Inside a block the action rule goes dotted: it separates buttons from the rows
+   above them, whereas the solid card-level rule separates one branch from the next. */
+.branch-many .actions {
+  margin-top: 9px; padding-top: 9px;
+  border-top: 1px dotted var(--rule);
+}
+
 /* ── plans ────────────────────────────────────────────────────────────────── */
 
 .plans {

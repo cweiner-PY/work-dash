@@ -11,7 +11,7 @@ const withBranch = (o) => ('branch' in o ? o : { ...o, branch: theBranch(o.item)
 const buildLauncher = (o) => rawBuildLauncher(withBranch(o))
 const openItem = (o, deps) => rawOpenItem(withBranch(o), deps)
 import { registerRoutes } from '../routes.js'
-import { reviewSpecs } from '../public/app.js'
+import { reviewSpecOf } from '../public/app.js'
 
 const theirs = (o = {}) => ({
   number: 7353, repo: 'PerformYard/PerformYard', isMine: false,
@@ -209,8 +209,14 @@ test('POST /api/review still validates plan paths', async () => {
 
 // --- the button ------------------------------------------------------------------------
 
-test('reviewSpecs offers one button per PR awaiting you, and none for your own', () => {
-  const specs = reviewSpecs(item([theirs(), mine(), theirs({ number: 9000 })]), config)
+// One PR lives on one branch, so the button belongs to the branch rather than to the item —
+// which is also how a ticket carrying two colleagues' PRs gets two buttons, each in the block
+// of the branch it reviews, instead of two buttons in one undifferentiated row.
+const branchesOf = (prs) => branchesFrom({ prs, repo: 'O/R' })
+
+test('reviewSpecOf offers a button on each branch awaiting your review, and none on your own', () => {
+  const bs = branchesOf([theirs(), mine(), theirs({ number: 9000, headRefName: 'PY-12349-other' })])
+  const specs = bs.map((b) => reviewSpecOf(b, config)).filter(Boolean)
   assert.deepEqual(specs.map((s) => s.prNumber), [7353, 9000])
   assert.equal(specs[0].label, 'review #7353')
   assert.match(specs[0].title, /critical-review/)
@@ -218,18 +224,18 @@ test('reviewSpecs offers one button per PR awaiting you, and none for your own',
   assert.match(specs[0].title, /bpereiraperform/)
 })
 
-test('reviewSpecs is empty for an item with no foreign PR', () => {
-  assert.deepEqual(reviewSpecs(item([mine()]), config), [])
-  assert.deepEqual(reviewSpecs(item([]), config), [])
-  assert.deepEqual(reviewSpecs({}, config), [])
+test('reviewSpecOf is null for a branch that is not somebody else\'s PR', () => {
+  assert.equal(reviewSpecOf(branchesOf([mine()])[0], config), null)
+  assert.equal(reviewSpecOf(branchesOf([])[0], config), null)
+  assert.equal(reviewSpecOf(undefined, config), null)
 })
 
-test('reviewSpecs skips a PR with no branch to check out', () => {
-  assert.deepEqual(reviewSpecs(item([theirs({ headRefName: null })]), config), [])
+test('reviewSpecOf skips a PR with no branch to check out', () => {
+  assert.equal(reviewSpecOf(branchesOf([theirs({ headRefName: null })])[0], config), null)
 })
 
-test('reviewSpecs falls back to critical-review before config loads', () => {
+test('reviewSpecOf falls back to critical-review before config loads', () => {
   for (const cfg of [null, undefined, {}]) {
-    assert.match(reviewSpecs(item([theirs()]), cfg)[0].title, /\/critical-review/)
+    assert.match(reviewSpecOf(branchesOf([theirs()])[0], cfg).title, /\/critical-review/)
   }
 })

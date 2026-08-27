@@ -215,6 +215,12 @@ export function assignLanes(items, config) {
     const branches = (item.branches ?? []).map((b) =>
       assessBranch(b, { item, config, foreign, stale, itemHasMyPr: myPrs.length > 0, humanGates }))
 
+    // Snapshot before the branch reasons are folded in: the card renders these at ticket level
+    // and each branch's own reasons inside that branch's block, where the block itself says
+    // which branch they are about. `reasons` stays the flat, labelled list every other
+    // consumer (notifications, the API, the CLI) already reads.
+    const ticketReasons = [...reasons]
+
     const multi = branches.length > 1
     for (const b of branches) {
       for (const r of b.reasons) reasons.push(multi ? labelReason(item, b, r) : r)
@@ -240,15 +246,17 @@ export function assignLanes(items, config) {
     // with a checkout is in-flight, and telling it that it is sprint-committed would be
     // explaining a lane it isn't in.
     if (lane === 'ready-to-start') {
-      reasons.push(fallbackToPlans
+      const why = fallbackToPlans
         ? `${item.plans.length} plan folder${item.plans.length > 1 ? 's' : ''} on disk`
-        : `sprint-committed: ${item.jira.activeSprint}`)
+        : `sprint-committed: ${item.jira.activeSprint}`
+      reasons.push(why)
+      ticketReasons.push(why)   // it explains the ticket's lane, not any one branch
     }
 
     const statusGroup = item.jira?.status ?? 'no ticket'
     const idx = order.indexOf(statusGroup)
 
-    return { ...item, branches, lane, reasons,
+    return { ...item, branches, lane, reasons, ticketReasons,
              signals: { foreign, stale, reclaimable: branches.some((b) => b.reclaimable) },
              // DEPRECATED item-level gate: there can be one per branch. Kept unchanged
              // (myPrs[0], exactly as before) until public/app.js reads branch.mergeGate.
