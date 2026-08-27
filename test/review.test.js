@@ -2,7 +2,14 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { reviewablePrs, pickReviewPr, reviewTarget } from '../actions/review.js'
-import { buildLauncher, openItem } from '../actions/open.js'
+import { buildLauncher as rawBuildLauncher, openItem as rawOpenItem } from '../actions/open.js'
+import { theBranch, branchesFrom } from '../test-support/branches.js'
+
+// Both act on ONE resolved branch of an item now. A review passes its own `review` target
+// and the branch it resolves from is the item's single branch, same as every other launch.
+const withBranch = (o) => ('branch' in o ? o : { ...o, branch: theBranch(o.item) })
+const buildLauncher = (o) => rawBuildLauncher(withBranch(o))
+const openItem = (o, deps) => rawOpenItem(withBranch(o), deps)
 import { registerRoutes } from '../routes.js'
 import { reviewSpecs } from '../public/app.js'
 
@@ -118,7 +125,7 @@ test('a normal (non-review) launch is completely unaffected', () => {
 
 // --- slot resolution -------------------------------------------------------------------
 
-test('a review resolves a slot on THEIR branch, which branchFor would never return', async () => {
+test('a review resolves a slot on THEIR branch, which a plain open would never target', async () => {
   let script = null
   const r = await openItem(
     { item: item([theirs()]), slots: [slot], plans: [], config,
@@ -144,9 +151,13 @@ test('a review still refuses a dirty slot', async () => {
 
 // --- the route -------------------------------------------------------------------------
 
+// The board is shaped the way board.js shapes it before serving: each item's branches derived
+// from its PRs and its checkout. /api/review resolves the branch under review by the PR's own
+// head, so the entry has to exist.
 const routesFor = (board, cfg = config) => {
   const routes = new Map()
-  registerRoutes(routes, { getBoard: async () => board, config: cfg, deps: { dry: true } })
+  const items = (board.items ?? []).map((i) => ({ ...i, branches: branchesFrom(i) }))
+  registerRoutes(routes, { getBoard: async () => ({ ...board, items }), config: cfg, deps: { dry: true } })
   return routes
 }
 

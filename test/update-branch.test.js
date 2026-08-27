@@ -1,7 +1,13 @@
 // test/update-branch.test.js
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { updateBranch } from '../actions/update-branch.js'
+import { updateBranch as rawUpdateBranch } from '../actions/update-branch.js'
+import { theBranch } from '../test-support/branches.js'
+
+// updateBranch acts on ONE resolved branch of an item now — the caller decides which (see
+// resolveBranch). These tests describe items by PR and checkout, so the branch is resolved
+// here the way routes.js resolves it: from the item's single branch.
+const updateBranch = (o, deps) => rawUpdateBranch('branch' in o ? o : { ...o, branch: theBranch(o.item) }, deps)
 
 const item = { id: 'PY-1', key: 'PY-1', repo: 'O/R', prs: [], slot: null }
 const clean = { dir: '/w/A', repo: 'O/R', branch: 'PY-1-x', dirty: false, dirtyCount: 0, behind: 13, ahead: 6 }
@@ -126,7 +132,12 @@ const pr = (o = {}) => ({
   number: 7110, repo: 'O/R', headRefName: 'PY-1-x', isMine: true, mergeStateStatus: null,
   baseCompare: behind(3), ...o,
 })
-const itemWithPr = (p) => ({ id: 'PY-1', key: 'PY-1', repo: 'O/R', slot: null, prs: [p] })
+// The checkout goes ON the item, because that is where it lives: join.js pairs each PR with
+// the checkout sitting on the same branch, and updateBranch reads that pairing. It used to
+// search the whole slot list for one whose branch equalled the PR's head — which is the bug
+// this change removes, since on a two-branch ticket that search found the wrong branch's
+// checkout or none at all.
+const itemWithPr = (p, slot = null) => ({ id: 'PY-1', key: 'PY-1', repo: 'O/R', slot, prs: [p] })
 
 test('a comparison of zero refuses as a no-op, whatever the merge state says', async () => {
   for (const status of ['CLEAN', 'BLOCKED', 'UNSTABLE', 'UNKNOWN', null]) {
@@ -197,7 +208,7 @@ test('mergeable CONFLICTING refuses locally even when the behind count is large'
 
 test('DIRTY refuses, naming the slot that holds the branch — server-side cannot resolve conflicts', async () => {
   let ran = 0
-  const r = await updateBranch({ item: itemWithPr(pr({ mergeStateStatus: 'DIRTY' })), slots: [clean] },
+  const r = await updateBranch({ item: itemWithPr(pr({ mergeStateStatus: 'DIRTY' }), clean), slots: [clean] },
     { run: async () => { ran++; return { code: 0, stdout: '', stderr: '' } } })
   assert.equal(ran, 0)
   assert.equal(r.ok, false)
@@ -217,7 +228,7 @@ test('DIRTY refuses, saying it is not checked out anywhere when no slot holds th
 test('BEHIND with a clean slot holding the branch: gh update-branch then git pull --ff-only, in order', async () => {
   const calls = []
   const run = async (cmd, args) => { calls.push([cmd, ...args].join(' ')); return { code: 0, stdout: 'ok', stderr: '' } }
-  const r = await updateBranch({ item: itemWithPr(pr({ mergeStateStatus: 'BEHIND' })), slots: [clean] }, { run })
+  const r = await updateBranch({ item: itemWithPr(pr({ mergeStateStatus: 'BEHIND' }), clean), slots: [clean] }, { run })
   assert.equal(r.ok, true)
   assert.deepEqual(calls, ['gh pr update-branch 7110 --repo O/R', 'git pull --ff-only'])
   assert.match(r.message, /Updated #7110 from master/)
@@ -237,7 +248,7 @@ test('BEHIND with a dirty slot holding the branch: remote update happens, local 
   const calls = []
   const run = async (cmd, args) => { calls.push([cmd, ...args].join(' ')); return { code: 0, stdout: 'ok', stderr: '' } }
   const dirty = { ...clean, dirty: true, dirtyCount: 2 }
-  const r = await updateBranch({ item: itemWithPr(pr({ mergeStateStatus: 'BEHIND' })), slots: [dirty] }, { run })
+  const r = await updateBranch({ item: itemWithPr(pr({ mergeStateStatus: 'BEHIND' }), dirty), slots: [dirty] }, { run })
   assert.equal(r.ok, true)
   assert.deepEqual(calls, ['gh pr update-branch 7110 --repo O/R'], 'the local pull must not be attempted')
   assert.match(r.message, /uncommitted changes/i)
@@ -249,7 +260,7 @@ test('a failed gh pr update-branch does not attempt the local pull', async () =>
     calls.push([cmd, ...args].join(' '))
     return { code: 1, stdout: '', stderr: 'GraphQL: not authorized' }
   }
-  const r = await updateBranch({ item: itemWithPr(pr({ mergeStateStatus: 'BEHIND' })), slots: [clean] }, { run })
+  const r = await updateBranch({ item: itemWithPr(pr({ mergeStateStatus: 'BEHIND' }), clean), slots: [clean] }, { run })
   assert.equal(r.ok, false)
   assert.deepEqual(calls, ['gh pr update-branch 7110 --repo O/R'])
   assert.match(r.message, /not authorized/)
@@ -262,7 +273,7 @@ test('a git pull that cannot fast-forward is reported, with no merge/reset/force
     if (cmd === 'gh') return { code: 0, stdout: 'ok', stderr: '' }
     return { code: 1, stdout: '', stderr: 'fatal: Not possible to fast-forward, aborting.' }
   }
-  const r = await updateBranch({ item: itemWithPr(pr({ mergeStateStatus: 'BEHIND' })), slots: [clean] }, { run })
+  const r = await updateBranch({ item: itemWithPr(pr({ mergeStateStatus: 'BEHIND' }), clean), slots: [clean] }, { run })
   assert.equal(r.ok, true, 'the remote update already succeeded; the local pull is opportunistic')
   assert.match(r.message, /did not fast-forward/i)
   for (const c of calls) {
@@ -286,7 +297,7 @@ test('BEHIND with an explicit chosenSlotDir belonging to a different repo refuse
 
 test('BEHIND dry run composes both commands and runs nothing', async () => {
   let ran = false
-  const r = await updateBranch({ item: itemWithPr(pr({ mergeStateStatus: 'BEHIND' })), slots: [clean] },
+  const r = await updateBranch({ item: itemWithPr(pr({ mergeStateStatus: 'BEHIND' }), clean), slots: [clean] },
     { run: async () => { ran = true; return { code: 0, stdout: '', stderr: '' } }, dry: true })
   assert.equal(r.ok, true)
   assert.equal(ran, false)

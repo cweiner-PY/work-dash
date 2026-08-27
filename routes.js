@@ -1,6 +1,6 @@
 // routes.js
 import { openItem } from './actions/open.js'
-import { myPrOf } from './lanes.js'
+import { resolveBranch, myPrOfBranch } from './actions/slot.js'
 import { updateBranch } from './actions/update-branch.js'
 import { mergePr } from './actions/merge.js'
 import { openEditor } from './actions/editor.js'
@@ -10,7 +10,11 @@ import { pickReviewPr, reviewTarget } from './actions/review.js'
 function staleBranchesOf(board) {
   const set = new Set()
   for (const i of board.items ?? []) {
-    if (i.slot?.branch && (i.signals?.stale || i.signals?.foreign)) set.add(i.slot.branch)
+    if (!(i.signals?.stale || i.signals?.foreign)) continue
+    // Every branch of the item, not the one the scalar `item.slot` happened to name: a
+    // finished ticket's SECOND checkout is just as fair game as its first, and leaving it out
+    // meant the slot picker called it "busy" forever.
+    for (const b of i.branches ?? []) if (b.slot?.branch) set.add(b.slot.branch)
   }
   return set
 }
@@ -45,16 +49,44 @@ export function registerRoutes(routes, { getBoard, config, deps = {} }) {
     return { board, item }
   }
 
+  // WHICH BRANCH of the item this request is for. A ticket can carry several — that is how a
+  // big feature gets split into separately reviewable pieces — so there is no longer any such
+  // thing as "the item's branch". With one branch it is unambiguous; with more, and no name
+  // supplied, this REFUSES and hands back the choices rather than picking one.
+  //
+  // Refusing matters: picking is what made `update branch` read its label off one branch's
+  // behind-count and then run against a different branch's PR. The UI renders a button per
+  // branch so it never has to see this, but the UI is a convenience and this is the authority.
+  //
+  // It is also the allowlist for `body.branch`: only a name the board already has for THIS
+  // item resolves, so a raw API call cannot hand an arbitrary string to git.
+  const pickBranch = (item, body) => {
+    const named = typeof body.branch === 'string' ? body.branch : null
+    const r = resolveBranch(item, named)
+    if (r.error) return { error: { ok: false, message: r.error } }
+    if (r.needsBranch) {
+      return { error: { ok: false, message: r.message, branches: r.branches, needsBranch: true } }
+    }
+    return { branch: r.branch }
+  }
+
   const launch = (skillRequired) => async (body, ctx) => {
     if (!body || typeof body !== 'object') return { ok: false, message: 'Expected a JSON object body.' }
     const { item, board } = await find(body.id)
     if (!item) return { ok: false, message: `Unknown item: ${body.id}` }
     if (skillRequired && !body.skill) return { ok: false, message: 'A skill name is required.' }
+    const picked = pickBranch(item, body)
+    if (picked.error) return picked.error
+    const branch = picked.branch
     // Validate whenever a skill is SUPPLIED, not only when it is required. /api/open does
     // not require one, but if a caller passes one it is submitted to Claude just the same,
     // so the applicability check must apply to both routes or the sibling route is a bypass.
-    if (body.skill && !item.skills.includes(body.skill)) {
-      return { ok: false, message: `${body.skill} does not apply to ${item.id}.` }
+    //
+    // Against THIS branch's skills, not a union over the item's. A rule like `slot.dirty` can
+    // be true of one branch and false of another, and a union would let a skill valid for one
+    // be launched against the other.
+    if (body.skill && !(branch.skills ?? []).includes(body.skill)) {
+      return { ok: false, message: `${body.skill} does not apply to ${item.id}${branch.name ? ` on ${branch.name}` : ''}.` }
     }
     // A repo hint is only meaningful for a branchless, repo-less item — the user telling
     // the picker which repo to draw a working directory from. Validate it against
@@ -79,11 +111,11 @@ export function registerRoutes(routes, { getBoard, config, deps = {} }) {
     // the launcher merge an arbitrary ref into a checkout. Strict === true for the same
     // reason /api/merge requires it of `confirmed` — Boolean("false") is true.
     const mergeBase = body.resolveConflicts === true
-      ? (myPrOf(item)?.baseRefName ?? config.repos[item.repo]?.defaultBranch ?? 'master')
+      ? (myPrOfBranch(branch)?.baseRefName ?? config.repos[item.repo]?.defaultBranch ?? 'master')
       : null
 
     const result = await openItem({
-      item, slots: board.slots ?? [], plans, skill: body.skill ?? null,
+      item, branch, slots: board.slots ?? [], plans, skill: body.skill ?? null,
       config, chosenSlotDir: body.slotDir ?? null, staleBranches: staleBranchesOf(board),
       claimedDirs: liveClaimedDirs(claims), repo: body.repo ?? null, mergeBase,
     }, deps)
@@ -101,8 +133,11 @@ export function registerRoutes(routes, { getBoard, config, deps = {} }) {
     if (!body || typeof body !== 'object') return { ok: false, message: 'Expected a JSON object body.' }
     const { item, board } = await find(body.id)
     if (!item) return { ok: false, message: `Unknown item: ${body.id}` }
+    const picked = pickBranch(item, body)
+    if (picked.error) return picked.error
     const result = await updateBranch({
       item,
+      branch: picked.branch,
       slots: board.slots ?? [],
       chosenSlotDir: body.slotDir ?? null,
       // Keep the merge base identical to the one slots.js measured "N behind" with.
@@ -127,6 +162,10 @@ export function registerRoutes(routes, { getBoard, config, deps = {} }) {
     if (picked.error) return { ok: false, message: picked.error }
     const target = reviewTarget(picked.pr)
     if (target.error) return { ok: false, message: target.error }
+    // No ambiguity to resolve here: the PR under review names its own branch, so that is the
+    // branch entry this launch is for. Nothing is inferred and body.branch is not consulted.
+    const onBranch = resolveBranch(item, picked.pr.headRefName)
+    if (onBranch.error) return { ok: false, message: onBranch.error }
 
     // Same allowlist as /api/open: plans become --add-dir arguments, so an unvalidated list
     // would hand Claude filesystem access anywhere.
@@ -134,7 +173,7 @@ export function registerRoutes(routes, { getBoard, config, deps = {} }) {
     const plans = (body.plans ?? []).filter((p) => allowed.get(p?.dir)?.has(p?.file))
 
     const result = await openItem({
-      item, slots: board.slots ?? [], plans, skill: config.reviewSkill ?? null,
+      item, branch: onBranch.branch, slots: board.slots ?? [], plans, skill: config.reviewSkill ?? null,
       config, chosenSlotDir: body.slotDir ?? null, staleBranches: staleBranchesOf(board),
       claimedDirs: liveClaimedDirs(claims), review: target.review,
     }, deps)
@@ -152,8 +191,11 @@ export function registerRoutes(routes, { getBoard, config, deps = {} }) {
     if (!body || typeof body !== 'object') return { ok: false, message: 'Expected a JSON object body.' }
     const { item, board } = await find(body.id)
     if (!item) return { ok: false, message: `Unknown item: ${body.id}` }
+    const picked = pickBranch(item, body)
+    if (picked.error) return picked.error
     return openEditor({
-      item, slots: board.slots ?? [], chosenSlotDir: body.slotDir ?? null, editor: config.editor,
+      item, branch: picked.branch, slots: board.slots ?? [],
+      chosenSlotDir: body.slotDir ?? null, editor: config.editor,
     }, deps)
   })
 

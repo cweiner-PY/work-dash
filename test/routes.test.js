@@ -1,8 +1,25 @@
 // test/routes.test.js
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { registerRoutes, liveClaimedDirs } from '../routes.js'
-import { skillsForItem } from '../board.js'
+import { registerRoutes as rawRegisterRoutes, liveClaimedDirs } from '../routes.js'
+import { skillsForItem, skillsForBranch } from '../board.js'
+import { branchesFrom } from '../test-support/branches.js'
+
+// The routes act on ONE resolved branch of an item, and gate a client-supplied skill name on
+// that branch's own skills — both of which board.js computes before the board is served. These
+// tests hand-build their boards, so the same shaping is applied here: derive each item's
+// branches from its PRs and its checkout, and attach each branch's skills.
+const shape = (item, cfg) => ({
+  ...item,
+  branches: branchesFrom(item).map((b) => ({ ...b, skills: skillsForBranch(item, b, cfg) })),
+})
+const registerRoutes = (routes, o) => rawRegisterRoutes(routes, {
+  ...o,
+  getBoard: async () => {
+    const b = await o.getBoard()
+    return { ...b, items: (b.items ?? []).map((i) => shape(i, o.config)) }
+  },
+})
 
 const config = {
   repos: { 'O/R': { slots: ['/w/A'] } },
@@ -267,18 +284,42 @@ test('a client cannot name the ref to merge — only whether to merge at all', a
   assert.ok(!r.detail.includes('attacker-branch'))
 })
 
-test("resolveConflicts ignores a colleague's review-requested PR when choosing the base", async () => {
-  // myPrOf, not prs[0]: a foreign PR's base branch must never decide what gets merged
-  // into the user's checkout.
+// A colleague's review request and the user's own checked-out branch are TWO branches of one
+// item, and this pair is why the base is chosen per branch rather than per item: a foreign PR's
+// base branch must never decide what gets merged into the user's own checkout.
+const twoBranchItem = () => {
   const slot = { dir: '/w/A', repo: 'O/R', branch: 'PY-1-x', dirty: false, dirtyCount: 0 }
-  const item = {
-    id: 'PY-1', key: 'PY-1', title: 't', repo: 'O/R', slot, plans: [], jira: null, skills: [],
-    prs: [{ number: 1, headRefName: 'theirs', isMine: false, baseRefName: 'their-base' }],
+  return {
+    slot,
+    item: {
+      id: 'PY-1', key: 'PY-1', title: 't', repo: 'O/R', slot, plans: [], jira: null, skills: [],
+      prs: [{ number: 1, headRefName: 'theirs', isMine: false, baseRefName: 'their-base' }],
+    },
   }
-  const r = await openWith({ resolveConflicts: true }, { item, slot })
+}
+
+test('an item with two branches is not acted on until one is named', async () => {
+  const r = await openWith({ resolveConflicts: true }, twoBranchItem())
+  assert.equal(r.ok, false, 'refuses rather than picking one')
+  assert.equal(r.needsBranch, true)
+  assert.deepEqual(r.branches.map((b) => b.name).sort(), ['PY-1-x', 'theirs'])
+  assert.match(r.message, /2 branches/)
+})
+
+test("resolveConflicts ignores a colleague's review-requested PR when choosing the base", async () => {
+  // Named branch: the user's own checkout, which carries no PR of theirs — so there is no
+  // baseRefName to read and the configured default applies. The foreign PR's base is on a
+  // different branch entirely and must not leak into this merge.
+  const r = await openWith({ resolveConflicts: true, branch: 'PY-1-x' }, twoBranchItem())
   assert.equal(r.ok, true, r.message)
   assert.ok(!r.detail.includes('their-base'), "a foreign PR's base must not be merged")
   assert.match(r.detail, /git merge 'origin\/master'/, 'falls back to the configured default')
+})
+
+test('a branch name the item does not have is refused', async () => {
+  const r = await openWith({ branch: '../../etc/passwd' }, twoBranchItem())
+  assert.equal(r.ok, false)
+  assert.match(r.message, /has no branch/)
 })
 
 test('a plain open still touches neither fetch nor merge', async () => {
@@ -341,4 +382,77 @@ test('POST /api/open-editor rejects a non-object body and an unknown id', async 
   const missing = await routes.get('POST /api/open-editor')({ id: 'nope' }, { config, invalidate() {} })
   assert.equal(missing.ok, false)
   assert.match(missing.message, /unknown item/i)
+})
+
+// --- one ticket, two branches: the shape this whole change exists for -------------------
+//
+// PY-12746 with PR #7110 on one branch and a second branch checked out in a slot. Before
+// branches, `update branch` read its label off the slot's behind-count and then ran `gh pr
+// update-branch` against #7110 — a different branch — and the local pull looked for a checkout
+// on #7110's head, failed to find the one sitting right there, and said "not checked out
+// locally". Neither the label nor the result named a branch, so nothing revealed the mismatch.
+
+const catalogItem = () => {
+  const slot = { dir: '/w/A', repo: 'O/R', branch: 'PY-12746-pr2', dirty: false, dirtyCount: 0, behind: 4, ahead: 21 }
+  return {
+    slot,
+    item: {
+      id: 'PY-12746', key: 'PY-12746', title: 'Competency catalog', repo: 'O/R', slot, plans: [], jira: null,
+      prs: [{ number: 7110, repo: 'O/R', headRefName: 'PY-12746-catalog', isMine: true, baseRefName: 'master',
+              mergeStateStatus: 'BEHIND', mergeable: 'MERGEABLE',
+              baseCompare: { known: true, behind: 24, ahead: 2 } }],
+    },
+  }
+}
+
+const updateWith = async (body) => {
+  const { item, slot } = catalogItem()
+  const routes = new Map()
+  registerRoutes(routes, {
+    getBoard: async () => ({ items: [item], slots: [slot] }), config, deps: { dry: true },
+  })
+  return routes.get('POST /api/update-branch')({ id: 'PY-12746', ...body }, { config, invalidate() {} })
+}
+
+test('update-branch refuses to choose between a ticket\'s two branches', async () => {
+  const r = await updateWith({})
+  assert.equal(r.ok, false)
+  assert.equal(r.needsBranch, true)
+  assert.deepEqual(r.branches, [
+    { name: 'PY-12746-catalog', pr: 7110, slot: null },
+    { name: 'PY-12746-pr2', pr: null, slot: '/w/A' },
+  ])
+})
+
+test('update-branch on the PR branch runs the remote update, and nothing local', async () => {
+  const r = await updateWith({ branch: 'PY-12746-catalog' })
+  assert.equal(r.ok, true, r.message)
+  assert.match(r.detail, /gh pr update-branch 7110 --repo O\/R/)
+  assert.ok(!r.detail.includes('/w/A'), "the other branch's checkout is not touched")
+  assert.ok(!r.detail.includes('git pull'), 'that branch is not checked out anywhere')
+})
+
+test('update-branch on the checked-out branch merges into THAT checkout', async () => {
+  const r = await updateWith({ branch: 'PY-12746-pr2' })
+  assert.equal(r.ok, true, r.message)
+  assert.match(r.detail, /cd \/w\/A/)
+  assert.match(r.detail, /git merge origin\/master/)
+  assert.ok(!r.detail.includes('7110'), "the other branch's PR is not updated")
+})
+
+test('open-editor opens the checkout of the branch it is asked about', async () => {
+  const { item, slot } = catalogItem()
+  const routes = new Map()
+  registerRoutes(routes, {
+    getBoard: async () => ({ items: [item], slots: [slot] }), config, deps: { dry: true },
+  })
+  const editor = routes.get('POST /api/open-editor')
+
+  const onPr = await editor({ id: 'PY-12746', branch: 'PY-12746-catalog' }, { config, invalidate() {} })
+  assert.equal(onPr.ok, false, 'the PR branch has no checkout, and saying so beats opening the wrong one')
+  assert.match(onPr.message, /no local checkout/)
+
+  const onSlot = await editor({ id: 'PY-12746', branch: 'PY-12746-pr2' }, { config, invalidate() {} })
+  assert.equal(onSlot.ok, true, onSlot.message)
+  assert.equal(onSlot.slot, '/w/A')
 })

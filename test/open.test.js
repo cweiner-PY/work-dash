@@ -6,7 +6,16 @@ import { existsSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
-import { buildLauncher, openItem, terminalMode, terminalArgs, tabHint } from '../actions/open.js'
+import { buildLauncher as rawBuildLauncher, openItem as rawOpenItem, terminalMode, terminalArgs, tabHint } from '../actions/open.js'
+import { theBranch } from '../test-support/branches.js'
+
+// Both now act on ONE resolved branch of an item — a ticket can carry several. These tests
+// describe their items by PR and checkout, so the branch is resolved here exactly as routes.js
+// resolves it: from the item's single branch. A test that means a specific branch of a
+// multi-branch item passes `branch` itself and this leaves it alone.
+const withBranch = (o) => ('branch' in o ? o : { ...o, branch: theBranch(o.item) })
+const buildLauncher = (o) => rawBuildLauncher(withBranch(o))
+const openItem = (o, deps) => rawOpenItem(withBranch(o), deps)
 
 const config = { docsDir: '/docs', repos: { 'O/R': { slots: ['/w/A'] } } }
 const item = {

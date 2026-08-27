@@ -7,8 +7,18 @@ import {
   parseWorktreeList, prunableWorktrees, planWorktree, pruneWorktrees,
   DEFAULT_WORKTREE_MAX_AGE_MS,
 } from '../actions/worktree.js'
-import { resolveSlot } from '../actions/slot.js'
-import { buildLauncher, openItem } from '../actions/open.js'
+import { resolveSlot as rawResolveSlot, checkoutBranchOf } from '../actions/slot.js'
+import { buildLauncher as rawBuildLauncher, openItem as rawOpenItem } from '../actions/open.js'
+import { branchesFrom, theBranch } from '../test-support/branches.js'
+
+// resolveSlot, buildLauncher and openItem all act on ONE resolved branch of an item now — the
+// caller works out which. These tests describe items by PR and checkout, so the branch is
+// derived here the way the routes derive it.
+const resolveSlot = (it, slots, cfg, opts = {}) =>
+  rawResolveSlot(it, slots, cfg, { branch: checkoutBranchOf(branchesFrom(it)[0]), ...opts })
+const withBranch = (o) => ('branch' in o ? o : { ...o, branch: theBranch(o.item) })
+const buildLauncher = (o) => rawBuildLauncher(withBranch(o))
+const openItem = (o, deps) => rawOpenItem(withBranch(o), deps)
 
 const REPO = 'PerformYard/Logan'
 const wtConfig = {

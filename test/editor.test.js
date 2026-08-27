@@ -1,7 +1,13 @@
 // test/editor.test.js
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { openEditor } from '../actions/editor.js'
+import { openEditor as rawOpenEditor } from '../actions/editor.js'
+import { theBranch } from '../test-support/branches.js'
+
+// openEditor acts on ONE resolved branch of an item now — the caller decides which (see
+// resolveBranch). These tests describe items by PR and checkout, so the branch is resolved
+// here the way routes.js resolves it: from the item's single branch.
+const openEditor = (o, deps) => rawOpenEditor('branch' in o ? o : { ...o, branch: theBranch(o.item) }, deps)
 
 const slot = { dir: '/Users/x/Work/PY-2', repo: 'O/R', branch: 'PY-12746-x', dirty: false, dirtyCount: 0 }
 const item = { id: 'PY-12746', key: 'PY-12746', repo: 'O/R', slot, prs: [] }

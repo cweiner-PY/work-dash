@@ -1,13 +1,53 @@
 // actions/slot.js
-import { myPrOf } from '../lanes.js'
+import { isMinePr } from '../lanes.js'
 import { checkoutMode, planWorktree } from './worktree.js'
 
-export function branchFor(item) {
-  // Only the user's own PR names a branch to check out — a colleague's review-requested
-  // PR must never redirect this item's checkout to their branch. Falls back to the
-  // slot's own branch, which is how a review-request-only item still resolves correctly.
-  return myPrOf(item)?.headRefName ?? item.slot?.branch ?? null
+// WHICH BRANCH an action is aimed at. There is no "the item's branch" any more — a ticket can
+// carry several — so either the caller names one, or the item has exactly one branch and that
+// is unambiguously what was meant.
+//
+// Fails CLOSED on ambiguity: with more than one branch and no name supplied it hands back the
+// choices instead of picking. Picking is precisely what went wrong before — `update branch`
+// read its label off one branch's behind-count and then ran against a different branch's PR,
+// and neither the label nor the result said which.
+export function resolveBranch(item, name = null) {
+  const branches = item?.branches ?? []
+  if (name != null) {
+    const found = branches.find((b) => b.name === name)
+    if (!found) return { error: `${item?.key ?? item?.id} has no branch ${name}.` }
+    return { branch: found }
+  }
+  if (branches.length === 1) return { branch: branches[0] }
+  // join.js guarantees at least one entry, so this is a belt-and-braces refusal rather than
+  // a reachable path — but an item arriving from anywhere else must not silently act on
+  // nothing.
+  if (branches.length === 0) return { error: `${item?.key ?? item?.id} has no branches at all.` }
+  return {
+    needsBranch: true,
+    branches: branches.map((b) => ({ name: b.name, pr: b.pr?.number ?? null, slot: b.slot?.dir ?? null })),
+    message: `${item?.key ?? item?.id} has ${branches.length} branches — which one?`,
+  }
 }
+
+// The branch a plain `open` should CHECK OUT for this branch entry: its own name, unless the
+// entry exists only because a colleague asked for a review. A review-requested PR must never
+// redirect `open` onto their branch — /api/review is the action for that, and it checks out
+// detached so nothing done there can land on the author's branch.
+//
+// A checkout of our own sitting on that same name is different: the branch is local and real,
+// so it is returned. `detached` excludes the checkout a finished review left behind, which is
+// on the commit rather than on the branch.
+export function checkoutBranchOf(branch) {
+  if (!branch) return null
+  const colleaguesPr = branch.pr && branch.pr.isMine === false
+  const ownCheckout = branch.slot && !branch.detached
+  if (colleaguesPr && !ownCheckout) return null
+  return branch.name ?? null
+}
+
+// The branch entry's own PR, and only when it is the user's. Same rule isMinePr has always
+// enforced item-wide, applied to one branch.
+export const myPrOfBranch = (branch) => (branch?.pr && isMinePr(branch.pr) ? branch.pr : null)
 
 // Same fail-closed dirty check and claim check as the branch-known path below — factored
 // out so the branchless path (no target branch, so no master/main/stale distinction
@@ -28,7 +68,11 @@ function eligibility(s, { claimedDirs }) {
 
 export function resolveSlot(
   item, slots, config,
-  { staleBranches = new Set(), claimedDirs = new Set(), repo = null, branch: branchOverride = null } = {}
+  // `branch` is supplied by the caller, which has already resolved WHICH branch of the item
+  // this is for (see resolveBranch and checkoutBranchOf). null means there is no branch to
+  // check out — a To Do ticket, or an item that exists only because a colleague asked for a
+  // review — and the branchless path below resolves a clean working directory instead.
+  { staleBranches = new Set(), claimedDirs = new Set(), repo = null, branch = null } = {}
 ) {
   // Jira carries nothing identifying the repo — a To Do ticket's title mentioning
   // "Logan" is prose, not data. item.repo (known from a PR or an existing slot) always
@@ -40,10 +84,6 @@ export function resolveSlot(
       message: 'This ticket has no known repository yet — which one is it in?',
     }
   }
-
-  // branchFor deliberately ignores a colleague's review-requested PR, so reviewing one
-  // requires saying which branch out loud. Nothing else passes an override.
-  const branch = branchOverride ?? branchFor(item)
 
   // Worktree mode resolves a path instead of competing for a pool. Nothing to rank and no
   // claim check: the path is derived from the branch, so two different items can never

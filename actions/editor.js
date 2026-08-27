@@ -9,7 +9,7 @@ import { run as defaultRun } from '../util/run.js'
 // macOS resolves the name against installed applications, so one config string covers
 // Cursor, VS Code, Zed or anything else.
 export async function openEditor(
-  { item, slots = [], chosenSlotDir = null, editor = 'Cursor' },
+  { item, branch = null, slots = [], chosenSlotDir = null, editor = 'Cursor' },
   { run = defaultRun, dry = false } = {}
 ) {
   let slot
@@ -23,7 +23,9 @@ export async function openEditor(
       return { ok: false, message: `${slot.dir} belongs to ${slot.repo}, not ${item.repo}.` }
     }
   } else {
-    slot = item.slot
+    // ONE resolved branch's checkout, not the scalar `item.slot` — which on a two-branch
+    // ticket opened whichever checkout happened to come first.
+    slot = branch?.slot ?? null
   }
 
   // No local checkout is the ordinary state for a To Do ticket, and there is nothing

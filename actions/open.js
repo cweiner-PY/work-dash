@@ -4,9 +4,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { run as defaultRun } from '../util/run.js'
-import { resolveSlot, branchFor } from './slot.js'
+import { resolveSlot, checkoutBranchOf, myPrOfBranch } from './slot.js'
 import { checkoutMode, pruneWorktrees } from './worktree.js'
-import { myPrOf } from '../lanes.js'
 
 // Single-quote a value for bash: close, escape, reopen.
 const q = (s) => `'${String(s).replaceAll("'", "'\\''")}'`
@@ -15,13 +14,16 @@ const q = (s) => `'${String(s).replaceAll("'", "'\\''")}'`
 // "resolve conflicts" action. The merge runs HERE, in the Terminal the user is watching,
 // rather than server-side: the output is visible, and /api/open never mutates a checkout
 // as an invisible side effect.
-export function buildLauncher({ item, slot, plans, skill, config, mergeBase = null, worktree = null, review = null }) {
-  const branch = branchFor(item)
+export function buildLauncher({ item, branch: target = null, slot, plans, skill, config, mergeBase = null, worktree = null, review = null }) {
+  // ONE branch of the item — the one the caller resolved. A ticket can carry several, and
+  // launching Claude with the wrong one's context is how a session got told it was on the PR's
+  // branch while the checkout actually held a different one.
+  const branch = checkoutBranchOf(target)
   const planDirs = [...new Set(plans.map((p) => p.dir))]
   const planFiles = plans.map((p) => `${p.dir}/${p.file}`)
   // Only the user's own PR belongs in the launch context — a colleague's review-requested
   // PR must not be presented to Claude as "the" PR for this ticket.
-  const myPr = myPrOf(item)
+  const myPr = myPrOfBranch(target)
 
   // Reviewing someone else's PR is a different job from working your own ticket, so it gets
   // its own context rather than a line appended to the author's one. Stated flatly and up
@@ -189,7 +191,7 @@ export function terminalArgs(path, mode) {
 }
 
 export async function openItem(
-  { item, slots, plans = [], skill = null, config, chosenSlotDir = null, staleBranches, claimedDirs, repo = null, mergeBase = null, review = null },
+  { item, branch = null, slots, plans = [], skill = null, config, chosenSlotDir = null, staleBranches, claimedDirs, repo = null, mergeBase = null, review = null },
   { run = defaultRun, writeFile = fsWriteFile, dry = false } = {}
 ) {
   // Worktree mode accumulates one worktree per branch ever launched on, so old ones are
@@ -213,15 +215,16 @@ export async function openItem(
     // though — the user picking a slot deliberately is a different act from the server
     // guessing one, so claimedDirs is never consulted on this path.
     const looksDirty = slot.dirty !== false || (slot.dirty ?? 0) > 0 || (slot.dirtyCount ?? 0) > 0
-    const wanted = review?.headRefName ?? branchFor(item)
+    const wanted = review?.headRefName ?? checkoutBranchOf(branch)
     if (looksDirty && slot.branch !== wanted) {
       return { ok: false, message: `${slot.dir} has ${slot.dirtyCount ?? 'an unknown number of'} uncommitted change(s) — commit or stash first.` }
     }
   } else {
     const r = resolveSlot(item, slots, config, {
       staleBranches, claimedDirs, repo,
-      // A review needs the author's branch, which branchFor will not supply.
-      branch: review?.headRefName ?? null,
+      // A review needs the AUTHOR's branch, which checkoutBranchOf deliberately refuses to
+      // return — a plain open must never redirect onto a colleague's branch.
+      branch: review?.headRefName ?? checkoutBranchOf(branch),
     })
     if (r.needsPicker) return { ok: false, message: r.message, candidates: r.candidates, needsRepo: r.needsRepo }
     // Worktree mode can fail for a reason no slot picker can fix — no clone to create the
@@ -231,7 +234,7 @@ export async function openItem(
     worktree = r.create ? { create: true, root: r.root, base: r.base } : null
   }
 
-  const script = buildLauncher({ item, slot, plans, skill, config, mergeBase, worktree, review })
+  const script = buildLauncher({ item, branch, slot, plans, skill, config, mergeBase, worktree, review })
   // A per-invocation suffix: the old deterministic path meant two opens of the SAME ticket
   // (e.g. a double-click, or /open then /run) raced on writing one file.
   const path = join(tmpdir(), `work-dash-${(item.key ?? item.id).replaceAll(/[^\w.-]/g, '_')}-${randomUUID()}.sh`)
