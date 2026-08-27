@@ -128,9 +128,20 @@ only `jiraSite`, `jiraEmail` and `jiraToken`.
 
 ## 6. Point it at your checkouts
 
-`slots` are the local clones the dashboard is allowed to use. Each repo needs at
-least one; several let you work on several branches at once. Clone them wherever
-you like and list the absolute paths:
+**First, pick a checkout mode** — where agent sessions run. `"checkoutMode"` in
+`config.json`:
+
+- **`"slots"`** (the default) — a fixed pool of clones you set up now, below.
+- **`"worktrees"`** — a `git worktree` per branch, created on demand under
+  `~/.cache/work-dash-worktrees`. Then you only need ONE clone per repo: set
+  `repos.*.root` to it (or leave a single `slots` entry, which is used as the
+  source). Nothing to pre-clone per branch, and no pool to run out of.
+
+Either way `doctor` checks what that mode actually requires, and switching later
+hides nothing — worktree mode still shows any `slots` you have configured.
+
+For slots mode: each repo needs at least one; several let you work on several
+branches at once. Clone them wherever you like and list the absolute paths:
 
 ```bash
 git clone git@github.com:PerformYard/PerformYard.git ~/Work/PY-1

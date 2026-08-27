@@ -478,3 +478,55 @@ test('a DRAFT held by a gate is in flight, not waiting on anyone', () => {
   })
   assert.equal(item.lane, 'in-flight')
 })
+
+
+// --- open review threads pull an item into needs-you ------------------------------------
+
+test('unanswered review threads are your move', () => {
+  const item = withPr({
+    number: 1, repo: 'O/R', isMine: true, isDraft: false, mergeable: 'MERGEABLE',
+    reviewDecision: 'REVIEW_REQUIRED', openThreads: 3,
+    requiredChecks: { total: 0, failing: [], known: true },
+  })
+  assert.equal(item.lane, 'needs-you')
+  assert.ok(item.reasons.some((r) => /3 open review threads on #1/.test(r)), item.reasons.join('; '))
+})
+
+test('one thread is singular', () => {
+  const item = withPr({
+    number: 1, repo: 'O/R', isMine: true, isDraft: false, mergeable: 'MERGEABLE',
+    reviewDecision: 'REVIEW_REQUIRED', openThreads: 1,
+    requiredChecks: { total: 0, failing: [], known: true },
+  })
+  assert.ok(item.reasons.some((r) => /1 open review thread on #1/.test(r)), item.reasons.join('; '))
+})
+
+test('zero threads says nothing at all', () => {
+  const item = withPr({
+    number: 1, repo: 'O/R', isMine: true, isDraft: false, mergeable: 'MERGEABLE',
+    reviewDecision: 'REVIEW_REQUIRED', openThreads: 0,
+    requiredChecks: { total: 0, failing: [], known: true },
+  })
+  assert.equal(item.lane, 'waiting')
+  assert.ok(!item.reasons.some((r) => /thread/.test(r)))
+})
+
+test('a draft with open threads explains itself but is not promoted', () => {
+  const item = withPr({
+    number: 1, repo: 'O/R', isMine: true, isDraft: true, mergeable: 'MERGEABLE',
+    reviewDecision: 'REVIEW_REQUIRED', openThreads: 2,
+    requiredChecks: { total: 0, failing: [], known: true },
+  })
+  assert.equal(item.lane, 'in-flight')
+  assert.ok(item.reasons.some((r) => /2 open review threads/.test(r)))
+})
+
+test('a missing openThreads field is not a truthy promotion', () => {
+  // Every other PR-shaped object in this codebase predates the field.
+  const item = withPr({
+    number: 1, repo: 'O/R', isMine: true, isDraft: false, mergeable: 'MERGEABLE',
+    reviewDecision: 'REVIEW_REQUIRED',
+    requiredChecks: { total: 0, failing: [], known: true },
+  })
+  assert.equal(item.lane, 'waiting')
+})

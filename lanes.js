@@ -132,6 +132,13 @@ export function assignLanes(items, config) {
     if (pr?.reviewDecision === 'CHANGES_REQUESTED' && !changesAddressed(pr)) {
       needs.push('changes requested'); promote = true
     }
+    // Feedback you have not answered is your move. Distinct from hasReviewComments, which
+    // is the broader "a human said something" net that gates the resolve-code-review skill;
+    // this is the count that is still actually waiting on you.
+    if (pr?.openThreads > 0) {
+      needs.push(`${pr.openThreads} open review thread${pr.openThreads === 1 ? '' : 's'} on #${pr.number}`)
+      if (!pr.isDraft) promote = true
+    }
     if (pr && pr.mergeable === 'CONFLICTING') {
       needs.push('conflicts with master')
       if (!pr.isDraft) promote = true

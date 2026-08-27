@@ -20,6 +20,7 @@ fragment pr on PullRequest {
   repository { nameWithOwner }
   reviews(last:50){ nodes{ state submittedAt author{ login } authorAssociation } }
   commits(last:1){ nodes{ commit{ committedDate } } }
+  reviewThreads(first:100){ nodes{ isResolved comments(last:1){ nodes{ author{ login } } } } }
 }`
 
 // Search caps out well below this in practice; the warning below fires if it ever doesn't.
@@ -103,6 +104,29 @@ export function latestChangesRequestedAt(reviews) {
   return times.length ? new Date(Math.max(...times)).toISOString() : null
 }
 
+// Review threads that are actually waiting on YOU: unresolved, and whose last comment is
+// not yours — once you have replied, the ball is back with the reviewer even though the
+// thread stays open. Verified against the live #7230, which has 6 unresolved threads whose
+// last comment is mine on every one: a naive count would have demanded attention for six
+// things already answered.
+//
+// Approved PRs count zero regardless. Reviewers here rarely click resolve, so an approval
+// supersedes whatever threads are still technically open — and nothing about an approved PR
+// is waiting on a comment.
+//
+// `first: 100` caps it. A PR with more open threads than that has bigger problems than an
+// undercount, and undercounting is the quiet direction rather than the alarming one.
+export function countOpenThreads(node, myLogin) {
+  if (node?.reviewDecision === 'APPROVED') return 0
+  return (node?.reviewThreads?.nodes ?? []).filter((t) => {
+    if (t?.isResolved) return false
+    const last = t?.comments?.nodes?.[0]?.author?.login ?? null
+    // An unattributable last comment counts as theirs: better to surface a thread that
+    // needed no attention than to hide one that did.
+    return last !== myLogin
+  }).length
+}
+
 export function normalizePr(node, { mine, myLogin }) {
   const reviews = node.reviews?.nodes ?? []
   return {
@@ -126,6 +150,9 @@ export function normalizePr(node, { mine, myLogin }) {
     // "have I already pushed fixes for this review?" costs no extra request.
     lastCommitAt: node.commits?.nodes?.[0]?.commit?.committedDate ?? null,
     changesRequestedAt: latestChangesRequestedAt(reviews),
+    // Own PRs only. On a colleague's PR, "threads whose last comment isn't mine" counts
+    // their internal discussion, which says nothing about what the user should do.
+    openThreads: mine ? countOpenThreads(node, myLogin) : 0,
     // Kept for the conflict case only (DIRTY), which GitHub cannot resolve server-side.
     // It is NOT the source of truth for "behind" — see BASE_COMPARE_QUERY above.
     mergeStateStatus: node.mergeStateStatus ?? null,

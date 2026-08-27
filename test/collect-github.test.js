@@ -3,7 +3,8 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { parseRequiredChecks, normalizePr, fetchGithub, hasHumanReviewFeedback,
-         parseBaseCompare, parsePrSearch, searchQueries, latestChangesRequestedAt } from '../collect/github.js'
+         parseBaseCompare, parsePrSearch, searchQueries, latestChangesRequestedAt,
+         countOpenThreads } from '../collect/github.js'
 import { mergeGateFor } from '../lanes.js'
 
 const fx = (n) => JSON.parse(readFileSync(new URL(`./fixtures/${n}`, import.meta.url), 'utf8'))
@@ -463,4 +464,67 @@ test('parseBaseCompare: a non-numeric or missing count is unknown, not coerced',
   // A legitimate zero IS knowledge, and must survive.
   assert.deepEqual(parseBaseCompare(wrap({ aheadBy: 4, behindBy: 0, status: 'AHEAD' })),
     { behind: 0, ahead: 4, status: 'AHEAD', known: true })
+})
+
+
+// --- open review threads ---------------------------------------------------------------
+
+const thread = (resolved, lastAuthor) => ({
+  isResolved: resolved,
+  comments: { nodes: lastAuthor === undefined ? [] : [{ author: lastAuthor === null ? null : { login: lastAuthor } }] },
+})
+
+// REGRESSION against real data: #7230 has 6 unresolved threads whose last comment is mine
+// on every one. A naive "unresolved" count would have demanded attention for six things
+// already answered.
+test('countOpenThreads ignores threads you already replied to', () => {
+  const node = { reviewDecision: 'REVIEW_REQUIRED', reviewThreads: { nodes: [
+    thread(false, 'me'), thread(false, 'me'), thread(false, 'reviewer'),
+  ] } }
+  assert.equal(countOpenThreads(node, 'me'), 1, 'only the one still waiting on you')
+})
+
+test('countOpenThreads ignores resolved threads', () => {
+  const node = { reviewDecision: 'REVIEW_REQUIRED', reviewThreads: { nodes: [
+    thread(true, 'reviewer'), thread(false, 'reviewer'),
+  ] } }
+  assert.equal(countOpenThreads(node, 'me'), 1)
+})
+
+test('countOpenThreads returns zero on an APPROVED PR whatever is open', () => {
+  // Reviewers rarely click resolve; an approval supersedes stale threads, and nothing about
+  // an approved PR is waiting on a comment.
+  const node = { reviewDecision: 'APPROVED', reviewThreads: { nodes: [
+    thread(false, 'reviewer'), thread(false, 'reviewer'),
+  ] } }
+  assert.equal(countOpenThreads(node, 'me'), 0)
+})
+
+test('countOpenThreads treats an unattributable last comment as theirs', () => {
+  // Surfacing a thread that needed no attention is better than hiding one that did.
+  for (const t of [thread(false, null), thread(false, undefined)]) {
+    assert.equal(countOpenThreads({ reviewDecision: 'REVIEW_REQUIRED', reviewThreads: { nodes: [t] } }, 'me'), 1)
+  }
+})
+
+test('countOpenThreads on a node with no threads at all is zero, not an error', () => {
+  assert.equal(countOpenThreads({}, 'me'), 0)
+  assert.equal(countOpenThreads(null, 'me'), 0)
+  assert.equal(countOpenThreads({ reviewThreads: { nodes: [] } }, 'me'), 0)
+})
+
+test('the recorded #7230 has unresolved threads but none waiting on the user', () => {
+  // The live shape this rule exists for, read straight from the fixture.
+  const n = node(7230)
+  const unresolved = n.reviewThreads.nodes.filter((t) => !t.isResolved).length
+  assert.ok(unresolved > 0, 'the fixture must actually contain unresolved threads')
+  assert.equal(countOpenThreads(n, 'cweiner-PY'), 0, 'because the last word on each is the user\'s')
+})
+
+test('normalizePr counts threads for your own PR and never for a colleague\'s', () => {
+  const n = { number: 1, repository: { nameWithOwner: 'O/R' }, reviewDecision: 'REVIEW_REQUIRED',
+              reviewThreads: { nodes: [thread(false, 'reviewer')] } }
+  assert.equal(normalizePr(n, { mine: true, myLogin: 'me' }).openThreads, 1)
+  assert.equal(normalizePr(n, { mine: false, myLogin: 'me' }).openThreads, 0,
+    "their internal discussion says nothing about what the user should do")
 })
