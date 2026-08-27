@@ -6,6 +6,8 @@ export class ConfigError extends Error {}
 
 const DEFAULTS = {
   port: 4200,
+  // Resolved by `open -a <editor>`, so any installed application name works.
+  editor: 'Cursor',
   jiraProject: 'PY',
   inFlightStatusOrder: [
     'In Progress', 'In Code Review', 'Ready To Test', 'In Testing', 'Ready To Merge',

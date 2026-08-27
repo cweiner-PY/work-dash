@@ -3,6 +3,7 @@ import { openItem } from './actions/open.js'
 import { myPrOf } from './lanes.js'
 import { updateBranch } from './actions/update-branch.js'
 import { mergePr } from './actions/merge.js'
+import { openEditor } from './actions/editor.js'
 
 // Branches whose ticket is finished or reassigned — a slot holding one is fair game.
 function staleBranchesOf(board) {
@@ -108,6 +109,18 @@ export function registerRoutes(routes, { getBoard, config, deps = {} }) {
     }, deps)
     if (result.ok) ctx.invalidate()
     return result
+  })
+
+  // Opens an existing checkout in the configured editor. No ctx.invalidate(): opening a
+  // folder changes nothing the board reports, so re-collecting would be pure cost. No slot
+  // claim either — an editor window is not a Claude session competing for the checkout.
+  routes.set('POST /api/open-editor', async (body) => {
+    if (!body || typeof body !== 'object') return { ok: false, message: 'Expected a JSON object body.' }
+    const { item, board } = await find(body.id)
+    if (!item) return { ok: false, message: `Unknown item: ${body.id}` }
+    return openEditor({
+      item, slots: board.slots ?? [], chosenSlotDir: body.slotDir ?? null, editor: config.editor,
+    }, deps)
   })
 
   routes.set('POST /api/merge', async (body, ctx) => {

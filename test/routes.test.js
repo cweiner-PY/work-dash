@@ -287,3 +287,58 @@ test('a plain open still touches neither fetch nor merge', async () => {
   assert.ok(!r.detail.includes('git merge'))
   assert.ok(!r.detail.includes('git fetch'))
 })
+
+
+// --- POST /api/open-editor -------------------------------------------------------------
+
+test('POST /api/open-editor opens the item\'s checkout with the configured editor', async () => {
+  const slot = { dir: '/w/A', repo: 'O/R', branch: 'PY-1-x', dirty: false, dirtyCount: 0 }
+  const item = { id: 'PY-1', key: 'PY-1', repo: 'O/R', slot, prs: [], plans: [], jira: null, skills: [] }
+  const routes = new Map()
+  registerRoutes(routes, {
+    getBoard: async () => ({ items: [item], slots: [slot] }),
+    config: { ...config, editor: 'Cursor' },
+    deps: { dry: true },
+  })
+  const r = await routes.get('POST /api/open-editor')({ id: 'PY-1' }, { config, invalidate() {} })
+  assert.equal(r.ok, true, r.message)
+  assert.match(r.detail, /open -a Cursor \/w\/A/)
+})
+
+test('POST /api/open-editor does not invalidate the board', async () => {
+  // Opening a folder changes nothing the board reports, so re-collecting every source
+  // (~6s against live Jira and GitHub) would be pure cost.
+  const slot = { dir: '/w/A', repo: 'O/R', branch: 'PY-1-x', dirty: false, dirtyCount: 0 }
+  const item = { id: 'PY-1', key: 'PY-1', repo: 'O/R', slot, prs: [], plans: [], jira: null, skills: [] }
+  const routes = new Map()
+  registerRoutes(routes, {
+    getBoard: async () => ({ items: [item], slots: [slot] }), config, deps: { dry: true },
+  })
+  let invalidated = 0
+  await routes.get('POST /api/open-editor')({ id: 'PY-1' }, { config, invalidate() { invalidated++ } })
+  assert.equal(invalidated, 0)
+})
+
+test('POST /api/open-editor rejects a directory that is not one of the board\'s slots', async () => {
+  const slot = { dir: '/w/A', repo: 'O/R', branch: 'PY-1-x', dirty: false, dirtyCount: 0 }
+  const item = { id: 'PY-1', key: 'PY-1', repo: 'O/R', slot, prs: [], plans: [], jira: null, skills: [] }
+  const routes = new Map()
+  registerRoutes(routes, {
+    getBoard: async () => ({ items: [item], slots: [slot] }), config, deps: { dry: true },
+  })
+  const r = await routes.get('POST /api/open-editor')(
+    { id: 'PY-1', slotDir: '/Users/cweiner/.ssh' }, { config, invalidate() {} })
+  assert.equal(r.ok, false)
+  assert.match(r.message, /unknown slot/i)
+})
+
+test('POST /api/open-editor rejects a non-object body and an unknown id', async () => {
+  const routes = new Map()
+  registerRoutes(routes, { getBoard: async () => ({ items: [] }), config, deps: { dry: true } })
+  const bad = await routes.get('POST /api/open-editor')(null, { config, invalidate() {} })
+  assert.equal(bad.ok, false)
+  assert.match(bad.message, /JSON object/)
+  const missing = await routes.get('POST /api/open-editor')({ id: 'nope' }, { config, invalidate() {} })
+  assert.equal(missing.ok, false)
+  assert.match(missing.message, /unknown item/i)
+})

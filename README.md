@@ -133,6 +133,14 @@ always counted, e.g. "6 backlog · 3 stale", so nothing disappears silently.
   starts `claude` there with the ticket key, Jira status/URL, branch, PR
   link, and any attached plan file paths written into its system prompt (and
   granted as `--add-dir` for the plan directories).
+- **cursor** (or whatever `editor` names) — opens the item's existing checkout in
+  your editor, and appears only on cards that have one. Runs
+  `open -a <editor> <dir>` and nothing else: no git, no checkout, no slot
+  resolution, no board re-collection. Because it mutates nothing it is the one
+  action safe to fire at a dirty checkout — which is exactly when you want it.
+  `open -a` rather than a `cursor`/`code` CLI shim, since those are optional
+  installs while the .app is what actually exists; macOS resolves the name, so
+  `"editor": "Zed"` in `config.json` is the whole change needed to switch.
 - **`/skill-name`** (the `run` action) — the same as open, but also submits
   a skill immediately, as `/skill-name TICKET-KEY`. Only skills the server
   computed as applicable to that item (via the `skills` predicates in

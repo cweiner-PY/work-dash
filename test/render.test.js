@@ -1,7 +1,7 @@
 // test/render.test.js
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { groupForDisplay, sourceChip, prChecksChip, prBehindChip, summarizeSubtasks, updateBranchSpec, hasBranch, needsRepoChoice, repoLabel, refreshLabel } from '../public/app.js'
+import { groupForDisplay, sourceChip, prChecksChip, prBehindChip, summarizeSubtasks, updateBranchSpec, hasBranch, needsRepoChoice, repoLabel, refreshLabel, editorSpec } from '../public/app.js'
 
 const it = (o) => ({ id: o.id, lane: o.lane, statusGroup: o.statusGroup ?? 'no ticket',
   sortIndex: o.sortIndex ?? Infinity, signals: { foreign: false, stale: false, reclaimable: false, ...o.signals },
@@ -396,4 +396,34 @@ test('refreshLabel: never returns an empty string, busy or not, at any elapsed t
     assert.equal(typeof label, 'string')
     assert.ok(label.length > 0, `expected a non-empty label for ${JSON.stringify(sample)}`)
   }
+})
+
+
+// --- editorSpec: the open-in-editor button ---------------------------------------------
+
+test('editorSpec: an item with a local checkout gets a button naming the editor', () => {
+  const spec = editorSpec({ slot: { dir: '/Users/x/Work/PY-2' } }, { editor: 'Cursor' })
+  assert.equal(spec.label, 'cursor')
+  assert.equal(spec.dir, '/Users/x/Work/PY-2')
+  assert.match(spec.title, /\/Users\/x\/Work\/PY-2/, 'the tooltip must say which folder opens')
+})
+
+test('editorSpec: no local checkout means no button at all, not a disabled one', () => {
+  // A To Do ticket with no checkout is the ordinary case, not a problem to flag. There is
+  // nothing to enable the button for, so it should not be on the card.
+  assert.equal(editorSpec({ slot: null }, { editor: 'Cursor' }), null)
+  assert.equal(editorSpec({}, { editor: 'Cursor' }), null)
+  assert.equal(editorSpec({ slot: { dir: null } }, { editor: 'Cursor' }), null)
+})
+
+test('editorSpec: falls back to Cursor before config has loaded', () => {
+  // state.config is null until /api/config returns; the first render must not crash or
+  // print "undefined" on the button.
+  for (const config of [null, undefined, {}]) {
+    assert.equal(editorSpec({ slot: { dir: '/w/PY-2' } }, config).label, 'cursor')
+  }
+})
+
+test('editorSpec: a configured editor name drives the label', () => {
+  assert.equal(editorSpec({ slot: { dir: '/w/PY-2' } }, { editor: 'Zed' }).label, 'zed')
 })

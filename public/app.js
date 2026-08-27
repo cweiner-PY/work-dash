@@ -176,6 +176,20 @@ export function summarizeSubtasks(subtasks) {
   return { open: openList.length, done: doneList.length, total: subtasks.length, openList, doneList }
 }
 
+// The editor button, shown only when the item HAS a local checkout — "if it's on a local
+// repo". Returns null otherwise rather than a disabled button: there is nothing to enable
+// it for, and a To Do ticket with no checkout is the ordinary case, not a problem.
+// The label carries the directory so a glance says which slot it lands in.
+export function editorSpec(item, config) {
+  if (!item.slot?.dir) return null
+  const editor = config?.editor ?? 'Cursor'
+  return {
+    label: editor.toLowerCase(),
+    dir: item.slot.dir,
+    title: `Open ${item.slot.dir} in ${editor}`,
+  }
+}
+
 // The refresh button's label as a pure function of busy state and elapsed time, testable
 // without a DOM. A forced refresh runs ~6s against live Jira/GitHub; a static "refreshing…"
 // reads as stuck the whole time, so a ticking counter is what tells the user it's making
@@ -451,6 +465,15 @@ if (typeof document !== 'undefined') {
       const open = el('button', null, 'open')
       open.addEventListener('click', () => post('/api/open', {}, open))
       actions.append(open)
+    }
+
+    // Sits beside open: same "get me into this work" intent, different destination.
+    const ed = editorSpec(item, state.config)
+    if (ed) {
+      const b = el('button', null, ed.label)
+      b.title = ed.title
+      b.addEventListener('click', () => post('/api/open-editor', {}, b))
+      actions.append(b)
     }
 
     for (const skill of item.skills ?? []) {
