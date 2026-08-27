@@ -1,7 +1,7 @@
 // test/lanes.test.js
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { assignLanes, mergeGateFor, myPrOf, isMinePr, needsSprintFallback } from '../lanes.js'
+import { assignLanes, mergeGateFor, myPrOf, isMinePr, needsSprintFallback, changesAddressed } from '../lanes.js'
 
 const config = {
   inFlightStatusOrder: ['In Progress', 'In Code Review', 'Ready To Test', 'In Testing', 'Ready To Merge'],
@@ -313,4 +313,89 @@ test('a dirty slot that is behind master is reported in reasons', () => {
   const it = lane(item({ jira: jira(), slot: { dir: '/s', branch: 'b', dirty: true, dirtyCount: 2, behind: 13, ahead: 6 } }))
   assert.ok(it.reasons.some((r) => /behind/.test(r)))
   assert.ok(it.reasons.some((r) => /uncommitted/i.test(r)))
+})
+
+
+// --- changesAddressed: whose turn is it on a changes-requested PR? ---------------------
+
+const REVIEWED = '2026-08-25T10:00:00Z'
+const cr = (o = {}) => ({
+  number: 1, repo: 'O/R', isMine: true, isDraft: false, mergeable: 'MERGEABLE',
+  reviewDecision: 'CHANGES_REQUESTED', changesRequestedAt: REVIEWED,
+  requiredChecks: { total: 0, failing: [], known: true },
+  ...o,
+})
+
+test('changesAddressed is true only once you pushed AFTER the review', () => {
+  assert.equal(changesAddressed(cr({ lastCommitAt: '2026-08-26T10:00:00Z' })), true, 'pushed after')
+  assert.equal(changesAddressed(cr({ lastCommitAt: '2026-08-24T10:00:00Z' })), false, 'pushed before')
+  assert.equal(changesAddressed(cr({ lastCommitAt: REVIEWED })), false, 'same instant is not after')
+})
+
+test('changesAddressed only applies to a CHANGES_REQUESTED PR', () => {
+  for (const reviewDecision of ['APPROVED', 'REVIEW_REQUIRED', null, undefined]) {
+    assert.equal(changesAddressed(cr({ reviewDecision, lastCommitAt: '2026-08-26T10:00:00Z' })), false,
+      String(reviewDecision))
+  }
+})
+
+test('changesAddressed fails PESSIMISTIC on missing or unparseable timestamps', () => {
+  // The safe direction is to keep nagging. Guessing "addressed" would quietly tell the user
+  // a real "changes requested" is somebody else's problem.
+  for (const o of [
+    { lastCommitAt: null }, { lastCommitAt: undefined }, { lastCommitAt: 'nope' },
+    { changesRequestedAt: null, lastCommitAt: '2026-08-26T10:00:00Z' },
+    { changesRequestedAt: 'nope', lastCommitAt: '2026-08-26T10:00:00Z' },
+  ]) {
+    assert.equal(changesAddressed(cr(o)), false, JSON.stringify(o))
+  }
+  assert.equal(changesAddressed(null), false)
+  assert.equal(changesAddressed(undefined), false)
+})
+
+// REGRESSION: before this, ANY changes-requested PR was promoted to needs-you, so a PR you
+// had already pushed fixes for nagged you until the reviewer came back — someone else's turn
+// presented as yours.
+test('an UNaddressed changes-requested PR is needs-you', () => {
+  const [item] = assignLanes([{
+    id: 'PY-1', key: 'PY-1', repo: 'O/R', slot: null, plans: [], jira: null,
+    prs: [cr({ lastCommitAt: '2026-08-24T10:00:00Z' })],
+    signals: {},
+  }], { inFlightStatusOrder: [] })
+  assert.equal(item.lane, 'needs-you')
+  assert.ok(item.reasons.some((r) => /changes requested/.test(r)))
+})
+
+test('an ADDRESSED changes-requested PR moves to waiting, and says why', () => {
+  const [item] = assignLanes([{
+    id: 'PY-1', key: 'PY-1', repo: 'O/R', slot: null, plans: [], jira: null,
+    prs: [cr({ lastCommitAt: '2026-08-26T10:00:00Z' })],
+    signals: {},
+  }], { inFlightStatusOrder: [] })
+  assert.equal(item.lane, 'waiting', 'the ball is in the reviewer\'s court')
+  assert.ok(item.reasons.some((r) => /changes pushed/.test(r)), item.reasons.join('; '))
+  assert.ok(!item.reasons.some((r) => r === 'changes requested'))
+})
+
+test('a failing required check outranks being addressed — CI is yours either way', () => {
+  const [item] = assignLanes([{
+    id: 'PY-1', key: 'PY-1', repo: 'O/R', slot: null, plans: [], jira: null,
+    prs: [cr({
+      lastCommitAt: '2026-08-26T10:00:00Z',
+      requiredChecks: { total: 1, failing: ['Linting'], known: true },
+    })],
+    signals: {},
+  }], { inFlightStatusOrder: [] })
+  assert.equal(item.lane, 'needs-you')
+  assert.ok(item.reasons.some((r) => /Linting/.test(r)))
+})
+
+test('a DRAFT that is addressed does not land in waiting', () => {
+  // A draft is not awaiting anyone's review by definition.
+  const [item] = assignLanes([{
+    id: 'PY-1', key: 'PY-1', repo: 'O/R', slot: null, plans: [], jira: null,
+    prs: [cr({ isDraft: true, lastCommitAt: '2026-08-26T10:00:00Z' })],
+    signals: {},
+  }], { inFlightStatusOrder: [] })
+  assert.equal(item.lane, 'in-flight')
 })

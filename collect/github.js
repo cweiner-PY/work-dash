@@ -1,22 +1,33 @@
 // collect/github.js
 import { run as defaultRun } from '../util/run.js'
 
-const PR_FIELDS = 'number,title,headRefName,baseRefName,reviewDecision,mergeable,isDraft,statusCheckRollup,updatedAt,url,reviews,mergeStateStatus'
+// ONE query for every PR in every configured repo, replacing four sequential
+// `gh pr list` invocations — measured at 5.2s of this collector's 7.1s, because gh spawns
+// a process and makes its own request per call. The consolidated call measures 1.4s.
+//
+// Required checks deliberately do NOT move here. GraphQL's branchProtectionRules does not
+// cover repository RULESETS, so a repo using those would report an empty required list —
+// and an empty-but-known list is exactly what mergeGateFor treats as passing. Trading a
+// silently permissive merge gate for 1.4s is not a trade worth making, so `gh pr checks
+// --required` stays.
+const PR_QUERY = `query($mine:String!,$review:String!,$first:Int!){
+  mine: search(query:$mine, type:ISSUE, first:$first){ nodes{ ...pr } }
+  reviewRequested: search(query:$review, type:ISSUE, first:$first){ nodes{ ...pr } }
+}
+fragment pr on PullRequest {
+  number title url isDraft mergeable reviewDecision mergeStateStatus updatedAt
+  headRefName baseRefName
+  repository { nameWithOwner }
+  reviews(last:50){ nodes{ state submittedAt author{ login } authorAssociation } }
+  commits(last:1){ nodes{ commit{ committedDate } } }
+}`
+
+// Search caps out well below this in practice; the warning below fires if it ever doesn't.
+const SEARCH_LIMIT = 50
 
 // gh signals "this repo configures no required checks" via a non-zero exit and this
 // message on stderr, NOT via an empty JSON array on stdout.
 const NO_REQUIRED_CHECKS = /no required checks/i
-
-export function summarizeChecks(rollup) {
-  const out = { pass: 0, fail: 0, pending: 0 }
-  for (const c of rollup ?? []) {
-    if (c.status && c.status !== 'COMPLETED') { out.pending++; continue }
-    if (c.conclusion === 'SUCCESS') out.pass++
-    else if (c.conclusion === 'FAILURE' || c.conclusion === 'TIMED_OUT') out.fail++
-    // CANCELLED, SKIPPED, NEUTRAL count as neither.
-  }
-  return out
-}
 
 // PENDING/QUEUED mean the check is still running, not that it failed. Every PR spends
 // a few minutes here after each push; counting that as "failing" would promote the
@@ -81,59 +92,109 @@ export function hasHumanReviewFeedback(reviews, myLogin) {
     ASSOC.has(r.authorAssociation))
 }
 
-export function normalizePr(raw, repo, { mine, myLogin }) {
+// The newest changes-requested review's timestamp, or null. Pure and exported because it
+// is half of the changesAddressed decision in lanes.js, and the half most likely to be
+// wrong — reviews arrive in no guaranteed order, so this takes the MAX rather than the last.
+export function latestChangesRequestedAt(reviews) {
+  const times = (reviews ?? [])
+    .filter((r) => r.state === 'CHANGES_REQUESTED' && r.submittedAt)
+    .map((r) => Date.parse(r.submittedAt))
+    .filter(Number.isFinite)
+  return times.length ? new Date(Math.max(...times)).toISOString() : null
+}
+
+export function normalizePr(node, { mine, myLogin }) {
+  const reviews = node.reviews?.nodes ?? []
   return {
-    repo,
-    number: raw.number,
-    title: raw.title,
-    headRefName: raw.headRefName,
-    baseRefName: raw.baseRefName ?? null,
-    reviewDecision: raw.reviewDecision ?? null,
-    mergeable: raw.mergeable ?? null,
-    isDraft: Boolean(raw.isDraft),
-    checks: summarizeChecks(raw.statusCheckRollup),
+    repo: node.repository?.nameWithOwner ?? null,
+    number: node.number,
+    title: node.title,
+    headRefName: node.headRefName,
+    baseRefName: node.baseRefName ?? null,
+    reviewDecision: node.reviewDecision ?? null,
+    mergeable: node.mergeable ?? null,
+    isDraft: Boolean(node.isDraft),
     // Starts UNKNOWN, not "zero required checks". fetchGithub replaces this with a
     // known:true result on a successful read; if the read fails it stays unknown and
     // the merge gate refuses rather than mistaking silence for a clean bill of health.
     requiredChecks: { total: 0, failing: [], known: false },
-    hasReviewComments: hasHumanReviewFeedback(raw.reviews, myLogin),
+    hasReviewComments: hasHumanReviewFeedback(reviews, myLogin),
     isMine: mine,
-    url: raw.url ?? null,
-    updatedAt: raw.updatedAt ?? null,
+    url: node.url ?? null,
+    updatedAt: node.updatedAt ?? null,
+    // The two halves of changesAddressed (lanes.js). Both come free with the PR query, so
+    // "have I already pushed fixes for this review?" costs no extra request.
+    lastCommitAt: node.commits?.nodes?.[0]?.commit?.committedDate ?? null,
+    changesRequestedAt: latestChangesRequestedAt(reviews),
     // Kept for the conflict case only (DIRTY), which GitHub cannot resolve server-side.
     // It is NOT the source of truth for "behind" — see BASE_COMPARE_QUERY above.
-    mergeStateStatus: raw.mergeStateStatus ?? null,
+    mergeStateStatus: node.mergeStateStatus ?? null,
     // Starts unknown for the same reason requiredChecks does. fetchGithub fills this in
     // for the user's own PRs, which are the only ones update-branch can act on.
     baseCompare: { ...COMPARE_UNKNOWN },
   }
 }
 
-async function listPrs(repo, extraArgs, { run }) {
-  const args = ['pr', 'list', '--repo', repo, '--state', 'open', '--json', PR_FIELDS, '--limit', '50', ...extraArgs]
-  const r = await run('gh', args)
-  if (r.code !== 0) throw new Error(`gh pr list failed for ${repo}: ${r.stderr.trim() || r.code}`)
-  return JSON.parse(r.stdout || '[]')
+// The search qualifiers for one query covering every configured repo. Exported so a test
+// can assert the repo scoping, which is the part that silently returns the wrong PRs if
+// it is built wrong — an unscoped search would pull in PRs from every repo on GitHub.
+export function searchQueries(config) {
+  const scope = Object.keys(config.repos).map((r) => `repo:${r}`).join(' ')
+  return {
+    mine: `is:pr is:open author:@me ${scope}`,
+    review: `is:pr is:open review-requested:@me ${scope}`,
+  }
+}
+
+// Pure: pull the PR nodes out of a GraphQL response. GraphQL can answer with data AND an
+// errors array, so partial data is used rather than discarded — the same rule the required
+// checks and the base comparison already follow.
+export function parsePrSearch(stdout) {
+  let data
+  try { data = JSON.parse(stdout) } catch { return { mine: null, review: null } }
+  const nodes = (key) => {
+    const n = data?.data?.[key]?.nodes
+    // A node without a number is a non-PullRequest search hit; the fragment cannot match it.
+    return Array.isArray(n) ? n.filter((x) => x && typeof x.number === 'number') : null
+  }
+  return { mine: nodes('mine'), review: nodes('reviewRequested') }
 }
 
 export async function fetchGithub(config, { run = defaultRun } = {}) {
   const prs = []
   const errors = []
+  const myLogin = config.githubLogin
 
-  for (const repo of Object.keys(config.repos)) {
-    try {
-      const mineRaw = await listPrs(repo, ['--author', '@me'], { run })
-      const reviewRaw = await listPrs(repo, ['--search', 'review-requested:@me'], { run })
-      const myLogin = config.githubLogin
-      for (const raw of mineRaw) prs.push(normalizePr(raw, repo, { mine: true, myLogin }))
-      for (const raw of reviewRaw) prs.push(normalizePr(raw, repo, { mine: false, myLogin }))
-    } catch (e) {
-      errors.push(e.message)
+  const { mine, review } = searchQueries(config)
+  const r = await run('gh', ['api', 'graphql',
+    '-f', `query=${PR_QUERY}`, '-f', `mine=${mine}`, '-f', `review=${review}`,
+    '-F', `first=${SEARCH_LIMIT}`])
+  const found = parsePrSearch(r.stdout)
+
+  // One call now covers every repo, so a total failure loses all GitHub data where the old
+  // per-repo loop could keep one repo's PRs. Partial data is therefore taken whenever
+  // GraphQL returns any, and a null (not merely empty) result is what counts as failure.
+  if (found.mine === null && found.review === null) {
+    errors.push(`gh pr search failed: ${r.stderr.trim() || `exit ${r.code}`}`)
+  } else {
+    for (const node of found.mine ?? []) prs.push(normalizePr(node, { mine: true, myLogin }))
+    for (const node of found.review ?? []) prs.push(normalizePr(node, { mine: false, myLogin }))
+    if (found.mine === null || found.review === null) {
+      errors.push(`gh pr search returned only part of the result: ${r.stderr.trim() || `exit ${r.code}`}`)
+    }
+    // Same truncation discipline as the Jira collector: say so rather than silently
+    // presenting a partial board as complete.
+    for (const [name, list] of [['authored', found.mine], ['review-requested', found.review]]) {
+      if (list?.length >= SEARCH_LIMIT) {
+        errors.push(`${name} PR search hit the ${SEARCH_LIMIT}-result limit; some may be missing`)
+      }
     }
   }
 
   // Required checks, one call per PR.
-  await Promise.all(prs.map(async (pr) => {
+  // The two enrichment passes are independent of each other, so they run concurrently
+  // rather than one after the other — they were costing ~1.4s and ~0.5s in series.
+  const requiredChecksPass = () => Promise.all(prs.map(async (pr) => {
     const r = await run('gh', ['pr', 'checks', String(pr.number), '--repo', pr.repo,
                                '--required', '--json', 'name,state,link'])
     // gh exits non-zero when any check is FAILING, so parse stdout regardless of code.
@@ -164,7 +225,7 @@ export async function fetchGithub(config, { run = defaultRun } = {}) {
   // How far behind its base each of the user's OWN PRs is — the signal update-branch
   // actually needs. Own PRs only: a colleague's review-requested PR has no update-branch
   // button (see myPrOf in lanes.js), so a call for it would be a wasted round trip.
-  await Promise.all(prs.filter((pr) => pr.isMine).map(async (pr) => {
+  const baseComparePass = () => Promise.all(prs.filter((pr) => pr.isMine).map(async (pr) => {
     const [owner, name] = pr.repo.split('/')
     if (!owner || !name || !pr.baseRefName || !pr.headRefName) {
       errors.push(`cannot compare ${pr.repo}#${pr.number} with its base: missing ref names`)
@@ -186,6 +247,8 @@ export async function fetchGithub(config, { run = defaultRun } = {}) {
       `${r.stderr.trim() || `exit ${r.code}`}`
     )
   }))
+
+  await Promise.all([requiredChecksPass(), baseComparePass()])
 
   return { prs, errors }
 }

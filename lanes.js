@@ -45,6 +45,22 @@ export function needsSprintFallback(items) {
   return jiraItems.length > 0 && jiraItems.every((i) => !i.jira.sprintFieldPresent)
 }
 
+// True once you have pushed commits AFTER the newest changes-requested review. GitHub's
+// reviewDecision stays CHANGES_REQUESTED until the reviewer comes back, so without this the
+// board keeps an already-addressed PR in needs-you and nags you about someone else's turn.
+// Self-correcting: a newer changes-requested review moves the timestamp and flips it back.
+//
+// Fails SAFE in the pessimistic direction — a missing or unparseable timestamp means "not
+// addressed", so an unknown state keeps nagging rather than quietly telling you a real
+// "changes requested" is somebody else's problem.
+export function changesAddressed(pr) {
+  if (pr?.reviewDecision !== 'CHANGES_REQUESTED') return false
+  const reviewed = Date.parse(pr.changesRequestedAt ?? '')
+  const pushed = Date.parse(pr.lastCommitAt ?? '')
+  if (!Number.isFinite(reviewed) || !Number.isFinite(pushed)) return false
+  return pushed > reviewed
+}
+
 export function assignLanes(items, config) {
   const order = config.inFlightStatusOrder ?? []
 
@@ -100,7 +116,11 @@ export function assignLanes(items, config) {
       needs.push(`required check failing: ${failing.join(', ')}`)
       if (!pr.isDraft) promote = true
     }
-    if (pr?.reviewDecision === 'CHANGES_REQUESTED') { needs.push('changes requested'); promote = true }
+    // Only when you have NOT already pushed fixes — see changesAddressed. An addressed PR
+    // is handled by the waiting lane below, where the ball actually is.
+    if (pr?.reviewDecision === 'CHANGES_REQUESTED' && !changesAddressed(pr)) {
+      needs.push('changes requested'); promote = true
+    }
     if (pr && pr.mergeable === 'CONFLICTING') {
       needs.push('conflicts with master')
       if (!pr.isDraft) promote = true
@@ -110,9 +130,15 @@ export function assignLanes(items, config) {
     if (promote) lane = 'needs-you'
 
     // --- lane 2: waiting on others ---
-    if (!lane && pr && !pr.isDraft && pr.reviewDecision === 'REVIEW_REQUIRED' && failing.length === 0) {
+    // Either never reviewed, or reviewed and since addressed: both are the reviewer's move.
+    // A failing required check still outranks this — CI is your problem either way.
+    const addressed = changesAddressed(pr)
+    if (!lane && pr && !pr.isDraft && failing.length === 0 &&
+        (pr.reviewDecision === 'REVIEW_REQUIRED' || addressed)) {
       lane = 'waiting'
-      reasons.push(`awaiting review on #${pr.number}`)
+      reasons.push(addressed
+        ? `changes pushed — awaiting re-review on #${pr.number}`
+        : `awaiting review on #${pr.number}`)
     }
 
     // --- lane 3: in flight ---

@@ -34,7 +34,7 @@ Every item lands in exactly one lane, in this order:
 | Lane | When |
 |---|---|
 | **Needs you** | A review is requested of you · the ticket is Done but your PR is still open · a **required** check is failing · changes were requested · your PR conflicts with its base · or it's approved and mergeable and just needs the button pressed |
-| **Waiting on others** | Your PR is open, not a draft, awaiting review, no failing required checks |
+| **Waiting on others** | Your PR is open, not a draft, no failing required checks, and either awaiting first review or **already updated since a changes-requested review** — the reviewer's move either way |
 | **In flight** | It has a local checkout, a draft PR, or Jira status category *In Progress*. Sub-grouped by Jira status in `inFlightStatusOrder` order |
 | **Ready to start** | Status category *To Do* **and** committed to the active sprint |
 | **Backlog** | Everything else |
@@ -132,7 +132,9 @@ stored per browser, defaulting to `ledger`. Deliberately not tied to
 `prefers-color-scheme`. Each is one token block in `public/style.css`.
 
 The page polls every 60s, skips it entirely while the tab is hidden, and catches
-up when you return if the board is stale.
+up when you return if the board is stale. A collection takes ~3.5s: one GraphQL
+call for every PR in every repo, then required checks and base comparisons
+concurrently.
 
 ## Safety guarantees
 
