@@ -104,9 +104,13 @@ export function updateBranchSpec(item, mainPr) {
     // Conflicts come first and outrank the behind count: however far behind the branch
     // is, GitHub cannot merge the base into it server-side while it conflicts.
     if (mainPr.mergeStateStatus === 'DIRTY' || mainPr.mergeable === 'CONFLICTING') {
+      // GitHub cannot resolve a conflict server-side, but "go and do it yourself" is not
+      // an action — a disabled button naming a task the user must perform elsewhere is
+      // just a label. This one opens a Terminal in the checkout with the merge already
+      // started and left conflicted, which is the actual first step.
       return {
-        label: 'resolve conflicts locally', disabled: true,
-        title: `#${mainPr.number} conflicts with ${base} — resolve it locally, GitHub can't.`,
+        label: 'resolve conflicts', disabled: false, action: 'resolve-conflicts',
+        title: `#${mainPr.number} conflicts with ${base} — opens a terminal with the merge started.`,
       }
     }
     const cmp = mainPr.baseCompare ?? {}
@@ -115,20 +119,20 @@ export function updateBranchSpec(item, mainPr) {
       // failed, so it is worth acting on. Anything else fails closed: an unread
       // comparison must never render as the confident "up to date".
       if (mainPr.mergeStateStatus === 'BEHIND') {
-        return { label: 'update branch', disabled: false, title: null }
+        return { label: 'update branch', disabled: false, action: 'update-branch', title: null }
       }
       return {
-        label: 'behind state unknown', disabled: true,
+        label: 'behind state unknown', disabled: true, action: 'update-branch',
         title: `Could not compare #${mainPr.number} with ${base} — try again after the next refresh.`,
       }
     }
     if (cmp.behind > 0) {
       return {
-        label: `update branch (${cmp.behind} behind)`, disabled: false,
+        label: `update branch (${cmp.behind} behind)`, disabled: false, action: 'update-branch',
         title: `#${mainPr.number} is ${cmp.behind} commit(s) behind ${base}.`,
       }
     }
-    return { label: 'up to date', disabled: true, title: `Already up to date with ${base}.` }
+    return { label: 'up to date', disabled: true, action: 'update-branch', title: `Already up to date with ${base}.` }
   }
   // No PR: fall back to the old local-only signal. The count is only as fresh as the
   // user's last manual fetch, so it must never be presented as current.
@@ -136,6 +140,7 @@ export function updateBranchSpec(item, mainPr) {
   return {
     label: item.slot.behind > 0 ? `update (${item.slot.behind} behind, as of last fetch)` : 'update branch',
     disabled: item.slot.dirty,
+    action: 'update-branch',
     title: item.slot.dirty ? `${item.slot.dirtyCount} uncommitted change(s)` : null,
   }
 }
@@ -468,7 +473,11 @@ if (typeof document !== 'undefined') {
       const u = el('button', null, spec.label)
       u.disabled = spec.disabled
       if (spec.title) u.title = spec.title
-      u.addEventListener('click', () => post('/api/update-branch', {}, u))
+      // Two different endpoints behind one button position, chosen by the spec rather
+      // than re-derived here: resolving a conflict is a launch, not a branch update.
+      u.addEventListener('click', () => (spec.action === 'resolve-conflicts'
+        ? post('/api/open', { resolveConflicts: true }, u)
+        : post('/api/update-branch', {}, u)))
       actions.append(u)
     }
 

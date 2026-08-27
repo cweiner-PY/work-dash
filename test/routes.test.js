@@ -204,3 +204,86 @@ test('a successful action invalidates the board cache', async () => {
   assert.equal(r.ok, true)
   assert.equal(invalidated, true)
 })
+
+
+// --- POST /api/open with resolveConflicts: the "resolve conflicts" button -------------
+
+const conflictItem = (pr = {}) => {
+  const slot = { dir: '/w/A', repo: 'O/R', branch: 'PY-1-x', dirty: false, dirtyCount: 0 }
+  const item = {
+    id: 'PY-1', key: 'PY-1', title: 't', repo: 'O/R', slot, plans: [], jira: null, skills: [],
+    prs: [{ number: 7110, headRefName: 'PY-1-x', isMine: true, baseRefName: 'master', ...pr }],
+  }
+  return { item, slot }
+}
+const openWith = async (body, { item, slot }) => {
+  const routes = new Map()
+  registerRoutes(routes, {
+    getBoard: async () => ({ items: [item], slots: [slot] }), config, deps: { dry: true },
+  })
+  return routes.get('POST /api/open')({ id: 'PY-1', ...body }, { config, invalidate() {} })
+}
+
+test('resolveConflicts merges the base branch named by the PR, not a hardcoded master', async () => {
+  const r = await openWith({ resolveConflicts: true }, conflictItem({ baseRefName: 'release-2' }))
+  assert.equal(r.ok, true, r.message)
+  assert.match(r.detail, /git merge 'origin\/release-2'/)
+  assert.ok(!r.detail.includes("origin/master"), 'must not fall back to master when a base is known')
+})
+
+test('resolveConflicts falls back to the configured default branch when the PR names no base', async () => {
+  const cfg = { ...config, repos: { 'O/R': { slots: ['/w/A'], defaultBranch: 'trunk' } } }
+  const { item, slot } = conflictItem({ baseRefName: null })
+  const routes = new Map()
+  registerRoutes(routes, {
+    getBoard: async () => ({ items: [item], slots: [slot] }), config: cfg, deps: { dry: true },
+  })
+  const r = await routes.get('POST /api/open')(
+    { id: 'PY-1', resolveConflicts: true }, { config: cfg, invalidate() {} })
+  assert.equal(r.ok, true, r.message)
+  assert.match(r.detail, /git merge 'origin\/trunk'/)
+})
+
+test('resolveConflicts is strict === true — no truthy value may trigger a merge', async () => {
+  // Same trap as `confirmed` on /api/merge: Boolean("false") is true, so anything short of
+  // a strict comparison would let "false", 1 or {} start a merge in the user's checkout.
+  for (const value of ['true', 'false', 1, {}, [], 'yes', null, undefined]) {
+    const r = await openWith({ resolveConflicts: value }, conflictItem())
+    assert.equal(r.ok, true, `${JSON.stringify(value)}: ${r.message}`)
+    assert.ok(!r.detail.includes('git merge'),
+      `resolveConflicts: ${JSON.stringify(value)} must NOT start a merge`)
+  }
+})
+
+test('a client cannot name the ref to merge — only whether to merge at all', async () => {
+  // mergeBase is derived server-side. If the body could set it, a raw call could merge an
+  // arbitrary ref into the checkout, which is the same class of hole the repo and plan
+  // allowlists above exist to close.
+  const r = await openWith(
+    { resolveConflicts: true, mergeBase: 'attacker-branch' },
+    conflictItem({ baseRefName: 'master' }))
+  assert.equal(r.ok, true, r.message)
+  assert.match(r.detail, /git merge 'origin\/master'/)
+  assert.ok(!r.detail.includes('attacker-branch'))
+})
+
+test("resolveConflicts ignores a colleague's review-requested PR when choosing the base", async () => {
+  // myPrOf, not prs[0]: a foreign PR's base branch must never decide what gets merged
+  // into the user's checkout.
+  const slot = { dir: '/w/A', repo: 'O/R', branch: 'PY-1-x', dirty: false, dirtyCount: 0 }
+  const item = {
+    id: 'PY-1', key: 'PY-1', title: 't', repo: 'O/R', slot, plans: [], jira: null, skills: [],
+    prs: [{ number: 1, headRefName: 'theirs', isMine: false, baseRefName: 'their-base' }],
+  }
+  const r = await openWith({ resolveConflicts: true }, { item, slot })
+  assert.equal(r.ok, true, r.message)
+  assert.ok(!r.detail.includes('their-base'), "a foreign PR's base must not be merged")
+  assert.match(r.detail, /git merge 'origin\/master'/, 'falls back to the configured default')
+})
+
+test('a plain open still touches neither fetch nor merge', async () => {
+  const r = await openWith({}, conflictItem())
+  assert.equal(r.ok, true, r.message)
+  assert.ok(!r.detail.includes('git merge'))
+  assert.ok(!r.detail.includes('git fetch'))
+})

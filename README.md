@@ -137,11 +137,28 @@ always counted, e.g. "6 backlog · 3 stale", so nothing disappears silently.
   a skill immediately, as `/skill-name TICKET-KEY`. Only skills the server
   computed as applicable to that item (via the `skills` predicates in
   config) are accepted.
-- **update branch** — `git fetch origin` then `git merge origin/<defaultBranch>`
-  in the item's checkout. Refuses outright if the working tree is dirty; it
-  never rebases, stashes, force-pushes, or aborts a conflicted merge. If the
-  merge conflicts, the repo is left exactly as git left it, for you to
-  resolve by hand.
+- **update branch (N behind)** — for a PR, `gh pr update-branch`, then a local
+  `git pull --ff-only` if the branch happens to be checked out (never a merge,
+  never a force). With no PR, `git fetch origin` then
+  `git merge origin/<defaultBranch>` in the item's checkout. Refuses outright
+  if the working tree is dirty; it never rebases, stashes, force-pushes, or
+  aborts a conflicted merge. If the merge conflicts, the repo is left exactly
+  as git left it, for you to resolve by hand.
+
+  The count comes from GitHub's own `Ref.compare`, **not** from
+  `mergeStateStatus`. That field answers "can this merge", not "is this
+  behind": `BEHIND` is only reported when branch protection requires branches
+  be up to date, and `BLOCKED`/`DIRTY` outrank it. Reading it as a
+  behind-signal once made the board show "up to date" on a PR 24 commits
+  behind master. A comparison that can't be read shows **behind state
+  unknown** and disables the button, rather than guessing zero.
+- **resolve conflicts** — replaces the update button when the PR conflicts
+  with its base, which GitHub cannot fix server-side. Opens a Terminal in the
+  checkout, runs the merge so the conflict is materialised in front of you,
+  and starts `claude` with the situation in its system prompt. The merge and
+  fetch are both `|| echo`-guarded so a conflicting merge can't kill the
+  launcher under `set -e`. The base branch is derived server-side from the
+  PR; the client sends only a boolean.
 - **squash & merge** — `gh pr merge --squash`. The button reflects the merge
   gate (below) but the server re-checks it independently before running
   anything, requires an explicit confirmation, and refuses to merge a PR you

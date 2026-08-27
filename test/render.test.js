@@ -187,11 +187,15 @@ test('updateBranchSpec: BEHIND is enabled with the plain "update branch" label',
   assert.equal(spec.label, 'update branch')
 })
 
-test('updateBranchSpec: DIRTY is disabled, labelled to resolve locally, with a reason in the title', () => {
-  const spec = updateBranchSpec({ slot: null }, { number: 42, mergeStateStatus: 'DIRTY' })
-  assert.equal(spec.disabled, true)
-  assert.match(spec.label, /resolve conflicts locally/)
-  assert.match(spec.title, /#42/)
+test('updateBranchSpec: DIRTY is an ENABLED action, not a label telling you to go elsewhere', () => {
+  const spec = updateBranchSpec({ slot: null }, {
+    number: 7110, mergeStateStatus: 'DIRTY', baseRefName: 'master',
+    baseCompare: { behind: 24, ahead: 11, status: 'DIVERGED', known: true },
+  })
+  assert.equal(spec.disabled, false, 'a disabled button naming a manual task is just a label')
+  assert.equal(spec.label, 'resolve conflicts')
+  assert.equal(spec.action, 'resolve-conflicts', 'must route to the launcher, not update-branch')
+  assert.match(spec.title, /master/)
 })
 
 // REGRESSION, live bug: PerformYard/PerformYard#7230 sat 24 commits behind master while
@@ -251,8 +255,9 @@ test('updateBranchSpec: BEHIND still acts even when the comparison failed', () =
 })
 
 test('updateBranchSpec: conflicts outrank the behind count', () => {
-  // A conflicting branch cannot be updated server-side however far behind it is, so
-  // DIRTY must win over behind:24 rather than offering an update that would fail.
+  // A conflicting branch cannot be brought up to date server-side however far behind it
+  // is, so DIRTY (or a CONFLICTING mergeable) must win over behind:24 and offer the
+  // conflict path rather than an update that would fail.
   for (const pr of [
     { number: 7110, mergeStateStatus: 'DIRTY', baseRefName: 'master',
       baseCompare: { behind: 24, ahead: 11, status: 'DIVERGED', known: true } },
@@ -260,10 +265,26 @@ test('updateBranchSpec: conflicts outrank the behind count', () => {
       baseCompare: { behind: 24, ahead: 11, status: 'DIVERGED', known: true } },
   ]) {
     const spec = updateBranchSpec({ slot: null }, pr)
-    assert.equal(spec.disabled, true)
-    assert.equal(spec.label, 'resolve conflicts locally')
+    assert.equal(spec.action, 'resolve-conflicts')
+    assert.equal(spec.label, 'resolve conflicts')
     assert.match(spec.title, /master/)
   }
+})
+
+test('updateBranchSpec: every non-conflict outcome routes to update-branch', () => {
+  // The click handler dispatches on spec.action, so an outcome that forgot to declare one
+  // would silently POST to the wrong endpoint.
+  const cases = [
+    { number: 1, mergeStateStatus: 'BLOCKED', baseCompare: { behind: 24, ahead: 1, known: true } },
+    { number: 1, mergeStateStatus: 'BLOCKED', baseCompare: { behind: 0, ahead: 1, known: true } },
+    { number: 1, mergeStateStatus: 'BLOCKED', baseCompare: { behind: null, known: false } },
+    { number: 1, mergeStateStatus: 'BEHIND', baseCompare: { behind: null, known: false } },
+  ]
+  for (const pr of cases) {
+    assert.equal(updateBranchSpec({ slot: null }, pr).action, 'update-branch', JSON.stringify(pr))
+  }
+  // ...including the no-PR local fallback.
+  assert.equal(updateBranchSpec({ slot: { behind: 3, dirty: false, dirtyCount: 0 } }, null).action, 'update-branch')
 })
 
 test('prBehindChip: says nothing when the branch is up to date', () => {

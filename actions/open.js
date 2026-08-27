@@ -10,7 +10,11 @@ import { myPrOf } from '../lanes.js'
 // Single-quote a value for bash: close, escape, reopen.
 const q = (s) => `'${String(s).replaceAll("'", "'\\''")}'`
 
-export function buildLauncher({ item, slot, plans, skill, config }) {
+// mergeBase, when given, is the base branch to merge in before Claude starts — the
+// "resolve conflicts" action. The merge runs HERE, in the Terminal the user is watching,
+// rather than server-side: the output is visible, and /api/open never mutates a checkout
+// as an invisible side effect.
+export function buildLauncher({ item, slot, plans, skill, config, mergeBase = null }) {
   const branch = branchFor(item)
   const planDirs = [...new Set(plans.map((p) => p.dir))]
   const planFiles = plans.map((p) => `${p.dir}/${p.file}`)
@@ -28,6 +32,10 @@ export function buildLauncher({ item, slot, plans, skill, config }) {
     branch ? `Branch: ${branch}` : `No branch yet — this ticket has not been started. Repo: ${slot.repo}.`,
     myPr ? `PR: #${myPr.number} ${myPr.url}` : null,
     planFiles.length ? `Plan files: ${planFiles.join(', ')}. Read them before acting.` : null,
+    mergeBase
+      ? `This branch conflicts with origin/${mergeBase}. The merge has just been started ` +
+        `in this checkout and left conflicted on purpose — resolve the conflicts, then commit.`
+      : null,
   ].filter(Boolean).join('\n')
 
   const claude = [
@@ -43,12 +51,21 @@ export function buildLauncher({ item, slot, plans, skill, config }) {
     `cd ${q(slot.dir)}`,
   ]
   if (branch && slot.branch !== branch) lines.push(`git checkout ${q(branch)}`)
+  if (mergeBase) {
+    // Both tolerant of failure, and both loud about it. `set -e` is on, so a bare `git
+    // merge` that stops on conflicts — the entire point of this path — would kill the
+    // script before Claude ever launched.
+    lines.push(
+      `git fetch origin || echo ${q(`>> git fetch failed — origin/${mergeBase} may be stale`)}`,
+      `git merge ${q(`origin/${mergeBase}`)} || echo ${q('>> merge stopped with conflicts — resolve them, then commit')}`,
+    )
+  }
   lines.push(claude, '')
   return lines.join('\n')
 }
 
 export async function openItem(
-  { item, slots, plans = [], skill = null, config, chosenSlotDir = null, staleBranches, claimedDirs, repo = null },
+  { item, slots, plans = [], skill = null, config, chosenSlotDir = null, staleBranches, claimedDirs, repo = null, mergeBase = null },
   { run = defaultRun, writeFile = fsWriteFile, dry = false } = {}
 ) {
   let slot
@@ -73,7 +90,7 @@ export async function openItem(
     slot = r.slot
   }
 
-  const script = buildLauncher({ item, slot, plans, skill, config })
+  const script = buildLauncher({ item, slot, plans, skill, config, mergeBase })
   // A per-invocation suffix: the old deterministic path meant two opens of the SAME ticket
   // (e.g. a double-click, or /open then /run) raced on writing one file.
   const path = join(tmpdir(), `work-dash-${(item.key ?? item.id).replaceAll(/[^\w.-]/g, '_')}-${randomUUID()}.sh`)

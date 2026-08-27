@@ -1,6 +1,11 @@
 // test/open.test.js
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { spawn } from 'node:child_process'
+import { existsSync, readFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { randomUUID } from 'node:crypto'
 import { buildLauncher, openItem } from '../actions/open.js'
 
 const config = { docsDir: '/docs', repos: { 'O/R': { slots: ['/w/A'] } } }
@@ -173,4 +178,88 @@ test('refuses a chosenSlotDir belonging to a different repo', async () => {
   assert.equal(ran, 0, 'must not emit or run anything for a cross-repo slot')
   assert.equal(r.ok, false)
   assert.match(r.message, /belongs to X\/Y/)
+})
+
+
+// --- the "resolve conflicts" path: a launch that starts the merge in the checkout ------
+
+test('mergeBase adds a tolerant fetch and merge before claude, in that order', () => {
+  const s = buildLauncher({ item, slot: slotA, plans, skill: null, config, mergeBase: 'master' })
+  const lines = s.split('\n')
+  const at = (re) => lines.findIndex((l) => re.test(l))
+  assert.ok(at(/git checkout 'PY-12746-competency'/) < at(/git fetch origin/), 'checkout before fetch')
+  assert.ok(at(/git fetch origin/) < at(/git merge/), 'fetch before merge')
+  assert.ok(at(/git merge/) < at(/^claude /), 'merge before claude')
+  assert.match(s, /git merge 'origin\/master'/)
+})
+
+test('the merge MUST tolerate failure — set -e would otherwise kill the script', () => {
+  // A conflicting merge exits non-zero. That is the entire point of this path, so a bare
+  // `git merge` under `set -euo pipefail` would abort before claude ever launched, and
+  // the user would get a closed window instead of a session.
+  const s = buildLauncher({ item, slot: slotA, plans, skill: null, config, mergeBase: 'master' })
+  const merge = s.split('\n').find((l) => l.startsWith('git merge'))
+  assert.match(merge, /\|\| echo /, 'the merge must not be allowed to abort the script')
+  assert.match(merge, /conflicts/i, 'and it must say what happened')
+  const fetch = s.split('\n').find((l) => l.startsWith('git fetch'))
+  assert.match(fetch, /\|\| echo /, 'a fetch failure must not abort it either')
+  assert.match(fetch, /stale/i)
+  // claude still runs after both.
+  assert.ok(s.split('\n').some((l) => l.startsWith('claude ')))
+})
+
+test('mergeBase tells Claude the tree is deliberately left conflicted', () => {
+  const s = buildLauncher({ item, slot: slotA, plans, skill: null, config, mergeBase: 'master' })
+  assert.match(s, /conflicts with origin\/master/)
+  assert.match(s, /resolve the conflicts/)
+})
+
+test('without mergeBase the launcher touches neither fetch nor merge', () => {
+  // The default path must stay exactly as it was: opening a ticket does not mutate a
+  // checkout beyond the checkout it already did.
+  const s = buildLauncher({ item, slot: slotA, plans, skill: null, config })
+  assert.ok(!/git fetch/.test(s))
+  assert.ok(!/git merge/.test(s))
+  assert.ok(!/conflict/i.test(s))
+})
+
+test('a base branch with shell metacharacters cannot become a second command', async () => {
+  // Asserted by RUNNING the generated line through bash rather than by matching a regex:
+  // a regex only proves the string looks quoted, while bash is the thing that decides.
+  // The payload OPENS with a quote so that it closes the one q() wraps around it — that
+  // is the shape which breaks out of a naive `'${s}'`, and it is verified to do so: with
+  // a naive q() this canary IS created, with the real q() it is not.
+  const canary = join(tmpdir(), `work-dash-injection-canary-${randomUUID()}`)
+  const script = buildLauncher({
+    item, slot: slotA, plans, skill: null, config,
+    mergeBase: `master'; touch ${canary}; echo '`,
+  })
+  const mergeLine = script.split('\n').find((l) => l.startsWith('git merge'))
+  assert.ok(mergeLine, 'the merge line must exist')
+
+  // A stub `git` that records its arguments, so nothing real is invoked.
+  const argsFile = join(tmpdir(), `work-dash-injection-args-${randomUUID()}`)
+  const probe = `git() { printf 'ARG:%s\\n' "$@" >> ${argsFile}; }\n${mergeLine}\n`
+  await new Promise((resolve, reject) => {
+    const p = spawn('bash', ['-c', probe])
+    p.on('error', reject)
+    p.on('close', () => resolve())
+  })
+
+  assert.equal(existsSync(canary), false, 'the injected command must never execute')
+  const recorded = existsSync(argsFile) ? readFileSync(argsFile, 'utf8') : ''
+  // git received the whole payload as ONE argument, metacharacters and all.
+  assert.match(recorded, /^ARG:merge\nARG:origin\/master'; touch .*; echo '\n$/)
+  for (const f of [canary, argsFile]) if (existsSync(f)) rmSync(f)
+})
+
+test('openItem passes mergeBase through to the launcher', async () => {
+  let script = null
+  const r = await openItem(
+    { item, slots: [slotA], plans, config, staleBranches: new Set(), claimedDirs: new Set(),
+      mergeBase: 'master' },
+    { run: async () => ({ code: 0, stdout: '', stderr: '' }),
+      writeFile: async (_p, c) => { script = c } })
+  assert.equal(r.ok, true, r.message)
+  assert.match(script, /git merge 'origin\/master'/)
 })

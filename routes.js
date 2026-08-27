@@ -1,5 +1,6 @@
 // routes.js
 import { openItem } from './actions/open.js'
+import { myPrOf } from './lanes.js'
 import { updateBranch } from './actions/update-branch.js'
 import { mergePr } from './actions/merge.js'
 
@@ -71,10 +72,18 @@ export function registerRoutes(routes, { getBoard, config, deps = {} }) {
       return { ok: false, message: `${rejected} plan path(s) do not belong to ${item.id}.` }
     }
 
+    // The "resolve conflicts" action. A boolean from the client, never a ref name: the
+    // base branch is derived here from the item's own PR, so a raw API call cannot make
+    // the launcher merge an arbitrary ref into a checkout. Strict === true for the same
+    // reason /api/merge requires it of `confirmed` — Boolean("false") is true.
+    const mergeBase = body.resolveConflicts === true
+      ? (myPrOf(item)?.baseRefName ?? config.repos[item.repo]?.defaultBranch ?? 'master')
+      : null
+
     const result = await openItem({
       item, slots: board.slots ?? [], plans, skill: body.skill ?? null,
       config, chosenSlotDir: body.slotDir ?? null, staleBranches: staleBranchesOf(board),
-      claimedDirs: liveClaimedDirs(claims), repo: body.repo ?? null,
+      claimedDirs: liveClaimedDirs(claims), repo: body.repo ?? null, mergeBase,
     }, deps)
     if (result.ok) {
       ctx.invalidate()
