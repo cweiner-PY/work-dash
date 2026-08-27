@@ -14,83 +14,88 @@ so those two actions require macOS. Everything else — collecting the board,
 
 ## Setup
 
-1. **Node >= 20.11.** The code uses `import.meta.dirname`, which requires
-   that version or later.
+**See [SETUP.md](SETUP.md)** — a step-by-step runbook written to be followed by a
+person or executed by a coding agent, with a verification command after every
+step. What follows is reference, not instructions.
 
-2. **`gh` must be authenticated:**
+```bash
+cp config.example.json config.json   # gitignored: it holds your Jira API token
+./bin/work-dash whoami               # prints your Jira accountId + GitHub login
+./bin/work-dash doctor               # checks every precondition, says how to fix each failure
+./bin/work-dash                      # start it
+```
 
-   ```
-   gh auth status
-   ```
+`doctor` exits non-zero while anything is wrong, so it works as a loop
+condition. It verifies the Node floor, the config keys, that `docsDir` exists,
+that every slot is a real clone of the repo it is listed under, `gh` auth, that
+`githubLogin` and `myAccountId` match the accounts actually authenticated, that
+every skill `when` rule parses, `osascript`, that the configured editor is
+installed, and the port — reporting "work-dash is already running here" rather
+than a failure when the port is held by the dashboard itself.
 
-   Required-check reading (and therefore the merge gate) depends on it — see
-   Troubleshooting below for what happens when it isn't.
+### Configuration reference
 
-3. **Copy the example config:**
+Everything lives in `config.json`. `docsDir` used to be required in a separate
+`~/.claude/` file named after one developer's account, which meant nobody else
+could run this; it is now a normal key here, with
+`~/.claude/work-dash.config.json` accepted as an optional fallback for anyone
+keeping one cross-tool config.
 
-   ```
-   cp config.example.json config.json
-   ```
+| Key | Required | What it is |
+|---|---|---|
+| `jiraSite` | yes | Jira base URL. |
+| `jiraEmail` | yes | The email your **Atlassian** account signs in with — not always your work address. A wrong one returns `200` with zero issues, which looks like an empty board rather than an error. |
+| `jiraToken` | yes | API token from id.atlassian.com. Never commit it. |
+| `myAccountId` | yes | Your Jira `accountId`. `work-dash whoami` prints it. |
+| `repos` | yes | `"Owner/Repo"` → `{ docsSubdir, slots: [...], defaultBranch? }`. `slots` are the local checkouts work-dash may inspect and drive; `docsSubdir` is that repo's folder under `docsDir`; `defaultBranch` defaults to `master` and is what "behind" is measured against. |
+| `docsDir` | yes | Root of the plans/docs tree. |
+| `jiraProject` | no | Project key to pull from. Default `PY`. |
+| `githubLogin` | no | Used to tell your own PR comments from a teammate's review feedback. |
+| `port` | no | Default 4200. |
+| `editor` | no | Any installed app name, resolved by `open -a`. Default `Cursor`. |
+| `notifications` | no | macOS notification when an item newly needs you. Default `true`. |
+| `inFlightStatusOrder` | no | Jira statuses, in the order they should appear as subgroups. |
+| `skills` | no | Your own skills and when to offer them — see below. |
 
-   `config.json` is gitignored; never commit it.
+A missing required key stops the server with the name of the key rather than
+starting half-configured.
 
-4. **Create a Jira API token** at
-   <https://id.atlassian.com/manage-profile/security/api-tokens> and put it
-   in `config.json` as `jiraToken`.
+### Adding your own skills
 
-5. **Get the Jira email right.** This is the setting most likely to trip
-   people up. Jira's basic auth wants the email your *Atlassian account*
-   actually uses to sign in — which is not always your work address. Test a
-   candidate email/token pair directly:
+Per-user config, not code. Each rule is a name and a condition; when the
+condition holds, that item gets a button that opens a terminal on the right
+checkout and submits `/name TICKET-KEY` to Claude. The skill has to exist in
+your own Claude setup — the dashboard only submits the slash command.
 
-   ```
-   curl -u 'you@example.com:YOUR_TOKEN' https://your-site.atlassian.net/rest/api/3/myself
-   ```
+```json
+"skills": [
+  { "name": "ticket-planner",      "when": "!branch && !pr" },
+  { "name": "critical-review",     "when": "slot" },
+  { "name": "resolve-code-review", "when": "pr.hasReviewComments || pr.changesRequested" },
+  { "name": "toggle-logan-env",    "when": "repo == 'PerformYard/Logan'" }
+]
+```
 
-   HTTP 200 means that email is the right one; HTTP 401 means it isn't, even
-   if the token is otherwise valid. (Confirmed against the live API for this
-   setup: the same Atlassian account, same token, returns 401 for the work
-   address and 200 for a different address — `accountId
-   62b43cb267dff38e0988a3bc` either way.)
-
-6. **Fill in the rest of `config.json`:**
-   - `jiraSite` — your Jira base URL.
-   - `jiraProject` — the project key to pull tickets from.
-   - `myAccountId` — your Jira `accountId`, visible in the `/myself` response
-     above or in any issue JSON under `fields.assignee.accountId`.
-   - `repos` — a map of `"Owner/Repo"` to `{ docsSubdir, slots: [...] }`,
-     where `slots` is the list of local checkout directories work-dash is
-     allowed to inspect and drive for that repo, and `docsSubdir` is the
-     subdirectory of the shared `docsDir` (see below) holding that repo's
-     plan folders. A repo entry may also set `defaultBranch` (defaults to
-     `master`) — it's the branch `collect/slots.js` measures "behind" against
-     and the one `update branch` merges from.
-   - `port` — what the server listens on. `config.example.json` defaults to
-     `4200`; this isn't a hard-coded value the app assumes — it's whatever
-     `config.json` sets it to (this checkout runs it on `4210`).
-   - `inFlightStatusOrder` and `skills` are optional and have defaults — see
-     `config.example.json` for their shape. `skills` maps skill names to a
-     small predicate language (`&&`, `||`, `!`, `==`, `!=`, dotted field
-     paths like `pr.changesRequested`) evaluated against each item to decide
-     which skills to offer for it.
-   - `githubLogin` (optional) — your GitHub login, used only to tell your own
-     PR replies and comments apart from a human teammate's review feedback.
-
-7. **Shared config.** `docsDir` (and optionally `cloudId`) come from
-   `~/.claude/coltw.config.json`, not from `config.json` — this file is
-   expected to be shared across tools on the machine, not maintained per
-   project. `docsDir` must be set or the server refuses to start.
-
-If any required key is missing from either file, the server prints exactly
-which one and exits rather than starting in a half-configured state.
+`when` sees `key`, `repo`, `slot`, `branch`, `plans`, `jira` and `pr`, with
+`!`, `&&`, `||`, `==`, `!=`, parentheses, single-quoted strings and dotted
+paths. It is a hand-written parser, not `eval`. `pr` is deliberately **your
+own** PR, never a colleague's review request, so a `pr`-gated skill will not
+fire on someone else's work. A rule that fails to parse is skipped with a
+warning, which means its button silently never appears — `doctor` checks every
+rule so a stray character doesn't cost you a button you never notice missing.
 
 ## Running
 
 ```
-node server.js
-# or, if installed as a bin:
-work-dash
+work-dash             # start the server and print its URL
+work-dash doctor      # check every precondition, and how to fix what fails
+work-dash whoami      # look up your Jira accountId and GitHub login
+work-dash help
 ```
+
+`node server.js` and `npm start` also work. `doctor` and `whoami` deliberately
+do not load `server.js` — importing it starts the server and exits on a config
+error, which is the exact situation those two commands exist to diagnose.
 
 Then open `http://127.0.0.1:<port>` (the port from `config.json`).
 
@@ -282,8 +287,9 @@ than treating the unknown state as clean.
 ## Development
 
 ```
-node --test                       # full 175-test suite, no network calls
+node --test                        # full suite, no network calls
 WORK_DASH_DRY=1 node server.js     # actions log their commands instead of running them
+work-dash doctor                   # verifies the live environment (this one DOES hit the network)
 ```
 
 `join.js` and `lanes.js` are pure functions (no fs, no child_process, no

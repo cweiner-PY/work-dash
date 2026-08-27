@@ -1,28 +1,29 @@
 {
   "port": 4200,
   "jiraSite": "https://performyard.atlassian.net",
-  "jiraEmail": "colt@performyard.com",
+  "jiraEmail": "you@performyard.com",
   "jiraToken": "PASTE_TOKEN_FROM_id.atlassian.com",
   "jiraProject": "PY",
+  "docsDir": "/Users/YOU/Work/docs",
   "editor": "Cursor",
   "notifications": true,
   "jiraSprintField": "customfield_10020",
-  "myAccountId": "62b43cb267dff38e0988a3bc",
+  "myAccountId": "RUN: work-dash whoami",
   "repos": {
     "PerformYard/PerformYard": {
       "docsSubdir": "PY",
       "slots": [
-        "/Users/cweiner/Work/PY-1",
-        "/Users/cweiner/Work/PY-2",
-        "/Users/cweiner/Work/PY-3"
+        "/Users/YOU/Work/PY-1",
+        "/Users/YOU/Work/PY-2",
+        "/Users/YOU/Work/PY-3"
       ]
     },
     "PerformYard/Logan": {
       "docsSubdir": "Logan",
       "slots": [
-        "/Users/cweiner/Work/Logan",
-        "/Users/cweiner/Work/Logan2",
-        "/Users/cweiner/Work/Logan3"
+        "/Users/YOU/Work/Logan",
+        "/Users/YOU/Work/Logan2",
+        "/Users/YOU/Work/Logan3"
       ]
     }
   },
@@ -66,5 +67,6 @@
       "name": "toggle-logan-env",
       "when": "repo == 'PerformYard/Logan'"
     }
-  ]
+  ],
+  "githubLogin": "RUN: work-dash whoami"
 }

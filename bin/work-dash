@@ -1,2 +1,28 @@
 #!/usr/bin/env node
-import '../server.js'
+// Subcommands are dispatched by dynamic import so that `doctor` and `whoami` never load
+// server.js — importing it starts the server AND exits the process on a config error,
+// which is exactly the situation those two commands exist to diagnose.
+const [cmd] = process.argv.slice(2)
+
+const USAGE = `work-dash — a local dashboard for Jira tickets, PRs and checkouts
+
+  work-dash            start the server and print its URL
+  work-dash doctor     check every precondition and say how to fix what fails
+  work-dash whoami     look up your Jira accountId and GitHub login for config.json
+  work-dash help       this message
+
+First-time setup: see SETUP.md (written to be followed by a person or an agent).
+`
+
+if (cmd === 'doctor') {
+  await (await import('../cli/doctor.js')).main()
+} else if (cmd === 'whoami') {
+  await (await import('../cli/whoami.js')).main()
+} else if (cmd === 'help' || cmd === '--help' || cmd === '-h') {
+  process.stdout.write(USAGE)
+} else if (cmd) {
+  process.stderr.write(`Unknown command: ${cmd}\n\n${USAGE}`)
+  process.exitCode = 1
+} else {
+  await import('../server.js')
+}
