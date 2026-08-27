@@ -1,71 +1,110 @@
 # work-dash
 
-A local dashboard that unifies Jira tickets, GitHub PRs, local git checkouts,
-and on-disk plan folders into one board, grouped by what needs action.
+One local board for your Jira tickets, open PRs, PRs awaiting your review, and
+your git checkouts — grouped by what needs action, with a button on every item
+that does the next thing.
 
-It runs as a single Node HTTP server with no build step and no external
-services beyond Jira's REST API and the `gh` CLI. The server binds to
-`127.0.0.1` only.
+A single Node process: no build step, **no runtime dependencies**, nothing
+beyond Jira's REST API and the `gh` CLI. Binds `127.0.0.1` only. The actions
+that launch things (**open**, **run a skill**, **resolve conflicts**, the editor
+link) are macOS-only; collecting the board and the git/GitHub actions aren't.
 
-**macOS only, currently.** The **open** and **run** actions launch a new
-Terminal window via `osascript`/AppleScript (`tell application "Terminal"`),
-so those two actions require macOS. Everything else — collecting the board,
-**update branch**, **squash & merge** — has no such dependency.
-
-## Setup
-
-**See [SETUP.md](SETUP.md)** — a step-by-step runbook written to be followed by a
-person or executed by a coding agent, with a verification command after every
-step. What follows is reference, not instructions.
+## Quick start
 
 ```bash
 cp config.example.json config.json   # gitignored: it holds your Jira API token
 ./bin/work-dash whoami               # prints your Jira accountId + GitHub login
 ./bin/work-dash doctor               # checks every precondition, says how to fix each failure
-./bin/work-dash                      # start it
+./bin/work-dash                      # start it, then open the URL it prints
 ```
 
+**First time? Follow [SETUP.md](SETUP.md)** — a runbook with a verification after
+every step, written to be followed by a person or executed by a coding agent.
+
 `doctor` exits non-zero while anything is wrong, so it works as a loop
-condition. It verifies the Node floor, the config keys, that `docsDir` exists,
-that every slot is a real clone of the repo it is listed under, `gh` auth, that
-`githubLogin` and `myAccountId` match the accounts actually authenticated, that
-every skill `when` rule parses, `osascript`, that the configured editor is
-installed, and the port — reporting "work-dash is already running here" rather
-than a failure when the port is held by the dashboard itself.
+condition. It checks the Node floor, config keys, `docsDir`, that each slot is a
+real clone of the repo it's listed under, `gh` auth, that `githubLogin` and
+`myAccountId` match the accounts actually authenticated, that every skill rule
+parses, the editor, and the port.
 
-### Configuration reference
+## The board
 
-Everything lives in `config.json`. `docsDir` used to be required in a separate
-`~/.claude/` file named after one developer's account, which meant nobody else
-could run this; it is now a normal key here, with
-`~/.claude/work-dash.config.json` accepted as an optional fallback for anyone
-keeping one cross-tool config.
+Every item lands in exactly one lane, in this order:
 
-| Key | Required | What it is |
+| Lane | When |
+|---|---|
+| **Needs you** | A review is requested of you · the ticket is Done but your PR is still open · a **required** check is failing · changes were requested · your PR conflicts with its base · or it's approved and mergeable and just needs the button pressed |
+| **Waiting on others** | Your PR is open, not a draft, awaiting review, no failing required checks |
+| **In flight** | It has a local checkout, a draft PR, or Jira status category *In Progress*. Sub-grouped by Jira status in `inFlightStatusOrder` order |
+| **Ready to start** | Status category *To Do* **and** committed to the active sprint |
+| **Backlog** | Everything else |
+
+Only **Backlog** and stale items (assigned to someone else, or whose ticket is
+already Done) are hidden by default; the two checkboxes reveal them. Anything
+hidden is still counted — "6 backlog · 3 stale" — so nothing vanishes silently.
+
+Cards also carry: your own PR's state and required checks, how far behind its
+base it is, an `idle Nd` chip once a PR has gone a day without activity (amber
+at 3, red at 7), the local checkout, why the item is in its lane, attached plan
+files, and Jira subtasks.
+
+## Actions
+
+| Action | What it does |
+|---|---|
+| **open** | New Terminal, `cd` to the checkout, check out the branch if needed, start `claude` with the ticket, branch, PR and selected plan paths in its system prompt — then waits for you to type |
+| **`/skill-name`** | The same, but submits `/skill-name TICKET-KEY` immediately. Only skills the server computed as applicable are accepted |
+| **update branch (N behind)** | `gh pr update-branch`, then a local `git pull --ff-only` if the branch is checked out. With no PR, `git fetch` + `git merge origin/<base>` locally |
+| **resolve conflicts** | Replaces the update button when the PR conflicts, which GitHub can't fix server-side. Opens a Terminal, runs the merge, and hands Claude an instruction based on whether it actually conflicted |
+| **squash & merge** | `gh pr merge --squash`, gated (below) |
+| **the checkout name** | Click `PY-2` on the slot row to open that folder in your editor. The ticket key opens Jira and the PR number opens GitHub, same idea |
+
+### The merge gate
+
+A PR is offered for merge only when it's approved, GitHub reports it
+`MERGEABLE`, it isn't a draft, the required-check list was **actually read**,
+and every check in it passed. The button shows the gate but the server
+re-checks it independently, requires explicit confirmation, and refuses to merge
+a PR you don't own.
+
+Only *required* checks gate it — a PR with failing non-required checks still
+merges. A repo configuring no required checks is gated on approval alone.
+
+"Behind" comes from GitHub's `Ref.compare`, never `mergeStateStatus` — that
+field answers "can this merge", not "is this behind" (see the comment in
+`collect/github.js`). An unreadable comparison shows **behind state unknown**
+and disables the button rather than guessing zero.
+
+## Configuration
+
+Everything lives in `config.json`. `work-dash whoami` finds the two values you
+can't guess; `doctor` validates the rest.
+
+| Key | | |
 |---|---|---|
-| `jiraSite` | yes | Jira base URL. |
-| `jiraEmail` | yes | The email your **Atlassian** account signs in with — not always your work address. A wrong one returns `200` with zero issues, which looks like an empty board rather than an error. |
-| `jiraToken` | yes | API token from id.atlassian.com. Never commit it. |
-| `myAccountId` | yes | Your Jira `accountId`. `work-dash whoami` prints it. |
-| `repos` | yes | `"Owner/Repo"` → `{ docsSubdir, slots: [...], defaultBranch? }`. `slots` are the local checkouts work-dash may inspect and drive; `docsSubdir` is that repo's folder under `docsDir`; `defaultBranch` defaults to `master` and is what "behind" is measured against. |
-| `docsDir` | yes | Root of the plans/docs tree. |
-| `jiraProject` | no | Project key to pull from. Default `PY`. |
-| `githubLogin` | no | Used to tell your own PR comments from a teammate's review feedback. |
-| `port` | no | Default 4200. |
-| `editor` | no | Any installed app name, resolved by `open -a`. Default `Cursor`. |
-| `notifications` | no | macOS notification when an item newly needs you. Default `true`. |
-| `inFlightStatusOrder` | no | Jira statuses, in the order they should appear as subgroups. |
-| `skills` | no | Your own skills and when to offer them — see below. |
+| `jiraSite` | required | Jira base URL |
+| `jiraEmail` | required | The email your **Atlassian** account signs in with — not always your work address. A wrong one returns `200` with zero issues |
+| `jiraToken` | required | API token from id.atlassian.com |
+| `myAccountId` | required | Your Jira account id |
+| `docsDir` | required | Root of your plans/docs tree |
+| `repos` | required | `"Owner/Repo"` → `{ docsSubdir, slots: [...], defaultBranch? }`. `slots` are the checkouts work-dash may drive; `defaultBranch` defaults to `master` |
+| `jiraProject` | | Project key. Default `PY` |
+| `githubLogin` | | Distinguishes your own PR comments from a teammate's review feedback |
+| `port` | | Default 4200 |
+| `editor` | | Any installed app name, resolved by `open -a`. Default `Cursor` |
+| `notifications` | | macOS notification when an item newly needs you. Default `true` |
+| `inFlightStatusOrder` | | Jira statuses in the order their subgroups appear |
+| `skills` | | Below |
 
-A missing required key stops the server with the name of the key rather than
-starting half-configured.
+A missing required key stops the server naming that key, rather than starting
+half-configured.
 
-### Adding your own skills
+### Your own skills
 
-Per-user config, not code. Each rule is a name and a condition; when the
-condition holds, that item gets a button that opens a terminal on the right
-checkout and submits `/name TICKET-KEY` to Claude. The skill has to exist in
-your own Claude setup — the dashboard only submits the slash command.
+Per-user config, not code. Each rule is a name and a condition; when it holds,
+that item gets a button that opens a terminal on the right checkout and submits
+`/name TICKET-KEY`. The skill has to exist in **your** Claude setup — the
+dashboard only submits the slash command.
 
 ```json
 "skills": [
@@ -76,245 +115,72 @@ your own Claude setup — the dashboard only submits the slash command.
 ]
 ```
 
-`when` sees `key`, `repo`, `slot`, `branch`, `plans`, `jira` and `pr`, with
-`!`, `&&`, `||`, `==`, `!=`, parentheses, single-quoted strings and dotted
-paths. It is a hand-written parser, not `eval`. `pr` is deliberately **your
-own** PR, never a colleague's review request, so a `pr`-gated skill will not
-fire on someone else's work. A rule that fails to parse is skipped with a
-warning, which means its button silently never appears — `doctor` checks every
-rule so a stray character doesn't cost you a button you never notice missing.
+`when` sees `key`, `repo`, `slot`, `branch`, `plans`, `jira` and `pr`, with `!`,
+`&&`, `||`, `==`, `!=`, parentheses, single-quoted strings and dotted paths. A
+hand-written parser, not `eval`.
 
-## Running
+`pr` is deliberately **your own** PR, never a colleague's review request, so a
+`pr`-gated skill won't fire on someone else's work. A rule that fails to parse
+is skipped with a warning — meaning its button silently never appears, which is
+why `doctor` checks every rule.
 
-```
-work-dash             # start the server and print its URL
-work-dash doctor      # check every precondition, and how to fix what fails
-work-dash whoami      # look up your Jira accountId and GitHub login
-work-dash help
-```
+### Appearance and polling
 
-`node server.js` and `npm start` also work. `doctor` and `whoami` deliberately
-do not load `server.js` — importing it starts the server and exits on a config
-error, which is the exact situation those two commands exist to diagnose.
+Six palettes via the swatches in the controls row — four light grounds
+(`ledger` tan, `clay`, `linen`, `sage`) and two dark (`manifest`, `phosphor`) —
+stored per browser, defaulting to `ledger`. Deliberately not tied to
+`prefers-color-scheme`. Each is one token block in `public/style.css`.
 
-Then open `http://127.0.0.1:<port>` (the port from `config.json`).
-
-### Appearance
-
-Six palettes, picked with the swatches at the right of the controls row: four light
-grounds (`ledger` tan, `clay` rose-grey, `linen` putty, `sage` green-grey) and two dark
-(`manifest` charcoal, `phosphor` CRT). The choice is stored per browser in
-`localStorage` under `work-dash:palette`; `ledger` is the default.
-
-The palette is deliberately NOT derived from `prefers-color-scheme`. That signal answers
-to both the macOS appearance schedule and Chrome's own theme setting, so a board keyed
-to it changes look on its own for reasons that have nothing to do with the board.
-
-Each palette is one token block in `public/style.css`; every rule in that file reads
-tokens rather than colour literals, so adding a seventh is a block plus one string in
-`PALETTES` in `public/app.js`.
-
-### Time, polling and notifications
-
-The board shows how long each PR has sat without activity — a push, a comment, a
-review — as an `idle Nd` chip, quiet at 1–2 days, amber from 3, red from 7.
-Nothing under a day, because `idle 2h` on every card is noise rather than
-information. Without it a PR awaiting review since last Tuesday looked exactly
-like one opened this morning, which is the difference between ignoring it and
-going to nudge someone.
-
-The page polls every 60s, matching the server's cache TTL, so essentially every
-tick really does re-collect: about 10 `gh` invocations plus the Jira calls. It
-skips the poll entirely while the tab is hidden, and catches up the moment you
-look at it again — but only if what's on screen is older than one poll, so
-flicking between tabs doesn't fire a collection each time. An unrecognised
-`visibilityState` polls rather than not, since silently never updating again is
-the worse failure.
-
-When an item **newly enters** the needs-you lane you get a macOS notification:
-one item is named with its reason, several become a single roll-call. It fires
-from the one place a real collection happens, so it runs once per collection
-however many polls asked for one, and the first collection after startup
-announces nothing — otherwise launching the dashboard would notify you about
-everything at once. The notification text is passed to `osascript` as arguments
-rather than interpolated into AppleScript, since ticket summaries contain quotes
-and backslashes. Set `"notifications": false` in `config.json` to silence it.
-
-## Lanes
-
-The board sorts every item into exactly one of five lanes:
-
-| Lane | Meaning |
-|---|---|
-| **Needs you** | Any of: a review is requested of you; the ticket is Done but your PR is still open; a **required** check is failing; changes were requested on your PR; your PR conflicts with the default branch; or your PR is approved and mergeable and just needs the merge button pressed. |
-| **Waiting on others** | Your PR is open, not a draft, awaiting review, and has no failing required checks. |
-| **In flight** | The item has a local checkout, or a draft PR. Sub-grouped by Jira status, ordered by `inFlightStatusOrder`; statuses not in that list sort last. |
-| **Ready to start** | The ticket's status category is "To Do" and it has at least one plan folder on disk. |
-| **Backlog** | Everything else. |
-
-The default view hides backlog/ready-to-start items and "stale" items
-(assigned to someone else, or whose ticket is already Done) — the "show
-backlog" and "show stale slots" checkboxes reveal them. Whatever is hidden is
-always counted, e.g. "6 backlog · 3 stale", so nothing disappears silently.
-
-## Actions
-
-- **open** — opens a new Terminal window, `cd`s into the resolved checkout,
-  checks out the item's branch only if the checkout isn't already on it, and
-  starts `claude` there with the ticket key, Jira status/URL, branch, PR
-  link, and any attached plan file paths written into its system prompt (and
-  granted as `--add-dir` for the plan directories).
-- **the checkout name on the slot row** (`PY-2`, `Logan3`) — click it to open
-  that folder in your editor. It follows the card's two other clickable
-  identifiers: the ticket key opens Jira, the PR number opens GitHub, the
-  checkout opens the editor. A `<button>` styled as text rather than an `<a>`,
-  since it performs an action instead of navigating.
-
-  Runs `open -a <editor> <dir>` and nothing else: no git, no checkout, no slot
-  resolution, and no board refresh afterwards — opening a folder changes nothing
-  the board reports, so re-collecting would cost ~6s of live API calls for
-  nothing. Because it mutates nothing it is the one action safe to fire at a
-  dirty checkout, which is exactly when you want it.
-
-  `open -a` rather than a `cursor`/`code` CLI shim, since those are optional
-  installs while the .app is what actually exists; macOS resolves the name, so
-  `"editor": "Zed"` in `config.json` is the whole change needed to switch.
-- **`/skill-name`** (the `run` action) — the same as open, but also submits
-  a skill immediately, as `/skill-name TICKET-KEY`. Only skills the server
-  computed as applicable to that item (via the `skills` predicates in
-  config) are accepted.
-- **update branch (N behind)** — for a PR, `gh pr update-branch`, then a local
-  `git pull --ff-only` if the branch happens to be checked out (never a merge,
-  never a force). With no PR, `git fetch origin` then
-  `git merge origin/<defaultBranch>` in the item's checkout. Refuses outright
-  if the working tree is dirty; it never rebases, stashes, force-pushes, or
-  aborts a conflicted merge. If the merge conflicts, the repo is left exactly
-  as git left it, for you to resolve by hand.
-
-  The count comes from GitHub's own `Ref.compare`, **not** from
-  `mergeStateStatus`. That field answers "can this merge", not "is this
-  behind": `BEHIND` is only reported when branch protection requires branches
-  be up to date, and `BLOCKED`/`DIRTY` outrank it. Reading it as a
-  behind-signal once made the board show "up to date" on a PR 24 commits
-  behind master. A comparison that can't be read shows **behind state
-  unknown** and disables the button, rather than guessing zero.
-- **resolve conflicts** — replaces the update button when the PR conflicts
-  with its base, which GitHub cannot fix server-side. Opens a Terminal in the
-  checkout, runs `git fetch` and `git merge origin/<base>`, then starts
-  `claude` **with an instruction submitted immediately** — like the run-skill
-  action, not like `open`, which deliberately waits for you to type.
-
-  Which instruction depends on how the merge actually went: the script branches
-  on the merge's exit status, so a merge that stops on conflicts tells Claude to
-  resolve them and commit, while one that merges cleanly tells Claude to confirm
-  and stop. GitHub's `DIRTY` can be stale, so the clean case is real and an
-  unconditional "resolve the conflicts" would send Claude hunting through a
-  clean tree. If a skill is also supplied it takes the prompt slot instead, since
-  a skill is something you asked for by name.
-
-  The merge sits in an `if` rather than being run bare: `set -euo pipefail` is on,
-  and a conflicting merge — the entire point — would otherwise kill the launcher
-  before Claude started. Clicking again on a still-conflicted tree is safe: the
-  slot resolves because it is already on the branch, and git's refusal to merge
-  over unmerged files lands on the same resolve instruction. The base branch is
-  derived server-side from your own PR; the client sends only a boolean.
-- **squash & merge** — `gh pr merge --squash`. The button reflects the merge
-  gate (below) but the server re-checks it independently before running
-  anything, requires an explicit confirmation, and refuses to merge a PR you
-  don't own.
-
-### The merge gate
-
-A PR is mergeable only when **all** of these hold:
-- it's approved (`reviewDecision === 'APPROVED'`),
-- GitHub reports it as `MERGEABLE`,
-- it isn't a draft,
-- the required-check list was actually read (not merely absent/unknown), and
-- every check in that list passed.
-
-Two things worth being explicit about, both verified against real PRs in
-this setup:
-- **Only required checks gate the merge.** A PR can have several failing
-  *non-required* checks and still be offered for merge if the one required
-  check on it passes — confirmed on a live PR with 2 failing non-required
-  checks and 1 failing required check, where only the required failure
-  blocked the button.
-- **A repo with no required checks configured merges on its own merits.**
-  One of the two repos here configures none; PRs on it are gated only by
-  approval, mergeability, and draft status.
-
-## Before you make this repo public
-
-Don't, without doing the work first. `config.json` has never been committed and no
-credential appears in any revision — `test/gitignore.test.js` asserts both — but the
-repository still carries real internal content:
-
-- `test/fixtures/` holds **recorded live Jira and GitHub responses**: real ticket keys and
-  full summaries (including customer-reported bug titles and a ticket naming AWS secrets
-  handling as tech debt), real sprint names, real PR titles and a teammate's GitHub login.
-  They are recorded on purpose — several genuine bugs were caught only because the fixtures
-  were real rather than invented — which is exactly why they cannot be published as-is.
-- `docs/plans/` and `docs/specs/` describe internal workflow and Jira configuration.
-- Commit messages reference real ticket keys and PR numbers throughout.
-
-Publishing would mean synthesising the fixtures, and accepting that the history keeps the
-originals unless it is rewritten. Keep it private and add collaborators instead.
+The page polls every 60s, skips it entirely while the tab is hidden, and catches
+up when you return if the board is stale.
 
 ## Safety guarantees
 
-- `collect/slots.js` is read-only: the only git commands it ever runs
-  against your checkouts are `git branch --show-current`,
-  `git status --porcelain`, and
-  `git rev-list --left-right --count <base>...HEAD`.
-- **update branch** refuses when the working tree is dirty, and never
-  rebases, stashes, force-pushes, or aborts a conflicted merge. On conflict
-  it leaves the repo exactly as git left it.
-- **open**/**run** never check out a branch over uncommitted changes, and
-  never operate on a checkout that belongs to a different repository than
-  the item being opened.
-- **squash & merge** requires an explicit confirmation from the caller,
-  re-checks the merge gate on the server regardless of what the UI showed,
-  and refuses to merge a PR authored by someone other than you.
-- The server binds `127.0.0.1` only. The Jira token is stripped from every
-  config response (`GET /api/config`) and redacted out of Jira error
-  messages before they're surfaced.
+- `collect/slots.js` is read-only. The only git it runs against your checkouts
+  is `branch --show-current`, `status --porcelain`, and `rev-list --count`.
+- **update branch** refuses a dirty tree, and never rebases, stashes,
+  force-pushes, or aborts a conflicted merge — on conflict it leaves the repo
+  exactly as git left it.
+- **open** / **run** never check a branch out over uncommitted changes, and
+  never touch a checkout belonging to a different repo than the item.
+- **squash & merge** needs explicit confirmation, re-checks the gate server-side
+  whatever the UI showed, and refuses a PR you don't own.
+- Unreadable state is never treated as good state: an unread check list blocks
+  the gate, an unread comparison disables the update button.
+- The token is stripped from `GET /api/config` and redacted from Jira errors.
+  `config.json` is gitignored, has never been committed, and
+  `test/gitignore.test.js` asserts both.
 
 ## Troubleshooting
 
-**The board is empty and I know I have tickets assigned.** Jira's search
-endpoint answers an unauthenticated (or wrong-email) request with HTTP 200
-and zero issues — not an error. work-dash knows this: whenever the primary
-Jira query comes back with zero issues, it separately calls `/rest/api/3/myself`
-to verify the credentials, and reports a credentials error (naming the likely
-cause — email vs. work address) instead of quietly showing a blank board. If
-you see that error, re-check `jiraEmail` against the Setup step above.
+Start with `work-dash doctor` — it covers nearly everything. Beyond it:
 
-**A PR's merge button won't enable and I don't know why.** Read the reason
-shown for it — the gate lists every blocker, not just the first one it
-finds. If it says the required-check status is unknown, that most often
-means `gh` isn't authenticated or a `gh pr checks` call failed; work-dash
-treats an unreadable check list as blocking, not as "assume it's fine",
-because guessing wrong here would let a broken PR merge silently.
+**Board empty but I have tickets.** Jira answers a wrong-email request with
+`200` and zero issues, not an error. work-dash re-checks `/myself` whenever the
+primary query returns nothing and reports a credentials error naming the likely
+cause, rather than showing a blank board.
 
-**`gh` isn't authenticated.** Run `gh auth status`. Without it, work-dash
-can still list PRs but records an error for the ones whose required-check
-state it couldn't read, and refuses to offer a merge for those PRs rather
-than treating the unknown state as clean.
+**Merge button won't enable.** Its tooltip lists every blocker, not just the
+first. "Check status unknown" usually means `gh` auth expired — an unreadable
+check list blocks the gate rather than being assumed clean.
+
+## Before making this repo public
+
+Don't, without work first. No credential is in any revision, but
+`test/fixtures/` are **recorded live Jira and GitHub responses** — real ticket
+keys and summaries, sprint names, a teammate's login. They're real on purpose;
+several genuine bugs were caught only because they weren't invented. `docs/` and
+the commit messages carry internal detail too. Add collaborators instead.
 
 ## Development
 
-```
-node --test                        # full suite, no network calls
-WORK_DASH_DRY=1 node server.js     # actions log their commands instead of running them
-work-dash doctor                   # verifies the live environment (this one DOES hit the network)
+```bash
+node --test                        # full suite, no network
+WORK_DASH_DRY=1 node server.js     # actions print what they would run
+work-dash doctor                   # verifies the live environment (this one does hit the network)
 ```
 
-`join.js` and `lanes.js` are pure functions (no fs, no child_process, no
-clock) and are tested against real recorded fixtures in `test/fixtures/`
-(actual Jira and `gh` responses, sanitized). The collectors and actions take
-their `run`/`fetch` dependency as an injectable argument, which the tests
-replace with fakes. Each action also takes a `dry` flag, checked before it
-runs any command; `WORK_DASH_DRY=1` sets that flag at server startup, so
-every action returns what it *would* do — the resolved checkout, the git
-commands, the `gh` invocation — without touching git, GitHub, or opening a
-Terminal.
+`join.js` and `lanes.js` are pure — no fs, no child_process, no clock — and are
+tested against recorded fixtures. Collectors and actions take their `run`/`fetch`
+dependency as an argument, which tests replace with fakes, and every action
+takes a `dry` flag checked before it runs anything.
