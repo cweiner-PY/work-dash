@@ -78,6 +78,25 @@ export function prBehindChip(pr) {
   return null
 }
 
+// Time since the PR last saw activity — a push, a comment, a review. The board otherwise
+// has no sense of time at all: a PR that has been awaiting review since last Tuesday
+// renders identically to one opened this morning, and which of the two it is decides
+// whether you go and nudge someone. updatedAt has been collected since the first version
+// of the collector and used nowhere until now.
+//
+// Nothing under a day: "idle 2h" on every card is noise, not information. `now` is passed
+// in rather than read from the clock so this stays testable.
+export function idleChip(pr, now = Date.now()) {
+  if (!pr?.updatedAt) return null
+  const then = Date.parse(pr.updatedAt)
+  // An unparseable timestamp says nothing rather than rendering "idle NaNd". A future one
+  // (clock skew between here and GitHub) falls out the same way, via days < 1.
+  if (!Number.isFinite(then)) return null
+  const days = Math.floor((now - then) / 86_400_000)
+  if (days < 1) return null
+  return { cls: days >= 7 ? 'bad' : days >= 3 ? 'warn' : '', text: `idle ${days}d`, days }
+}
+
 // A PR whose required-check state could not be read (known !== true) must never render
 // as the confident "no required checks" — the merge gate already fails safe on this
 // case (see mergeGateFor), and the card must not contradict it. known is checked first,
@@ -192,6 +211,20 @@ export function editorSpec(item, config) {
   }
 }
 
+// Whether to run a collection now. A hidden tab has nobody looking at it, and one
+// collection costs ~10 gh invocations plus the Jira calls; with the server's cache TTL
+// equal to the poll interval, essentially every tick really does re-collect, so a tab
+// buried behind a dozen others polls all day for nothing.
+//
+// minAgeMs lets one rule serve both callers: the interval tick (any age will do) and the
+// moment the tab is looked at again (only worth it if what is on screen is actually
+// stale). Anything other than 'hidden' counts as watchable — failing open means an
+// unfamiliar visibilityState degrades to polling, never to silently never polling again.
+export function shouldCollect({ visibility, lastLoadedAt = 0, now, minAgeMs = 0 }) {
+  if (visibility === 'hidden') return false
+  return now - lastLoadedAt >= minAgeMs
+}
+
 // The refresh button's label as a pure function of busy state and elapsed time, testable
 // without a DOM. A forced refresh runs ~6s against live Jira/GitHub; a static "refreshing…"
 // reads as stuck the whole time, so a ticking counter is what tells the user it's making
@@ -210,7 +243,7 @@ if (typeof document !== 'undefined') {
   // (button click, auto-poll, or the initial load) is in progress. It is what makes a
   // double-click on refresh a no-op and makes a 60s auto-poll tick skip itself entirely
   // rather than colliding with a manual refresh already running.
-  const state = { board: null, config: null, showBacklog: false, showStale: false, busy: false }
+  const state = { board: null, config: null, showBacklog: false, showStale: false, busy: false, lastLoadedAt: 0 }
   const $ = (sel) => document.querySelector(sel)
   const el = (tag, cls, text) => {
     const n = document.createElement(tag)
@@ -273,6 +306,7 @@ if (typeof document !== 'undefined') {
         ? await api('/api/refresh', {}, { strict: true })
         : await api('/api/items', undefined, { strict: true })
       render()
+      state.lastLoadedAt = Date.now()
       clearRefreshError()
     } catch (e) {
       // Silent failure is the exact bug class this project keeps getting bitten by: old
@@ -399,6 +433,8 @@ if (typeof document !== 'undefined') {
       row.append(el('span', `pr-checks ${cls}`, text))
       const behind = prBehindChip(pr)
       if (behind) row.append(el('span', `chip ${behind.cls}`, behind.text))
+      const idle = idleChip(pr)
+      if (idle) row.append(el('span', `chip ${idle.cls}`, idle.text))
       if (pr.isDraft) row.append(el('span', 'chip', 'draft'))
       c.append(row)
     }
@@ -643,7 +679,20 @@ if (typeof document !== 'undefined') {
   $('#board').append(el('p', 'boot', 'collecting — jira · github · checkouts'))
 
   loadConfig().then(load)
-  setInterval(() => load(), 60_000)
+
+  const POLL_MS = 60_000
+  setInterval(() => {
+    if (shouldCollect({ visibility: document.visibilityState, lastLoadedAt: state.lastLoadedAt, now: Date.now() })) load()
+  }, POLL_MS)
+
+  // Catch up the moment the tab is looked at again — but only when the board on screen is
+  // older than one poll, so flicking between tabs does not fire a collection each time.
+  document.addEventListener('visibilitychange', () => {
+    if (shouldCollect({
+      visibility: document.visibilityState, lastLoadedAt: state.lastLoadedAt,
+      now: Date.now(), minAgeMs: POLL_MS,
+    })) load()
+  })
 
   window.__workDash = { state, load, render, selectedPlans }
 }

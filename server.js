@@ -1,5 +1,6 @@
 // server.js
 import { createServer } from 'node:http'
+import { notifyLaneChanges } from './util/notify.js'
 import { readFile } from 'node:fs/promises'
 import { join, extname, normalize } from 'node:path'
 import { loadConfig, ConfigError } from './config.js'
@@ -21,10 +22,23 @@ try {
 }
 
 let cache = { at: 0, board: null }
+// Deliberately separate from the cache: an action invalidates cache.board, and if the
+// notifier read its baseline from there, every action would blind it to whatever entered
+// needs-you before the following collection. This survives invalidation.
+let lastItems = null
 
 async function board({ force = false } = {}) {
   if (!force && cache.board && Date.now() - cache.at < CACHE_MS) return cache.board
-  cache = { at: Date.now(), board: await buildBoard(config) }
+  const next = await buildBoard(config)
+  cache = { at: Date.now(), board: next }
+  // Fired here because this is the single place a real collection happens, so it runs once
+  // per collection however many clients or polls asked for one. Never awaited and never
+  // allowed to throw: a notification is the least important thing this process does and
+  // must not delay a board response or make a good collection look like a failure.
+  const prev = lastItems
+  lastItems = next.items
+  notifyLaneChanges(prev, next.items, { enabled: config.notifications !== false })
+    .catch((e) => console.warn(`notification failed: ${e.message}`))
   return cache.board
 }
 

@@ -1,7 +1,7 @@
 // test/render.test.js
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { groupForDisplay, sourceChip, prChecksChip, prBehindChip, summarizeSubtasks, updateBranchSpec, hasBranch, needsRepoChoice, repoLabel, refreshLabel, editorSpec } from '../public/app.js'
+import { groupForDisplay, sourceChip, prChecksChip, prBehindChip, summarizeSubtasks, updateBranchSpec, hasBranch, needsRepoChoice, repoLabel, refreshLabel, editorSpec, idleChip, shouldCollect } from '../public/app.js'
 
 const it = (o) => ({ id: o.id, lane: o.lane, statusGroup: o.statusGroup ?? 'no ticket',
   sortIndex: o.sortIndex ?? Infinity, signals: { foreign: false, stale: false, reclaimable: false, ...o.signals },
@@ -438,4 +438,72 @@ test('editorSpec: falls back to Cursor before config has loaded', () => {
 
 test('editorSpec: a configured editor name reaches the tooltip', () => {
   assert.match(editorSpec({ slot: { dir: '/w/PY-2' } }, { editor: 'Zed' }).title, /in Zed$/)
+})
+
+
+// --- idleChip: the board's only sense of time ------------------------------------------
+
+const DAY = 86_400_000
+const NOW = Date.parse('2026-08-27T10:00:00Z')
+const agedPr = (days) => ({ updatedAt: new Date(NOW - days * DAY).toISOString() })
+
+test('idleChip: nothing under a day — "idle 2h" on every card is noise', () => {
+  for (const hours of [0, 1, 5, 23.9]) {
+    assert.equal(idleChip({ updatedAt: new Date(NOW - hours * 3_600_000).toISOString() }, NOW), null,
+      `${hours}h must not render a chip`)
+  }
+})
+
+test('idleChip: whole days, escalating by how long it has sat', () => {
+  assert.deepEqual(idleChip(agedPr(1), NOW), { cls: '', text: 'idle 1d', days: 1 })
+  assert.deepEqual(idleChip(agedPr(2), NOW), { cls: '', text: 'idle 2d', days: 2 })
+  assert.equal(idleChip(agedPr(3), NOW).cls, 'warn', 'three days is a nudge')
+  assert.equal(idleChip(agedPr(6), NOW).cls, 'warn')
+  assert.equal(idleChip(agedPr(7), NOW).cls, 'bad', 'a week is a problem')
+  assert.equal(idleChip(agedPr(30), NOW).text, 'idle 30d')
+})
+
+test('idleChip: a missing or unparseable timestamp says nothing, never "idle NaNd"', () => {
+  for (const updatedAt of [null, undefined, '', 'not a date', 'yesterday']) {
+    assert.equal(idleChip({ updatedAt }, NOW), null, JSON.stringify(updatedAt))
+  }
+  assert.equal(idleChip(null, NOW), null)
+  assert.equal(idleChip({}, NOW), null)
+})
+
+test('idleChip: a future timestamp (clock skew) renders nothing rather than a negative age', () => {
+  assert.equal(idleChip({ updatedAt: new Date(NOW + 5 * DAY).toISOString() }, NOW), null)
+})
+
+// --- shouldCollect: do not poll for a tab nobody is looking at -------------------------
+
+test('shouldCollect: a hidden tab never collects', () => {
+  assert.equal(shouldCollect({ visibility: 'hidden', lastLoadedAt: 0, now: NOW }), false)
+  // Not even when the data on screen is ancient — there is nobody to show it to.
+  assert.equal(shouldCollect({ visibility: 'hidden', lastLoadedAt: NOW - 10 * DAY, now: NOW, minAgeMs: 60_000 }), false)
+})
+
+test('shouldCollect: a visible tab collects on the interval tick regardless of age', () => {
+  // minAgeMs defaults to 0: the tick IS the schedule, so it does not second-guess itself.
+  assert.equal(shouldCollect({ visibility: 'visible', lastLoadedAt: NOW - 1000, now: NOW }), true)
+})
+
+test('shouldCollect: coming back to a tab only collects if the board is actually stale', () => {
+  // Flicking between tabs must not fire a ~6s collection every time.
+  assert.equal(shouldCollect({ visibility: 'visible', lastLoadedAt: NOW - 5_000, now: NOW, minAgeMs: 60_000 }), false)
+  assert.equal(shouldCollect({ visibility: 'visible', lastLoadedAt: NOW - 61_000, now: NOW, minAgeMs: 60_000 }), true)
+  // Exactly at the boundary counts as stale.
+  assert.equal(shouldCollect({ visibility: 'visible', lastLoadedAt: NOW - 60_000, now: NOW, minAgeMs: 60_000 }), true)
+})
+
+test('shouldCollect: an unfamiliar visibilityState fails OPEN, still polling', () => {
+  // Failing closed here would mean a browser reporting something we did not anticipate
+  // silently stops updating the board forever, which is the worse of the two directions.
+  for (const visibility of ['prerender', 'unloaded', undefined, null, '']) {
+    assert.equal(shouldCollect({ visibility, lastLoadedAt: 0, now: NOW }), true, String(visibility))
+  }
+})
+
+test('shouldCollect: never loaded yet is always stale enough', () => {
+  assert.equal(shouldCollect({ visibility: 'visible', now: NOW, minAgeMs: 60_000 }), true)
 })

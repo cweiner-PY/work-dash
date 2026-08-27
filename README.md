@@ -109,6 +109,32 @@ Each palette is one token block in `public/style.css`; every rule in that file r
 tokens rather than colour literals, so adding a seventh is a block plus one string in
 `PALETTES` in `public/app.js`.
 
+### Time, polling and notifications
+
+The board shows how long each PR has sat without activity — a push, a comment, a
+review — as an `idle Nd` chip, quiet at 1–2 days, amber from 3, red from 7.
+Nothing under a day, because `idle 2h` on every card is noise rather than
+information. Without it a PR awaiting review since last Tuesday looked exactly
+like one opened this morning, which is the difference between ignoring it and
+going to nudge someone.
+
+The page polls every 60s, matching the server's cache TTL, so essentially every
+tick really does re-collect: about 10 `gh` invocations plus the Jira calls. It
+skips the poll entirely while the tab is hidden, and catches up the moment you
+look at it again — but only if what's on screen is older than one poll, so
+flicking between tabs doesn't fire a collection each time. An unrecognised
+`visibilityState` polls rather than not, since silently never updating again is
+the worse failure.
+
+When an item **newly enters** the needs-you lane you get a macOS notification:
+one item is named with its reason, several become a single roll-call. It fires
+from the one place a real collection happens, so it runs once per collection
+however many polls asked for one, and the first collection after startup
+announces nothing — otherwise launching the dashboard would notify you about
+everything at once. The notification text is passed to `osascript` as arguments
+rather than interpolated into AppleScript, since ticket summaries contain quotes
+and backslashes. Set `"notifications": false` in `config.json` to silence it.
+
 ## Lanes
 
 The board sorts every item into exactly one of five lanes:
