@@ -1,7 +1,7 @@
 // test/render.test.js
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { groupForDisplay, sourceChip, prChecksChip, summarizeSubtasks, updateBranchSpec, hasBranch, needsRepoChoice, repoLabel } from '../public/app.js'
+import { groupForDisplay, sourceChip, prChecksChip, summarizeSubtasks, updateBranchSpec, hasBranch, needsRepoChoice, repoLabel, refreshLabel } from '../public/app.js'
 
 const it = (o) => ({ id: o.id, lane: o.lane, statusGroup: o.statusGroup ?? 'no ticket',
   sortIndex: o.sortIndex ?? Infinity, signals: { foreign: false, stale: false, reclaimable: false, ...o.signals },
@@ -259,4 +259,41 @@ test('repoLabel: uses docsSubdir when configured', () => {
 test('repoLabel: falls back to the full repo key when docsSubdir is unset', () => {
   const config = { repos: { 'Owner/Repo': {} } }
   assert.equal(repoLabel(config, 'Owner/Repo'), 'Owner/Repo')
+})
+
+// --- refreshLabel ---
+
+test('refreshLabel: not busy returns the idle label', () => {
+  assert.equal(refreshLabel({ busy: false }), 'refresh')
+  assert.equal(refreshLabel({ busy: false, elapsedMs: 5000 }), 'refresh', 'elapsedMs is irrelevant when not busy')
+})
+
+test('refreshLabel: busy under one second is the plain label, no counter yet', () => {
+  assert.equal(refreshLabel({ busy: true, elapsedMs: 0 }), 'refreshing…')
+  assert.equal(refreshLabel({ busy: true, elapsedMs: 400 }), 'refreshing…')
+  assert.equal(refreshLabel({ busy: true, elapsedMs: 999 }), 'refreshing…')
+})
+
+test('refreshLabel: busy at 2s/3s/10s shows the counted form — a static label reads as stuck', () => {
+  assert.equal(refreshLabel({ busy: true, elapsedMs: 2000 }), 'refreshing… 2s')
+  assert.equal(refreshLabel({ busy: true, elapsedMs: 3000 }), 'refreshing… 3s')
+  assert.equal(refreshLabel({ busy: true, elapsedMs: 10000 }), 'refreshing… 10s')
+})
+
+test('refreshLabel: never returns an empty string, busy or not, at any elapsed time', () => {
+  const samples = [
+    { busy: false },
+    { busy: false, elapsedMs: 0 },
+    { busy: true, elapsedMs: 0 },
+    { busy: true, elapsedMs: 500 },
+    { busy: true, elapsedMs: 1000 },
+    { busy: true, elapsedMs: 2000 },
+    { busy: true, elapsedMs: 59000 },
+    { busy: true, elapsedMs: 600000 },
+  ]
+  for (const sample of samples) {
+    const label = refreshLabel(sample)
+    assert.equal(typeof label, 'string')
+    assert.ok(label.length > 0, `expected a non-empty label for ${JSON.stringify(sample)}`)
+  }
 })

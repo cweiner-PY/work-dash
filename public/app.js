@@ -141,10 +141,25 @@ export function summarizeSubtasks(subtasks) {
   return { open: openList.length, done: doneList.length, total: subtasks.length, openList, doneList }
 }
 
+// The refresh button's label as a pure function of busy state and elapsed time, testable
+// without a DOM. A forced refresh runs ~6s against live Jira/GitHub; a static "refreshing…"
+// reads as stuck the whole time, so a ticking counter is what tells the user it's making
+// progress. Under one second it stays plain — a "0s"/"1s" flicker right at click time
+// would read as noise, not progress.
+export function refreshLabel({ busy, elapsedMs = 0 }) {
+  if (!busy) return 'refresh'
+  const seconds = Math.floor(elapsedMs / 1000)
+  return seconds < 1 ? 'refreshing…' : `refreshing… ${seconds}s`
+}
+
 // --- appended to public/app.js ---
 // Guarded so the module stays importable by node --test (no document there).
 if (typeof document !== 'undefined') {
-  const state = { board: null, config: null, showBacklog: false, showStale: false, busy: new Set() }
+  // busy is the single in-flight flag for board collection: true while any load() call
+  // (button click, auto-poll, or the initial load) is in progress. It is what makes a
+  // double-click on refresh a no-op and makes a 60s auto-poll tick skip itself entirely
+  // rather than colliding with a manual refresh already running.
+  const state = { board: null, config: null, showBacklog: false, showStale: false, busy: false }
   const $ = (sel) => document.querySelector(sel)
   const el = (tag, cls, text) => {
     const n = document.createElement(tag)
@@ -153,18 +168,70 @@ if (typeof document !== 'undefined') {
     return n
   }
 
-  async function api(path, body) {
+  async function api(path, body, { strict = false } = {}) {
     const res = await fetch(path, {
       method: body === undefined ? 'GET' : 'POST',
       headers: body === undefined ? {} : { 'Content-Type': 'application/json' },
       body: body === undefined ? undefined : JSON.stringify(body),
     })
-    return res.json()
+    const data = await res.json()
+    // strict is for the board-loading calls only. /api/items and /api/refresh always
+    // return 200 on success, so any other status (403 from the Host/Origin guard, 500
+    // from a build failure) is a real failure load() must catch and surface, not silently
+    // treat as board data. Action routes (open/run/update-branch/merge) deliberately stay
+    // non-strict: they use 400 to carry a domain-level {ok:false, message} that post()
+    // already reads straight from the body, and always did.
+    if (strict && !res.ok) throw new Error(data?.message ?? `request failed (${res.status})`)
+    return data
   }
 
+  function refreshErrorEl() {
+    let e = $('#refresh-error')
+    if (!e) {
+      // Reuses the existing degraded-source error styling (.src-errors) rather than
+      // inventing a new one — same idea, same visual language: a source of truth failed
+      // to update and here is why.
+      e = el('p', 'src-errors')
+      e.id = 'refresh-error'
+      $('#top').append(e)
+    }
+    return e
+  }
+  const showRefreshError = (message) => { refreshErrorEl().textContent = message }
+  const clearRefreshError = () => { const e = $('#refresh-error'); if (e) e.textContent = '' }
+
   async function load({ force = false } = {}) {
-    state.board = force ? await api('/api/refresh', {}) : await api('/api/items')
-    render()
+    // Single in-flight flag: a double-click cannot queue a second collection, and an
+    // auto-poll tick that fires while a manual refresh is running just skips itself.
+    if (state.busy) return
+    state.busy = true
+
+    const btn = $('#refresh')
+    let tick = null
+    if (force) {
+      const start = Date.now()
+      btn.disabled = true
+      btn.textContent = refreshLabel({ busy: true, elapsedMs: 0 })
+      tick = setInterval(() => {
+        btn.textContent = refreshLabel({ busy: true, elapsedMs: Date.now() - start })
+      }, 1000)
+    }
+
+    try {
+      state.board = force
+        ? await api('/api/refresh', {}, { strict: true })
+        : await api('/api/items', undefined, { strict: true })
+      render()
+      clearRefreshError()
+    } catch (e) {
+      // Silent failure is the exact bug class this project keeps getting bitten by: old
+      // data staying on screen is fine, but nothing telling the user it's stale is not.
+      showRefreshError(`refresh failed: ${e.message}`)
+    } finally {
+      if (tick) clearInterval(tick)
+      state.busy = false
+      if (force) { btn.disabled = false; btn.textContent = refreshLabel({ busy: false }) }
+    }
   }
 
   // Fetched once at startup, not on every poll — needed only to list configured repos
@@ -416,6 +483,10 @@ if (typeof document !== 'undefined') {
   $('#refresh').addEventListener('click', () => load({ force: true }))
   $('#showBacklog').addEventListener('change', (e) => { state.showBacklog = e.target.checked; render() })
   $('#showStale').addEventListener('change', (e) => { state.showStale = e.target.checked; render() })
+
+  // The first load is as slow as a forced one (~6s, uncached) — a blank board for that
+  // whole stretch reads as broken. render() replaces this the moment real data lands.
+  $('#board').textContent = 'loading…'
 
   loadConfig().then(load)
   setInterval(() => load(), 60_000)

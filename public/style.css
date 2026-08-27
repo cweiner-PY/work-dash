@@ -20,6 +20,7 @@ h1 { margin: 0 0 6px; font-size: 16px; letter-spacing: .02em; }
 .src.bad { color: var(--bad); border-color: var(--bad); }
 .src-errors { color: var(--muted); font-size: 12px; margin-top: 4px; }
 #controls { display: flex; gap: 14px; align-items: center; margin-top: 8px; font-size: 12px; }
+#refresh[disabled] { opacity: .6; cursor: not-allowed; }
 #hidden { margin: 6px 0 0; color: var(--muted); font-size: 12px; }
 main { padding: 12px 20px 60px; max-width: 1100px; }
 /* Last-resort guard: the page body must never scroll sideways even if some future
