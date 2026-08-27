@@ -166,7 +166,7 @@ test('isPlaceholder treats the example config\'s stand-ins as unset', () => {
   assert.equal(isPlaceholder('PASTE_TOKEN_FROM_id.atlassian.com'), true)
   assert.equal(isPlaceholder('/Users/YOU/Work/docs'), true)
   // Real values must not be mistaken for placeholders.
-  assert.equal(isPlaceholder('62b43cb267dff38e0988a3bc'), false)
+  assert.equal(isPlaceholder('deadbeefdeadbeefdeadbeef'), false)
   assert.equal(isPlaceholder('/Users/cweiner/Work/docs'), false)
   assert.equal(isPlaceholder('cweiner-PY'), false)
   assert.equal(isPlaceholder('you@performyard.com'), false, 'a real-looking email is not a placeholder')

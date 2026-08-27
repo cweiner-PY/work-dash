@@ -15,7 +15,7 @@ const raw = {
     status: { name: 'Ready To Test', statusCategory: { name: 'In Progress' } },
     issuetype: { name: 'Bug' },
     priority: { name: 'P2-Medium' },
-    assignee: { displayName: 'Colt Weiner', accountId: '62b43cb267dff38e0988a3bc' },
+    assignee: { displayName: 'Colt Weiner', accountId: 'deadbeefdeadbeefdeadbeef' },
   },
 }
 
@@ -28,7 +28,7 @@ test('normalizes a raw issue', () => {
     issuetype: 'Bug',
     priority: 'P2-Medium',
     assignee: 'Colt Weiner',
-    assigneeAccountId: '62b43cb267dff38e0988a3bc',
+    assigneeAccountId: 'deadbeefdeadbeefdeadbeef',
     activeSprint: null,
     // `raw.fields` above has no customfield_10020 key at all — the field is absent,
     // not merely null-valued.

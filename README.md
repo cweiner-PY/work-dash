@@ -243,6 +243,23 @@ this setup:
   One of the two repos here configures none; PRs on it are gated only by
   approval, mergeability, and draft status.
 
+## Before you make this repo public
+
+Don't, without doing the work first. `config.json` has never been committed and no
+credential appears in any revision — `test/gitignore.test.js` asserts both — but the
+repository still carries real internal content:
+
+- `test/fixtures/` holds **recorded live Jira and GitHub responses**: real ticket keys and
+  full summaries (including customer-reported bug titles and a ticket naming AWS secrets
+  handling as tech debt), real sprint names, real PR titles and a teammate's GitHub login.
+  They are recorded on purpose — several genuine bugs were caught only because the fixtures
+  were real rather than invented — which is exactly why they cannot be published as-is.
+- `docs/plans/` and `docs/specs/` describe internal workflow and Jira configuration.
+- Commit messages reference real ticket keys and PR numbers throughout.
+
+Publishing would mean synthesising the fixtures, and accepting that the history keeps the
+originals unless it is rewritten. Keep it private and add collaborators instead.
+
 ## Safety guarantees
 
 - `collect/slots.js` is read-only: the only git commands it ever runs

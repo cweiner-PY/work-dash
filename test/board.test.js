@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs'
 import { buildBoard } from '../board.js'
 
 const fx = (n) => JSON.parse(readFileSync(new URL(`./fixtures/${n}`, import.meta.url), 'utf8'))
-const ME = '62b43cb267dff38e0988a3bc'
+const ME = 'deadbeefdeadbeefdeadbeef'
 
 const config = {
   myAccountId: ME,

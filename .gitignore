@@ -1,4 +1,16 @@
+# Holds the Jira API token. Never commit it — test/gitignore.test.js asserts this.
 config.json
+
+# Belt and braces for the credential shapes that end up in a project like this.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*_token
+*.token
+
 node_modules/
 .DS_Store
 scratch/
+.superpowers/
