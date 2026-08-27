@@ -43,14 +43,24 @@ Only **Backlog** and stale items (assigned to someone else, or whose ticket is
 already Done) are hidden by default; the two checkboxes reveal them. Anything
 hidden is still counted — "6 backlog · 3 stale" — so nothing vanishes silently.
 
-Cards also carry: your own PR's state and required checks, how far behind its
-base it is, an `idle Nd` chip once a PR has gone a day without activity (amber
-at 3, red at 7), the local checkout, why the item is in its lane, attached plan
-files, and Jira subtasks.
+**A card is a ticket; its blocks are branches.** Split a big feature across
+several branches carrying one Jira key and each gets its own block on that
+ticket's card: its own PR state, its own checkout, its own reasons, and its own
+buttons. A ticket with one branch renders flat, exactly as before — the blocks
+only appear when there is something to tell apart.
 
-**Checkouts** are matched to cards by branch name, and a **detached** one — which
+Each block carries: that branch's PR state and required checks, how far behind
+its base it is, an `idle Nd` chip once a PR has gone a day without activity
+(amber at 3, red at 7), its local checkout, and why it is in its lane. Plan
+files and Jira subtasks belong to the ticket and sit once at the bottom.
+
+Every action names the branch it acts on. The server **refuses** to act on a
+multi-branch ticket without one rather than picking — so `update branch` can no
+longer read its label off one branch and run against another.
+
+**Checkouts** are matched to branches by name, and a **detached** one — which
 is what a review leaves behind — by its HEAD sha against known PR heads, so it
-reads `reviewing #7353` on that PR's card rather than appearing as a blank item.
+reads `reviewing #7353` on that PR's block rather than appearing as a blank item.
 Checkouts no card claims are listed as `free checkouts:` in the masthead, with
 their state, so an exhausted pool is visible. A checkout sitting on the default
 branch is capacity and gets no card; it used to render as an item titled
@@ -63,10 +73,10 @@ branch is capacity and gets no card; it used to render as an item titled
 | **open** | New Terminal, `cd` to the checkout, check out the branch if needed, start `claude` with the ticket, branch, PR and selected plan paths in its system prompt — then waits for you to type |
 | **`/skill-name`** | The same, but submits `/skill-name TICKET-KEY` immediately. Only skills the server computed as applicable are accepted |
 | **review #N** | Appears where a PR awaits **your** review. Resolves a slot, `git fetch` + `git checkout --detach origin/<their-branch>`, and runs `reviewSkill` (default `/critical-review`) with a system prompt stating you are the reviewer, not the author, and must change nothing. Detached on purpose: an accidental commit lands on no branch and cannot reach their PR. One button per reviewable PR, so you pick |
-| **update branch (N behind)** | `gh pr update-branch`, then a local `git pull --ff-only` if the branch is checked out. With no PR, `git fetch` + `git merge origin/<base>` locally |
+| **update branch (N behind)** | `gh pr update-branch`, then a local `git pull --ff-only` if that branch is checked out. With no PR, `git fetch` + `git merge origin/<base>` locally. Refused on a detached checkout — the merge would land on no branch |
 | **resolve conflicts** | Replaces the update button when the PR conflicts, which GitHub can't fix server-side. Opens a Terminal, runs the merge, and hands Claude an instruction based on whether it actually conflicted |
 | **squash & merge** | `gh pr merge --squash`, gated (below) |
-| **the checkout name** | Click `PY-2` on the slot row to open that folder in your editor. The ticket key opens Jira and the PR number opens GitHub, same idea |
+| **the checkout name** | Click `PY-2` on a block's checkout row to open that folder in your editor. The ticket key opens Jira and the PR number opens GitHub, same idea |
 
 ### The merge gate
 
@@ -132,6 +142,11 @@ dashboard only submits the slash command.
 `when` sees `key`, `repo`, `slot`, `branch`, `plans`, `jira` and `pr`, with `!`,
 `&&`, `||`, `==`, `!=`, parentheses, single-quoted strings and dotted paths. A
 hand-written parser, not `eval`.
+
+Rules are evaluated **once per branch**, so `slot` and `pr` are singular for
+real: on a ticket with a PR on one branch and a checkout on another, the
+`pr`-gated skills appear on the first block and the `slot`-gated ones on the
+second, each acting on its own branch.
 
 `pr` is deliberately **your own** PR, never a colleague's review request, so a
 `pr`-gated skill won't fire on someone else's work. A rule that fails to parse
