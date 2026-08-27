@@ -65,9 +65,10 @@ test('a PR whose ticket is absent from the primary query still joins via enrichm
 
 test('a slot attaches to its Jira item by branch key', () => {
   const it = board().get('PY-13888')
-  assert.equal(it.slot.dir, '/Users/cweiner/Work/PY-1')
-  assert.equal(it.slot.dirty, true)
-  assert.equal(it.slot.behind, 13)
+  const [b] = it.branches
+  assert.equal(b.slot.dir, '/Users/cweiner/Work/PY-1')
+  assert.equal(b.slot.dirty, true)
+  assert.equal(b.slot.behind, 13)
   assert.equal(it.jira.assignee, 'Bruce Pereira')
 })
 
@@ -79,7 +80,8 @@ test('keyless PR and keyless slot on the same branch join into ONE item', () => 
   assert.equal(it.key, null)
   assert.equal(it.prs.length, 1)
   assert.equal(it.prs[0].number, 704)
-  assert.equal(it.slot.dir, '/Users/cweiner/Work/Logan')
+  assert.equal(it.branches.length, 1, 'one branch carrying both the PR and the checkout')
+  assert.equal(it.branches[0].slot.dir, '/Users/cweiner/Work/Logan')
   // and there is no second, PR-only or slot-only, item for that branch
   const dupes = [...b.values()].filter((i) => i.prs.some((p) => p.number === 704))
   assert.equal(dupes.length, 1)
@@ -89,7 +91,7 @@ test('a keyless slot with no PR becomes its own item', () => {
   const it = board().get('PerformYard/Logan:update-churn-agent-prompt')
   assert.equal(it.key, null)
   assert.equal(it.prs.length, 0)
-  assert.equal(it.slot.dir, '/Users/cweiner/Work/Logan3')
+  assert.equal(it.branches[0].slot.dir, '/Users/cweiner/Work/Logan3')
   assert.equal(it.title, 'update-churn-agent-prompt')
 })
 
@@ -187,8 +189,8 @@ test('a detached slot whose HEAD is a known PR head lands on THAT PR\'s item', (
   })
   assert.ok(!items.some((i) => i.id.includes('null')), 'no phantom item')
   const it = items.find((i) => i.key === 'PY-12349')
-  assert.equal(it.slot.dir, '/w/A')
-  assert.equal(it.slot.holdingPr, 7353, 'and it says which PR it is holding')
+  assert.equal(it.branches[0].slot.dir, '/w/A')
+  assert.equal(it.branches[0].slot.holdingPr, 7353, 'and it says which PR it is holding')
 })
 
 test('the annotation is on the item\'s copy, never on the collector\'s slot', () => {
@@ -209,7 +211,7 @@ test('an identical sha in a DIFFERENT repo does not attach — that would be a f
     slots: [slotAt('/w/A', null, 'abc123')],
     config: cfg,
   })
-  assert.ok(!items.some((i) => i.slot))
+  assert.ok(!items.some((i) => i.branches.some((b) => b.slot)))
 })
 
 test('two detached slots no longer collide into one item', () => {
@@ -219,7 +221,8 @@ test('two detached slots no longer collide into one item', () => {
     slots: [slotAt('/w/A', null, 'sha1'), slotAt('/w/B', null, 'sha2')],
     config: cfg,
   })
-  assert.deepEqual(items.filter((i) => i.slot).map((i) => i.slot.dir).sort(), ['/w/A', '/w/B'])
+  assert.deepEqual(items.flatMap((i) => i.branches).map((b) => b.slot?.dir).filter(Boolean).sort(),
+    ['/w/A', '/w/B'])
 })
 
 test('a detached slot with no sha at all is simply not work', () => {
@@ -249,7 +252,7 @@ test('a default-branch slot DOES attach when something else already made that it
     config: cfg,
   })
   assert.equal(items.length, 1)
-  assert.equal(items[0].slot.dir, '/w/A')
+  assert.equal(items[0].branches.find((b) => b.slot).slot.dir, '/w/A')
 })
 
 test('a slot on a live feature branch with no PR is still work', () => {

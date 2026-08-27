@@ -1,7 +1,7 @@
 // test/lanes.test.js
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { assignLanes as rawAssignLanes, mergeGateFor, myPrOf, isMinePr, needsSprintFallback, changesAddressed, shortBranch } from '../lanes.js'
+import { assignLanes as rawAssignLanes, mergeGateFor, isMinePr, needsSprintFallback, changesAddressed, shortBranch } from '../lanes.js'
 
 // assignLanes reads item.branches — join.js builds them by pairing each PR with the checkout
 // on the same branch. These tests describe their inputs in the terms they are ABOUT (a PR, a
@@ -45,19 +45,10 @@ const jira = (o = {}) => ({ key: 'PY-1', summary: 's', status: 'In Progress', st
   ...o })
 const item = (o = {}) => ({ id: 'PY-1', key: 'PY-1', title: 's', repo: 'O/R', jira: null, prs: [], slot: null, plans: [], ...o })
 
-// --- myPrOf / isMinePr ---
-test('myPrOf returns the user\'s own PR when the item also carries a review request', () => {
-  const mine = pr({ number: 1, isMine: true })
-  const review = pr({ number: 2, isMine: false })
-  assert.equal(myPrOf(item({ prs: [review, mine] })).number, 1)
-})
-test('myPrOf returns null when the item\'s only PR is a review request', () => {
-  const review = pr({ number: 2, isMine: false })
-  assert.equal(myPrOf(item({ prs: [review] })), null)
-})
-test('myPrOf returns null for an item with no PRs at all', () => {
-  assert.equal(myPrOf(item({ prs: [] })), null)
-})
+// --- isMinePr ---
+// myPrOf is gone: "the item's PR" was answered by taking the first of them, which on a ticket
+// with two branches silently meant one of them. The question is now asked per branch — see
+// myPrOfBranch in actions/slot.js and its tests in slot.test.js.
 test('isMinePr treats isMine: undefined as mine (no explicit false)', () => {
   assert.equal(isMinePr({ number: 1 }), true)
   assert.equal(isMinePr({ number: 1, isMine: false }), false)
@@ -118,7 +109,7 @@ test('failing required check puts the item in needs-you', () => {
 test('approved and mergeable with green required checks is needs-you: go merge', () => {
   const it = lane(item({ jira: jira(), prs: [pr({ reviewDecision: 'APPROVED' })] }))
   assert.equal(it.lane, 'needs-you')
-  assert.equal(it.mergeGate.allowed, true)
+  assert.equal(it.branches[0].mergeGate.allowed, true)
   assert.ok(it.reasons.some((r) => /merge/i.test(r)))
 })
 test('changes requested is needs-you', () => {

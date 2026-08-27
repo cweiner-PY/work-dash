@@ -97,7 +97,9 @@ test('every item carries a lane and a reasons array', async () => {
   for (const i of b.items) {
     assert.ok(['needs-you', 'waiting', 'in-flight', 'ready-to-start', 'backlog'].includes(i.lane), i.id)
     assert.ok(Array.isArray(i.reasons))
-    assert.ok(i.mergeGate && typeof i.mergeGate.allowed === 'boolean')
+    // One gate per branch: an item with two PRs has two, and one being mergeable says
+    // nothing about the other.
+    for (const b of i.branches) assert.ok(b.mergeGate && typeof b.mergeGate.allowed === 'boolean')
   }
 })
 

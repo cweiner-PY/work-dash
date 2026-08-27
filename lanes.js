@@ -21,16 +21,15 @@ export function mergeGateFor(pr) {
 }
 
 // It never checked open/closed — there is no such field — only whose PR it is. Shared by
-// lanes.js, actions/merge.js, board.js's skillsForItem, actions/slot.js's branchFor, and
-// actions/open.js: an item can carry a colleague's review-requested PR alongside (or
-// instead of) the user's own, and every consumer of "the item's PR" must agree on which
-// one that is.
+// lanes.js, actions/merge.js, board.js's skillsForBranch and actions/slot.js's myPrOfBranch:
+// an item can carry a colleague's review-requested PR alongside (or instead of) the user's
+// own, and every consumer of "this branch's PR" must agree on which one counts.
+//
+// There is deliberately no item-wide equivalent any more. `myPrOf(item)` used to answer "the
+// item's PR" by taking the first of them, which on a ticket with two branches silently meant
+// one of them — see myPrOfBranch in actions/slot.js for the question that can actually be
+// answered.
 export const isMinePr = (pr) => pr?.isMine !== false
-
-// The user's own PR on this item, or null if the item carries none (e.g. only a
-// colleague's review request). Never falls back to `prs[0]` — that would silently treat
-// a review-requested PR as if it belonged to the user.
-export const myPrOf = (item) => (item?.prs ?? []).find(isMinePr) ?? null
 
 // If the configured sprint field is ABSENT from every Jira issue's raw `fields` — not
 // merely null-valued — that is almost certainly a misconfigured jiraSprintField for this
@@ -258,9 +257,6 @@ export function assignLanes(items, config) {
 
     return { ...item, branches, lane, reasons, ticketReasons,
              signals: { foreign, stale, reclaimable: branches.some((b) => b.reclaimable) },
-             // DEPRECATED item-level gate: there can be one per branch. Kept unchanged
-             // (myPrs[0], exactly as before) until public/app.js reads branch.mergeGate.
-             mergeGate: mergeGateFor(myPrs[0]),
              statusGroup, sortIndex: idx === -1 ? Infinity : idx }
   })
 }

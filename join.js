@@ -138,12 +138,6 @@ export function join({ jira = [], enrichment = [], prs = [], slots = [], plans =
   // it did when `slot` was scalar, which is why converting the consumers stayed safe.
   for (const it of byId.values()) {
     if (it.branches.length === 0) it.branches.push({ name: null, repo: it.repo, pr: null, slot: null, detached: false })
-    // DEPRECATED alias, removed once every consumer reads `branches`. Kept only so this
-    // change could land one layer at a time with the suite green at every commit.
-    Object.defineProperty(it, 'slot', {
-      get() { return this.branches.find((b) => b.slot)?.slot ?? null },
-      enumerable: true, configurable: true,
-    })
   }
 
   return [...byId.values()]

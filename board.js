@@ -1,6 +1,6 @@
 // board.js
 import { join as joinItems } from './join.js'
-import { assignLanes, myPrOf, isMinePr } from './lanes.js'
+import { assignLanes, isMinePr } from './lanes.js'
 import { extractKey } from './util/key.js'
 import { fetchPrimary as jiraPrimary, fetchByKeys as jiraByKeys, fetchSubtasks as jiraSubtasks } from './collect/jira.js'
 import { fetchGithub as ghFetch } from './collect/github.js'
@@ -42,16 +42,6 @@ export function skillsForBranch(item, branch, config) {
   return out
 }
 
-// DEPRECATED, and deliberately still computed the OLD way — from myPrOf and the scalar slot
-// alias — rather than as a union over branches. A union would be a superset, and routes.js
-// gates a client-supplied skill name on this list; widening it even for one commit would let
-// a skill valid for one branch be launched against another. It is deleted, along with that
-// gate, once the routes validate against the target branch's own skills.
-export function skillsForItem(item, config) {
-  const pr = myPrOf(item)
-  return skillsForBranch(item, { name: item.slot?.branch ?? pr?.headRefName ?? null,
-                                 repo: item.repo, pr, slot: item.slot ?? null }, config)
-}
 
 async function guarded(fn, fallback) {
   try {
@@ -133,7 +123,6 @@ export async function buildBoard(config, deps = {}) {
   ).map((i) => ({
     ...i,
     branches: i.branches.map((b) => ({ ...b, skills: skillsForBranch(i, b, config) })),
-    skills: skillsForItem(i, config),
   }))
 
   // Every checkout no item claimed: spare capacity, plus any detached one whose HEAD matched

@@ -316,8 +316,8 @@ test('BEHIND dry run with no local candidate composes only the remote command', 
 })
 
 test('a review-requested PR (not the user\'s own) does not divert this from the old local-only path', async () => {
-  // myPrOf must exclude a colleague's PR — an item carrying only one must still take the
-  // local fetch+merge path, not the remote-state path.
+  // myPrOfBranch must exclude a colleague's PR — a branch carrying only one must still take
+  // the local fetch+merge path, not the remote-state path.
   const calls = []
   const run = async (cmd, args) => { calls.push(args.join(' ')); return { code: 0, stdout: 'Fast-forward', stderr: '' } }
   const reviewOnly = { id: 'PY-1', key: 'PY-1', repo: 'O/R', slot: clean, prs: [pr({ isMine: false, mergeStateStatus: 'BEHIND' })] }

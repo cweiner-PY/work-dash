@@ -2,7 +2,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { registerRoutes as rawRegisterRoutes, liveClaimedDirs } from '../routes.js'
-import { skillsForItem, skillsForBranch } from '../board.js'
+import { skillsForBranch } from '../board.js'
 import { branchesFrom } from '../test-support/branches.js'
 
 // The routes act on ONE resolved branch of an item, and gate a client-supplied skill name on
@@ -32,37 +32,38 @@ const config = {
   ],
 }
 
-test('skillsForItem picks the applicable skills', () => {
-  const bare = { key: 'PY-1', repo: 'O/R', prs: [], slot: null, plans: [], jira: null }
-  assert.deepEqual(skillsForItem(bare, config), ['ticket-planner'])
+// skillsForItem is gone: it had to pick one PR and one checkout to stand for the whole item.
+// Each rule is evaluated against ONE branch, whose `pr` and `slot` are singular for real —
+// which is what the predicate grammar was always written against.
+const skillsFor = (item, o = {}) => skillsForBranch(item, { name: null, repo: item.repo, pr: null, slot: null, detached: false, ...o }, config)
 
-  const withSlot = { ...bare, slot: { dir: '/w/A', branch: 'PY-1-x' } }
-  assert.deepEqual(skillsForItem(withSlot, config), ['critical-review'])
-
-  const withComments = { ...bare, prs: [{ hasReviewComments: true, reviewDecision: 'REVIEW_REQUIRED' }] }
-  assert.deepEqual(skillsForItem(withComments, config), ['resolve-code-review'])
+test('skillsForBranch picks the applicable skills', () => {
+  const bare = { key: 'PY-1', repo: 'O/R', plans: [], jira: null }
+  assert.deepEqual(skillsFor(bare), ['ticket-planner'])
+  assert.deepEqual(skillsFor(bare, { name: 'PY-1-x', slot: { dir: '/w/A', branch: 'PY-1-x' } }), ['critical-review'])
+  assert.deepEqual(skillsFor(bare, { name: 'PY-1-x', pr: { hasReviewComments: true, reviewDecision: 'REVIEW_REQUIRED' } }),
+    ['resolve-code-review'])
 })
 
-test('a Logan item gets the logan-only skill', () => {
-  const logan = { key: 'PY-1', repo: 'PerformYard/Logan', prs: [], slot: { dir: '/w/L', branch: 'b' }, plans: [], jira: null }
-  assert.ok(skillsForItem(logan, config).includes('toggle-logan-env'))
+test('a Logan branch gets the logan-only skill', () => {
+  const logan = { key: 'PY-1', repo: 'PerformYard/Logan', plans: [], jira: null }
+  assert.ok(skillsFor(logan, { name: 'b', slot: { dir: '/w/L', branch: 'b' } }).includes('toggle-logan-env'))
 })
 
 test('an unparseable rule is skipped, not thrown', () => {
-  const withSlot = { key: 'PY-1', repo: 'O/R', prs: [], slot: { dir: '/w/A', branch: 'b' }, plans: [], jira: null }
-  const out = skillsForItem(withSlot, config)
-  assert.ok(!out.includes('broken'))
+  const item = { key: 'PY-1', repo: 'O/R', plans: [], jira: null }
+  assert.ok(!skillsFor(item, { name: 'b', slot: { dir: '/w/A', branch: 'b' } }).includes('broken'))
 })
 
-test("skillsForItem on a review-request-only item does not offer pr-gated skills", () => {
-  // Regression for the live PY-1 case: an item carrying only a colleague's review-requested
+test("a branch that is only a review request does not offer pr-gated skills", () => {
+  // Regression for the live PY-1 case: a branch carrying only a colleague's review-requested
   // PR must not offer /pr-description, /ticket-finisher, etc. — those are gated on `pr`,
-  // and `pr` must be null here, not the raw first (foreign) PR.
-  const reviewOnly = {
-    key: 'PY-1', repo: 'O/R', slot: { dir: '/w/A', branch: 'PY-1-my-older-branch' }, plans: [], jira: null,
-    prs: [{ hasReviewComments: true, reviewDecision: 'REVIEW_REQUIRED', isMine: false }],
-  }
-  const out = skillsForItem(reviewOnly, config)
+  // and `pr` must be null there, not the raw foreign PR.
+  const item = { key: 'PY-1', repo: 'O/R', plans: [], jira: null }
+  const out = skillsFor(item, {
+    name: 'PY-1-bruce', slot: { dir: '/w/A', branch: 'PY-1-bruce' },
+    pr: { hasReviewComments: true, reviewDecision: 'REVIEW_REQUIRED', isMine: false },
+  })
   assert.ok(!out.includes('resolve-code-review'), 'a pr-gated skill must not appear for a PR that is not the user\'s own')
   assert.deepEqual(out, ['critical-review'], 'only the slot-gated skill applies')
 })
