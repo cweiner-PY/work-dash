@@ -73,7 +73,10 @@ export function prBehindChip(pr) {
   const cmp = pr.baseCompare
   if (!cmp) return null
   const base = pr.baseRefName ?? 'base'
-  if (cmp.known !== true) return { cls: 'warn', text: `behind ${base}: unknown` }
+  // A colleague's review-requested PR is deliberately never compared (see fetchGithub), so
+  // "unknown" there would report a failure that never happened. Only a PR we actually tried
+  // to compare can honestly be unknown.
+  if (cmp.known !== true) return pr.isMine === false ? null : { cls: 'warn', text: `behind ${base}: unknown` }
   if (cmp.behind > 0) return { cls: 'warn', text: `${cmp.behind} behind ${base}` }
   return null
 }

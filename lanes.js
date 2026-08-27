@@ -108,12 +108,23 @@ export function assignLanes(items, config) {
     // pull the item into needs-you.
     let lane = null
     const failing = pr?.requiredChecks?.failing ?? []
+    // Some required checks are HUMAN gates, not CI. PerformYard's "QA Code Review" is
+    // FAILURE until a QA engineer approves it, which is the EXPECTED state of a ticket
+    // sitting in Ready To Test. Counting it as a failing check put every such ticket in
+    // needs-you reading "required check failing", implying the user could fix it by pushing
+    // code. They cannot — it is someone else's move.
+    //
+    // It still blocks mergeGateFor, unchanged: you may not merge before QA signs off. The
+    // only thing that changes is whose turn the board says it is.
+    const humanGates = new Set(config.humanGateChecks ?? [])
+    const failingCi = failing.filter((n) => !humanGates.has(n))
+    const failingGates = failing.filter((n) => humanGates.has(n))
     const needs = []
     let promote = false
     if (reviewPrs.length) { needs.push(`review requested of you (#${reviewPrs[0].number})`); promote = true }
     if (pr && stale) { needs.push(`ticket is Done but PR #${pr.number} is still open`); promote = true }
-    if (failing.length) {
-      needs.push(`required check failing: ${failing.join(', ')}`)
+    if (failingCi.length) {
+      needs.push(`required check failing: ${failingCi.join(', ')}`)
       if (!pr.isDraft) promote = true
     }
     // Only when you have NOT already pushed fixes — see changesAddressed. An addressed PR
@@ -132,13 +143,16 @@ export function assignLanes(items, config) {
     // --- lane 2: waiting on others ---
     // Either never reviewed, or reviewed and since addressed: both are the reviewer's move.
     // A failing required check still outranks this — CI is your problem either way.
+    // Three ways the ball can be in someone else's court: never reviewed, reviewed and
+    // since addressed, or held only by a human gate. CI failing outranks all three.
     const addressed = changesAddressed(pr)
-    if (!lane && pr && !pr.isDraft && failing.length === 0 &&
-        (pr.reviewDecision === 'REVIEW_REQUIRED' || addressed)) {
+    const gateHeld = failingGates.length > 0 && failingCi.length === 0
+    if (!lane && pr && !pr.isDraft && failingCi.length === 0 &&
+        (pr.reviewDecision === 'REVIEW_REQUIRED' || addressed || gateHeld)) {
       lane = 'waiting'
-      reasons.push(addressed
-        ? `changes pushed — awaiting re-review on #${pr.number}`
-        : `awaiting review on #${pr.number}`)
+      if (addressed) reasons.push(`changes pushed — awaiting re-review on #${pr.number}`)
+      else if (pr.reviewDecision === 'REVIEW_REQUIRED') reasons.push(`awaiting review on #${pr.number}`)
+      if (gateHeld) reasons.push(`awaiting ${failingGates.join(', ')} on #${pr.number}`)
     }
 
     // --- lane 3: in flight ---

@@ -1,5 +1,26 @@
 // collect/slots.js
+import { stat as defaultStat } from 'node:fs/promises'
 import { run as defaultRun } from '../util/run.js'
+import { checkoutMode, repoRootFor, parseWorktreeList } from '../actions/worktree.js'
+
+// Which directories to inspect for a repo. In slots mode that is the configured list; in
+// worktree mode it is discovered from git itself, so nothing has to be pre-cloned and the
+// board sees worktrees created by earlier launches. The main clone is included in both
+// modes — it is a real checkout, and the editor link and update-branch work on it.
+async function dirsFor(config, repo, cfg, { run, errors }) {
+  if (checkoutMode(config) !== 'worktrees') return cfg.slots ?? []
+  const root = repoRootFor(config, repo)
+  if (!root) {
+    errors.push(`no clone configured for ${repo}: set repos["${repo}"].root to a local clone`)
+    return []
+  }
+  const r = await run('git', ['-C', root, 'worktree', 'list', '--porcelain'])
+  if (r.code !== 0) {
+    errors.push(`could not list worktrees for ${repo}: ${r.stderr.trim() || `exit ${r.code}`}`)
+    return []
+  }
+  return parseWorktreeList(r.stdout).filter((w) => !w.bare).map((w) => w.dir)
+}
 
 async function git(run, dir, args) {
   const r = await run('git', args, { cwd: dir })
@@ -7,13 +28,18 @@ async function git(run, dir, args) {
   return r.stdout
 }
 
-export async function collectSlots(config, { run = defaultRun } = {}) {
-  const slots = []
+export async function collectSlots(config, { run = defaultRun, stat = defaultStat } = {}) {
   const errors = []
 
+  // Three git commands per checkout. Run SEQUENTIALLY this was 3.4s for six slots and the
+  // slowest source on the board — each subprocess costs ~190ms and none of them depend on
+  // another. Collected as a list of tasks and awaited together; the results are mapped in
+  // order rather than pushed on completion, so the slot order still follows the config.
+  const tasks = []
   for (const [repo, cfg] of Object.entries(config.repos)) {
     const base = `origin/${cfg.defaultBranch ?? 'master'}`
-    for (const dir of cfg.slots ?? []) {
+    for (const dir of await dirsFor(config, repo, cfg, { run, errors })) {
+      tasks.push(async () => {
       try {
         const branch = (await git(run, dir, ['branch', '--show-current'])).trim() || null
         const porcelain = await git(run, dir, ['status', '--porcelain'])
@@ -37,11 +63,23 @@ export async function collectSlots(config, { run = defaultRun } = {}) {
           errors.push(e.message)
         }
 
-        slots.push({ dir, repo, branch, dirty: dirtyCount > 0, dirtyCount, behind, ahead })
+        // mtime is only used to decide which worktrees are old enough to prune, and its
+        // absence must never cost us the slot — prunableWorktrees ignores a non-finite one.
+        let mtimeMs = null
+        try { mtimeMs = (await stat(dir)).mtimeMs } catch { /* not prunable, still a slot */ }
+
+        return { dir, repo, branch, dirty: dirtyCount > 0, dirtyCount, behind, ahead, mtimeMs }
       } catch (e) {
+        // One unreadable checkout must not cost the others. Reported, and dropped from the
+        // slot list rather than half-populated — a slot whose `dirty` is unknown is exactly
+        // what every action's fail-closed check is written to distrust.
         errors.push(e.message)
+        return null
       }
+      })
     }
   }
+
+  const slots = (await Promise.all(tasks.map((t) => t()))).filter(Boolean)
   return { slots, errors }
 }

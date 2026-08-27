@@ -507,3 +507,14 @@ test('shouldCollect: an unfamiliar visibilityState fails OPEN, still polling', (
 test('shouldCollect: never loaded yet is always stale enough', () => {
   assert.equal(shouldCollect({ visibility: 'visible', now: NOW, minAgeMs: 60_000 }), true)
 })
+
+
+test('prBehindChip says nothing for a PR we never compared', () => {
+  // A colleague's review-requested PR is never compared, so reporting "unknown" would claim
+  // a failure that never happened — it showed as "BEHIND MASTER: UNKNOWN" on the live board.
+  const theirs = { isMine: false, baseRefName: 'master', baseCompare: { behind: null, known: false } }
+  assert.equal(prBehindChip(theirs), null)
+  // Our own unread comparison DOES still say unknown, because we did try.
+  const mine = { isMine: true, baseRefName: 'master', baseCompare: { behind: null, known: false } }
+  assert.match(prBehindChip(mine).text, /unknown/)
+})

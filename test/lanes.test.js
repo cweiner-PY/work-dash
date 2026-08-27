@@ -399,3 +399,82 @@ test('a DRAFT that is addressed does not land in waiting', () => {
   }], { inFlightStatusOrder: [] })
   assert.equal(item.lane, 'in-flight')
 })
+
+
+// --- human gates: a check that stays red until a PERSON acts ---------------------------
+
+const GATES = { inFlightStatusOrder: [], humanGateChecks: ['QA Code Review'] }
+const withPr = (pr, jira = null) => assignLanes([{
+  id: 'PY-1', key: 'PY-1', repo: 'O/R', slot: null, plans: [], jira, prs: [pr], signals: {},
+}], GATES)[0]
+
+// REGRESSION, reported from the live board: PY-13751 sat in NEEDS YOU reading "required
+// check failing: QA Code Review" while its Jira status was Ready To Test. The gate is
+// FAILURE until a QA engineer approves — the expected state of a ticket with QA — so the
+// board was telling the user to fix something only somebody else can act on.
+test('a failing HUMAN gate does not put an approved PR in needs-you', () => {
+  const item = withPr({
+    number: 7230, repo: 'O/R', isMine: true, isDraft: false, mergeable: 'MERGEABLE',
+    reviewDecision: 'APPROVED',
+    requiredChecks: { total: 6, failing: ['QA Code Review'], known: true },
+  })
+  assert.equal(item.lane, 'waiting', item.reasons.join('; '))
+  assert.ok(item.reasons.some((r) => /awaiting QA Code Review/.test(r)), item.reasons.join('; '))
+  assert.ok(!item.reasons.some((r) => /required check failing/.test(r)),
+    'must not imply the user broke something')
+})
+
+test('a failing CI check still lands in needs-you, gate or no gate', () => {
+  const item = withPr({
+    number: 1, repo: 'O/R', isMine: true, isDraft: false, mergeable: 'MERGEABLE',
+    reviewDecision: 'APPROVED',
+    requiredChecks: { total: 6, failing: ['QA Code Review', 'Linting'], known: true },
+  })
+  assert.equal(item.lane, 'needs-you')
+  assert.ok(item.reasons.some((r) => /required check failing: Linting/.test(r)),
+    'and names only the check the user can actually fix: ' + item.reasons.join('; '))
+})
+
+test('a human gate still BLOCKS the merge gate — QA must sign off first', () => {
+  // The lane changed; permission to merge did not.
+  const gate = mergeGateFor({
+    reviewDecision: 'APPROVED', mergeable: 'MERGEABLE', isDraft: false,
+    requiredChecks: { total: 6, failing: ['QA Code Review'], known: true },
+  })
+  assert.equal(gate.allowed, false)
+  assert.ok(gate.blockers.some((b) => /QA Code Review/.test(b)), gate.blockers.join('; '))
+})
+
+test('an unreviewed PR held by a gate reports BOTH waits', () => {
+  const item = withPr({
+    number: 1, repo: 'O/R', isMine: true, isDraft: false, mergeable: 'MERGEABLE',
+    reviewDecision: 'REVIEW_REQUIRED',
+    requiredChecks: { total: 6, failing: ['QA Code Review'], known: true },
+  })
+  assert.equal(item.lane, 'waiting')
+  assert.ok(item.reasons.some((r) => /awaiting review/.test(r)), item.reasons.join('; '))
+  assert.ok(item.reasons.some((r) => /awaiting QA Code Review/.test(r)), item.reasons.join('; '))
+})
+
+test('with no humanGateChecks configured, every required check is CI again', () => {
+  // An organisation without a human gate must get the old behaviour exactly.
+  const item = assignLanes([{
+    id: 'PY-1', key: 'PY-1', repo: 'O/R', slot: null, plans: [], jira: null, signals: {},
+    prs: [{
+      number: 1, repo: 'O/R', isMine: true, isDraft: false, mergeable: 'MERGEABLE',
+      reviewDecision: 'APPROVED',
+      requiredChecks: { total: 1, failing: ['QA Code Review'], known: true },
+    }],
+  }], { inFlightStatusOrder: [], humanGateChecks: [] })[0]
+  assert.equal(item.lane, 'needs-you')
+  assert.ok(item.reasons.some((r) => /required check failing: QA Code Review/.test(r)))
+})
+
+test('a DRAFT held by a gate is in flight, not waiting on anyone', () => {
+  const item = withPr({
+    number: 1, repo: 'O/R', isMine: true, isDraft: true, mergeable: 'MERGEABLE',
+    reviewDecision: 'REVIEW_REQUIRED',
+    requiredChecks: { total: 6, failing: ['QA Code Review'], known: true },
+  })
+  assert.equal(item.lane, 'in-flight')
+})

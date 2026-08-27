@@ -27,12 +27,14 @@ test('reads branch, dirty count and ahead/behind', async () => {
     '/Users/cweiner/Work/Logan2|status --porcelain': '',
     '/Users/cweiner/Work/Logan2|rev-list --left-right --count origin/master...HEAD': '2\t1\n',
   })
-  const { slots, errors } = await collectSlots(config, { run })
+  // stat is injected, so this asserts on the collector rather than on whether the fixture
+  // paths happen to exist on the machine running the suite.
+  const { slots, errors } = await collectSlots(config, { run, stat: async () => ({ mtimeMs: 1000 }) })
   assert.deepEqual(errors, [])
   assert.deepEqual(slots[0], {
     dir: '/Users/cweiner/Work/PY-1', repo: 'PerformYard/PerformYard',
     branch: 'PY-13888-fix-share-report-basic-admin',
-    dirty: true, dirtyCount: 2, behind: 13, ahead: 6,
+    dirty: true, dirtyCount: 2, behind: 13, ahead: 6, mtimeMs: 1000,
   })
   assert.equal(slots[1].dirty, false)
   assert.equal(slots[1].dirtyCount, 0)
@@ -112,4 +114,22 @@ test('a detached HEAD yields a null branch, not a crash', async () => {
   }
   const { slots } = await collectSlots({ repos: { 'O/R': { slots: ['/tmp/x'] } } }, { run })
   assert.equal(slots[0].branch, null)
+})
+
+
+test('a slot survives stat failing — mtime only gates pruning', async () => {
+  const run = fakeRun({
+    '/Users/cweiner/Work/PY-1|branch --show-current': 'b\n',
+    '/Users/cweiner/Work/PY-1|status --porcelain': '',
+    '/Users/cweiner/Work/PY-1|rev-list --left-right --count origin/master...HEAD': '0\t0\n',
+    '/Users/cweiner/Work/Logan2|branch --show-current': 'c\n',
+    '/Users/cweiner/Work/Logan2|status --porcelain': '',
+    '/Users/cweiner/Work/Logan2|rev-list --left-right --count origin/master...HEAD': '0\t0\n',
+  })
+  const { slots, errors } = await collectSlots(config, {
+    run, stat: async () => { throw new Error('ENOENT') },
+  })
+  assert.equal(slots.length, 2, 'the slots must still be reported')
+  assert.equal(slots[0].mtimeMs, null)
+  assert.deepEqual(errors, [], 'an unstattable directory is not a collection error')
 })

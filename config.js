@@ -6,6 +6,10 @@ export class ConfigError extends Error {}
 
 const DEFAULTS = {
   port: 4200,
+  // Required checks that are HUMAN gates rather than CI. These stay FAILURE until a person
+  // acts, so they must not be read as "you broke something" — see lanes.js. Set to [] at an
+  // organisation that has none.
+  humanGateChecks: ['QA Code Review'],
   // macOS notification when an item newly enters the needs-you lane. Set false to silence.
   notifications: true,
   // Resolved by `open -a <editor>`, so any installed application name works.
