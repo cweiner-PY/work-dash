@@ -65,6 +65,19 @@ export function sourceChip(name, s) {
   return { cls, text, error: s.error ?? null }
 }
 
+// The PR row's behind-base chip. Returns null when there is nothing worth saying — an
+// up-to-date branch needs no chip. An unknown comparison DOES get one: the card must not
+// stay silent about a fact it failed to establish, which is how the false "up to date"
+// went unnoticed for as long as it did.
+export function prBehindChip(pr) {
+  const cmp = pr.baseCompare
+  if (!cmp) return null
+  const base = pr.baseRefName ?? 'base'
+  if (cmp.known !== true) return { cls: 'warn', text: `behind ${base}: unknown` }
+  if (cmp.behind > 0) return { cls: 'warn', text: `${cmp.behind} behind ${base}` }
+  return null
+}
+
 // A PR whose required-check state could not be read (known !== true) must never render
 // as the confident "no required checks" — the merge gate already fails safe on this
 // case (see mergeGateFor), and the card must not contradict it. known is checked first,
@@ -77,28 +90,45 @@ export function prChecksChip(rc) {
   return { cls: 'ok', text: `required ${rc.total}/${rc.total}` }
 }
 
-// The update-branch button's label and enabled state are driven by the PR's
-// mergeStateStatus, not the local (possibly days-stale) "N behind" count — see
-// actions/update-branch.js. Pure and exported so it is testable without a DOM, same as
-// prChecksChip. `mainPr` is the item's OWN PR (never a colleague's review request) or null.
+// The update-branch button's label and enabled state, driven by GitHub's own comparison
+// of the PR branch against its base — NOT by mergeStateStatus, which cannot answer the
+// question: BLOCKED and DIRTY outrank BEHIND, and BEHIND is only reported at all when
+// branch protection requires branches be up to date. An earlier version of this function
+// read CLEAN/BLOCKED/UNSTABLE as "up to date" and told the user a PR 24 commits behind
+// master had nothing to do. See BASE_COMPARE_QUERY in collect/github.js.
+// Pure and exported so it is testable without a DOM, same as prChecksChip. `mainPr` is
+// the item's OWN PR (never a colleague's review request) or null.
 export function updateBranchSpec(item, mainPr) {
   if (mainPr) {
-    switch (mainPr.mergeStateStatus) {
-      case 'BEHIND':
-        return { label: 'update branch', disabled: false, title: null }
-      case 'DIRTY':
-        return {
-          label: 'resolve conflicts locally', disabled: true,
-          title: `#${mainPr.number} conflicts with the base branch — resolve it locally, GitHub can't.`,
-        }
-      case 'CLEAN': case 'BLOCKED': case 'UNSTABLE':
-        return { label: 'up to date', disabled: true, title: 'Already up to date with the base branch.' }
-      default:
-        return {
-          label: 'state unknown', disabled: true,
-          title: "GitHub hasn't finished computing this yet — try again after the next refresh.",
-        }
+    const base = mainPr.baseRefName ?? 'the base branch'
+    // Conflicts come first and outrank the behind count: however far behind the branch
+    // is, GitHub cannot merge the base into it server-side while it conflicts.
+    if (mainPr.mergeStateStatus === 'DIRTY' || mainPr.mergeable === 'CONFLICTING') {
+      return {
+        label: 'resolve conflicts locally', disabled: true,
+        title: `#${mainPr.number} conflicts with ${base} — resolve it locally, GitHub can't.`,
+      }
     }
+    const cmp = mainPr.baseCompare ?? {}
+    if (cmp.known !== true) {
+      // A BEHIND status still proves the branch is behind even when the comparison
+      // failed, so it is worth acting on. Anything else fails closed: an unread
+      // comparison must never render as the confident "up to date".
+      if (mainPr.mergeStateStatus === 'BEHIND') {
+        return { label: 'update branch', disabled: false, title: null }
+      }
+      return {
+        label: 'behind state unknown', disabled: true,
+        title: `Could not compare #${mainPr.number} with ${base} — try again after the next refresh.`,
+      }
+    }
+    if (cmp.behind > 0) {
+      return {
+        label: `update branch (${cmp.behind} behind)`, disabled: false,
+        title: `#${mainPr.number} is ${cmp.behind} commit(s) behind ${base}.`,
+      }
+    }
+    return { label: 'up to date', disabled: true, title: `Already up to date with ${base}.` }
   }
   // No PR: fall back to the old local-only signal. The count is only as fresh as the
   // user's last manual fetch, so it must never be presented as current.
@@ -346,6 +376,8 @@ if (typeof document !== 'undefined') {
       row.append(el('span', `pr-review ${pr.reviewDecision === 'APPROVED' ? 'ok' : 'warn'}`, pr.reviewDecision ?? 'no review'))
       const { cls, text } = prChecksChip(pr.requiredChecks)
       row.append(el('span', `pr-checks ${cls}`, text))
+      const behind = prBehindChip(pr)
+      if (behind) row.append(el('span', `chip ${behind.cls}`, behind.text))
       if (pr.isDraft) row.append(el('span', 'chip', 'draft'))
       c.append(row)
     }

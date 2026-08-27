@@ -7,10 +7,11 @@ export async function updateBranch(
   { run = defaultRun, dry = false } = {}
 ) {
   // The user's own PR, if any (never a colleague's review request — see lanes.js). Its
-  // presence changes the whole strategy: with a PR, GitHub's mergeStateStatus is the
-  // source of truth for "behind", since collect/slots.js never fetches and the local
-  // ahead/behind count can be days stale. Without one, there is nothing for GitHub to
-  // compare against, so a local branch behind master falls back to the old local-only path.
+  // presence changes the whole strategy: with a PR, GitHub's own comparison of the branch
+  // against its base is the source of truth for "behind", since collect/slots.js never
+  // fetches and the local ahead/behind count can be days stale. Without one, there is
+  // nothing for GitHub to compare against, so a local branch behind master falls back to
+  // the old local-only path.
   const pr = myPrOf(item)
   if (!pr) return localOnlyUpdate({ item, slots, chosenSlotDir, defaultBranch }, { run, dry })
   return remoteUpdate({ item, pr, slots, chosenSlotDir, defaultBranch }, { run, dry })
@@ -84,33 +85,44 @@ function findLocalCandidate({ item, pr, slots, chosenSlotDir }) {
   return { slot: found ?? null }
 }
 
-// --- The user has an open PR: GitHub's mergeStateStatus drives the whole decision. ---
+// --- The user has an open PR: GitHub's branch comparison drives the decision, with
+// mergeStateStatus consulted only for the conflict case it uniquely reports. ---
 async function remoteUpdate({ item, pr, slots, chosenSlotDir, defaultBranch }, { run, dry }) {
   const status = pr.mergeStateStatus ?? null
   const found = findLocalCandidate({ item, pr, slots, chosenSlotDir })
   if (found.error) return { ok: false, message: found.error }
   const candidate = found.slot
 
-  if (status === 'DIRTY') {
-    // Server-side cannot resolve conflicts — only the user, locally, can.
+  if (status === 'DIRTY' || pr.mergeable === 'CONFLICTING') {
+    // Server-side cannot resolve conflicts — only the user, locally, can. Checked before
+    // the behind count, since a conflicting branch is unmergeable however far behind.
     const where = candidate ? `checked out in ${candidate.dir.split('/').pop()}` : 'not checked out anywhere'
     return {
       ok: false,
       message: `#${pr.number} conflicts with ${defaultBranch} and needs resolving locally (${where}).`,
     }
   }
-  if (status === 'CLEAN' || status === 'BLOCKED' || status === 'UNSTABLE') {
-    // Not behind: BLOCKED/UNSTABLE describe review or check state, not the branch's
-    // relationship to the base branch, so there is nothing for this action to fix.
+
+  // The behind count, NOT mergeStateStatus. BLOCKED and UNSTABLE describe review and
+  // check state; they say nothing about the branch's position relative to its base, and
+  // they outrank BEHIND when both apply. Reading them as "up to date" is what made this
+  // action refuse every PR in these repos — all of which were behind master at the time.
+  const cmp = pr.baseCompare ?? { known: false, behind: null }
+  if (cmp.known !== true) {
+    // A BEHIND status still proves the branch is behind, so it is actionable even when
+    // the comparison itself failed. Anything else fails closed rather than running
+    // `gh pr update-branch` against a branch whose position is unknown.
+    if (status !== 'BEHIND') {
+      return {
+        ok: false,
+        message: `#${pr.number}'s position relative to ${defaultBranch} isn't known yet — try again after the next refresh.`,
+      }
+    }
+  } else if (cmp.behind === 0) {
     return { ok: false, message: `#${pr.number} is already up to date with ${defaultBranch} — nothing to do.` }
   }
-  if (status !== 'BEHIND') {
-    // UNKNOWN, or the field absent entirely: GitHub computes this lazily and had not
-    // finished as of the last collection.
-    return { ok: false, message: `#${pr.number}'s merge state isn't known yet — try again after the next refresh.` }
-  }
 
-  // status === 'BEHIND'. The remote update proceeds regardless of local checkout state;
+  // Behind confirmed. The remote update proceeds regardless of local checkout state;
   // the local pull is an opportunistic second step that never blocks the first.
   const canPullLocally = candidate && !isSlotDirty(candidate)
   if (dry) {

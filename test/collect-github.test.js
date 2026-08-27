@@ -2,7 +2,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { summarizeChecks, parseRequiredChecks, normalizePr, fetchGithub, hasHumanReviewFeedback } from '../collect/github.js'
+import { summarizeChecks, parseRequiredChecks, normalizePr, fetchGithub, hasHumanReviewFeedback, parseBaseCompare } from '../collect/github.js'
 import { mergeGateFor } from '../lanes.js'
 
 const fx = (n) => JSON.parse(readFileSync(new URL(`./fixtures/${n}`, import.meta.url), 'utf8'))
@@ -114,9 +114,15 @@ test('hasHumanReviewFeedback ignores bots and the user themselves', () => {
   assert.equal(hasHumanReviewFeedback(undefined, ME), false)
 })
 
+// gh api graphql response for Ref.compare, recorded live 2026-08-27. Every fake `run`
+// answers the compare call from these rather than falling through to the pr-list branch.
+const compareFx = (name) => JSON.stringify(fx(name))
+const isCompare = (args) => args.includes('graphql')
+
 test('fetchGithub calls gh per repo and attaches required checks', async () => {
   const calls = []
   const run = async (cmd, args) => {
+    if (isCompare(args)) return { code: 0, stdout: compareFx('gh-compare-7230.json'), stderr: '' }
     calls.push([cmd, ...args].join(' '))
     if (args.includes('checks')) {
       const n = args[2]   // ['pr', 'checks', '<number>', ...]
@@ -146,6 +152,7 @@ test('gh reporting NO required checks is a known zero, not a failure', async () 
   // "no required checks reported on the '<branch>' branch" on stderr. Treating that as
   // a collection failure would make every Logan PR permanently unmergeable.
   const run = async (cmd, args) => {
+    if (isCompare(args)) return { code: 0, stdout: compareFx('gh-compare-7230.json'), stderr: '' }
     if (args.includes('checks')) {
       return {
         code: 1,
@@ -176,6 +183,7 @@ test('a genuine gh-checks failure is RECORDED and leaves the gate unknown', asyn
   // The dangerous case: gh itself fails (expired auth, offline, gh missing). Empty
   // stdout must NOT be read as "no required checks are failing".
   const run = async (cmd, args) => {
+    if (isCompare(args)) return { code: 0, stdout: compareFx('gh-compare-7230.json'), stderr: '' }
     if (args.includes('checks')) return { code: 1, stdout: '', stderr: 'gh: could not authenticate' }
     if (args.some((a) => String(a).includes('review-requested'))) return { code: 0, stdout: '[]', stderr: '' }
     const repo = args[args.indexOf('--repo') + 1]
@@ -195,6 +203,7 @@ test('a checks call that exits non-zero BUT returns valid json is still parsed',
   // The exit-code trap: gh exits 1 precisely because a check is failing. That data
   // is the most important data we collect, so it must not be discarded.
   const run = async (cmd, args) => {
+    if (isCompare(args)) return { code: 0, stdout: compareFx('gh-compare-7230.json'), stderr: '' }
     if (args.includes('checks')) {
       return { code: 1, stdout: JSON.stringify(fx('gh-checks-required-7230.json')), stderr: '' }
     }
@@ -211,6 +220,7 @@ test('a checks call that exits non-zero BUT returns valid json is still parsed',
 
 test('a failing gh call for one repo is reported but does not lose the other repo', async () => {
   const run = async (cmd, args) => {
+    if (isCompare(args)) return { code: 0, stdout: compareFx('gh-compare-7230.json'), stderr: '' }
     if (args.includes('PerformYard/Logan')) return { code: 1, stdout: '', stderr: 'boom' }
     if (args.includes('checks')) return { code: 0, stdout: '[]', stderr: '' }
     if (args.some((a) => String(a).includes('review-requested'))) return { code: 0, stdout: '[]', stderr: '' }
@@ -221,4 +231,164 @@ test('a failing gh call for one repo is reported but does not lose the other rep
   assert.equal(prs.length, 3)
   assert.equal(errors.length, 1)
   assert.match(errors[0], /Logan/)
+})
+
+
+// --- base comparison: how far behind its base each of the user's own PRs is ---------
+// The signal mergeStateStatus cannot provide. See BASE_COMPARE_QUERY in collect/github.js.
+
+test('parseBaseCompare reads the real GraphQL response for #7230', () => {
+  // Recorded live 2026-08-27, when #7230 sat 24 commits behind master while the board
+  // reported "up to date" because its mergeStateStatus was BLOCKED.
+  const c = parseBaseCompare(JSON.stringify(fx('gh-compare-7230.json')))
+  assert.deepEqual(c, { behind: 24, ahead: 18, status: 'DIVERGED', known: true })
+})
+
+test('parseBaseCompare reads the real GraphQL response for Logan #704', () => {
+  const c = parseBaseCompare(JSON.stringify(fx('gh-compare-704.json')))
+  assert.deepEqual(c, { behind: 5, ahead: 7, status: 'DIVERGED', known: true })
+})
+
+test('parseBaseCompare: a NOT_FOUND response is unknown, never zero', () => {
+  // The real failure shape, recorded live: compare:null alongside an errors array, with
+  // gh exiting non-zero. behind must be null so no caller can read it as "up to date".
+  const c = parseBaseCompare(JSON.stringify(fx('gh-compare-notfound.json')))
+  assert.equal(c.known, false)
+  assert.equal(c.behind, null)
+})
+
+test('parseBaseCompare: unparseable or empty output is unknown', () => {
+  for (const bad of ['', 'not json', '{}', 'null', '{"data":{"repository":null}}']) {
+    assert.equal(parseBaseCompare(bad).known, false, JSON.stringify(bad))
+    assert.equal(parseBaseCompare(bad).behind, null, JSON.stringify(bad))
+  }
+})
+
+test('parseBaseCompare: a non-numeric or missing count is unknown, not coerced', () => {
+  // Absence of a number is absence of knowledge. Reading a missing behindBy as 0 is the
+  // precise shape of the bug this whole comparison exists to fix.
+  const wrap = (compare) => JSON.stringify({ data: { repository: { ref: { compare } } } })
+  assert.equal(parseBaseCompare(wrap({ aheadBy: 1 })).known, false, 'behindBy missing')
+  assert.equal(parseBaseCompare(wrap({ behindBy: 2 })).known, false, 'aheadBy missing')
+  assert.equal(parseBaseCompare(wrap({ aheadBy: 1, behindBy: null })).known, false)
+  assert.equal(parseBaseCompare(wrap({ aheadBy: 1, behindBy: '3' })).known, false, 'a string is not a count')
+  // A legitimate zero IS knowledge, and must survive.
+  assert.deepEqual(parseBaseCompare(wrap({ aheadBy: 4, behindBy: 0, status: 'AHEAD' })),
+    { behind: 0, ahead: 4, status: 'AHEAD', known: true })
+})
+
+test('normalizePr carries baseRefName and starts the comparison unknown', () => {
+  const raw = fx('gh-prs-PerformYard_PerformYard.json').find((p) => p.number === 7230)
+  const pr = normalizePr(raw, 'PerformYard/PerformYard', { mine: true, myLogin: 'cweiner-PY' })
+  assert.equal(pr.baseRefName, 'master')
+  assert.equal(pr.baseCompare.known, false, 'must not claim knowledge before the call is made')
+  assert.equal(pr.baseCompare.behind, null)
+})
+
+test('fetchGithub compares OWN PRs only, and passes the real base and head refs', async () => {
+  const graphqlCalls = []
+  const run = async (cmd, args) => {
+    if (isCompare(args)) {
+      graphqlCalls.push(args.join(' '))
+      return { code: 0, stdout: compareFx('gh-compare-7230.json'), stderr: '' }
+    }
+    if (args.includes('checks')) return { code: 0, stdout: '[]', stderr: '' }
+    const repo = args[args.indexOf('--repo') + 1]
+    if (args.some((a) => String(a).includes('review-requested'))) {
+      // A colleague's PR: it has no update-branch button, so it must not be compared.
+      return { code: 0, stdout: JSON.stringify([{
+        number: 999, title: 'theirs', headRefName: 'their-branch', baseRefName: 'master',
+        url: 'u', reviews: [],
+      }]), stderr: '' }
+    }
+    return { code: 0, stdout: JSON.stringify(fx('gh-prs-' + repo.replace('/', '_') + '.json')), stderr: '' }
+  }
+  const config = { githubLogin: 'cweiner-PY', repos: { 'PerformYard/Logan': {} } }
+  const { prs, errors } = await fetchGithub(config, { run })
+
+  const mine = prs.find((p) => p.number === 704)
+  const theirs = prs.find((p) => p.number === 999)
+  assert.deepEqual(errors, [])
+  assert.equal(mine.baseCompare.behind, 24)
+  assert.equal(theirs.baseCompare.known, false, "a colleague's PR is never compared")
+  assert.equal(graphqlCalls.length, 1, 'exactly one comparison, for the one own PR')
+  assert.match(graphqlCalls[0], /base=master/)
+  assert.match(graphqlCalls[0], /head=feat\/salesforce-implementation-date-source-of-truth/)
+  assert.match(graphqlCalls[0], /owner=PerformYard/)
+  assert.match(graphqlCalls[0], /name=Logan/)
+  assert.ok(!graphqlCalls[0].includes('their-branch'))
+})
+
+test('fetchGithub uses raw string fields, so a branch named like a literal survives', async () => {
+  // gh's typed -F coerces values that look like numbers, booleans or null. A branch
+  // legitimately named "null" must reach GraphQL as the string "null".
+  let seen = null
+  const run = async (cmd, args) => {
+    if (isCompare(args)) { seen = args; return { code: 0, stdout: compareFx('gh-compare-704.json'), stderr: '' } }
+    if (args.includes('checks')) return { code: 0, stdout: '[]', stderr: '' }
+    if (args.some((a) => String(a).includes('review-requested'))) return { code: 0, stdout: '[]', stderr: '' }
+    return { code: 0, stdout: JSON.stringify([{
+      number: 1, title: 't', headRefName: 'null', baseRefName: 'master', url: 'u', reviews: [],
+    }]), stderr: '' }
+  }
+  await fetchGithub({ githubLogin: 'me', repos: { 'O/R': {} } }, { run })
+  assert.ok(seen, 'the comparison must have been attempted')
+  assert.ok(!seen.includes('-F'), 'must never use gh\'s typed field flag')
+  assert.ok(seen.includes('head=null'), 'the branch name must pass through verbatim')
+})
+
+test('a failed comparison is RECORDED and leaves the PR unknown, not up to date', async () => {
+  // The dangerous direction: the call fails and behind silently reads as 0. Mirrors the
+  // required-checks contract exactly — known stays false and the failure is surfaced.
+  const run = async (cmd, args) => {
+    if (isCompare(args)) {
+      return { code: 1, stdout: compareFx('gh-compare-notfound.json'),
+               stderr: "Could not resolve head ref 'no-such-branch-xyz'." }
+    }
+    if (args.includes('checks')) return { code: 0, stdout: '[]', stderr: '' }
+    if (args.some((a) => String(a).includes('review-requested'))) return { code: 0, stdout: '[]', stderr: '' }
+    const repo = args[args.indexOf('--repo') + 1]
+    return { code: 0, stdout: JSON.stringify(fx('gh-prs-' + repo.replace('/', '_') + '.json')), stderr: '' }
+  }
+  const config = { githubLogin: 'cweiner-PY', repos: { 'PerformYard/Logan': {} } }
+  const { prs, errors } = await fetchGithub(config, { run })
+
+  assert.equal(prs.length, 1, 'the PR itself must survive a failed comparison')
+  assert.equal(prs[0].baseCompare.known, false)
+  assert.equal(prs[0].baseCompare.behind, null)
+  assert.equal(errors.length, 1, 'the failure must be surfaced, not swallowed')
+  assert.match(errors[0], /could not compare/)
+  assert.match(errors[0], /Could not resolve head ref/)
+})
+
+test('a comparison that exits non-zero BUT returns a usable answer is still used', async () => {
+  // GraphQL can answer with data AND a non-zero gh exit. Discarding a good number
+  // because of the exit code is the same trap the required-checks read already avoids.
+  const run = async (cmd, args) => {
+    if (isCompare(args)) return { code: 1, stdout: compareFx('gh-compare-7230.json'), stderr: 'some warning' }
+    if (args.includes('checks')) return { code: 0, stdout: '[]', stderr: '' }
+    if (args.some((a) => String(a).includes('review-requested'))) return { code: 0, stdout: '[]', stderr: '' }
+    const repo = args[args.indexOf('--repo') + 1]
+    return { code: 0, stdout: JSON.stringify(fx('gh-prs-' + repo.replace('/', '_') + '.json')), stderr: '' }
+  }
+  const { prs, errors } = await fetchGithub(
+    { githubLogin: 'cweiner-PY', repos: { 'PerformYard/Logan': {} } }, { run })
+  assert.equal(prs[0].baseCompare.behind, 24)
+  assert.deepEqual(errors, [])
+})
+
+test('a PR missing its base ref name is reported, never silently compared', async () => {
+  let attempted = 0
+  const run = async (cmd, args) => {
+    if (isCompare(args)) { attempted++; return { code: 0, stdout: compareFx('gh-compare-704.json'), stderr: '' } }
+    if (args.includes('checks')) return { code: 0, stdout: '[]', stderr: '' }
+    if (args.some((a) => String(a).includes('review-requested'))) return { code: 0, stdout: '[]', stderr: '' }
+    return { code: 0, stdout: JSON.stringify([{
+      number: 5, title: 't', headRefName: 'x', url: 'u', reviews: [],   // no baseRefName
+    }]), stderr: '' }
+  }
+  const { prs, errors } = await fetchGithub({ githubLogin: 'me', repos: { 'O/R': {} } }, { run })
+  assert.equal(attempted, 0, 'must not guess a base branch')
+  assert.equal(prs[0].baseCompare.known, false)
+  assert.match(errors[0], /missing ref names/)
 })

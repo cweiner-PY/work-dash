@@ -115,18 +115,24 @@ test('dry run runs nothing', async () => {
   assert.match(r.detail, /git merge origin\/master/)
 })
 
-// --- state-aware redesign: the user HAS an open PR, so GitHub's mergeStateStatus (not
-// the local, possibly days-stale, ahead/behind count) decides what happens. ---
+// --- state-aware redesign: the user HAS an open PR, so GitHub decides what happens —
+// its comparison of the branch against its base for "behind", and mergeStateStatus only
+// for the conflict case it uniquely reports. NOT the local, possibly days-stale, count. ---
+
+const behind = (n) => ({ behind: n, ahead: 1, status: n ? 'DIVERGED' : 'AHEAD', known: true })
+const UNKNOWN_COMPARE = { behind: null, ahead: null, status: null, known: false }
 
 const pr = (o = {}) => ({
-  number: 7110, repo: 'O/R', headRefName: 'PY-1-x', isMine: true, mergeStateStatus: null, ...o,
+  number: 7110, repo: 'O/R', headRefName: 'PY-1-x', isMine: true, mergeStateStatus: null,
+  baseCompare: behind(3), ...o,
 })
 const itemWithPr = (p) => ({ id: 'PY-1', key: 'PY-1', repo: 'O/R', slot: null, prs: [p] })
 
-test('CLEAN, BLOCKED and UNSTABLE all refuse as a no-op: already up to date', async () => {
-  for (const status of ['CLEAN', 'BLOCKED', 'UNSTABLE']) {
+test('a comparison of zero refuses as a no-op, whatever the merge state says', async () => {
+  for (const status of ['CLEAN', 'BLOCKED', 'UNSTABLE', 'UNKNOWN', null]) {
     let ran = 0
-    const r = await updateBranch({ item: itemWithPr(pr({ mergeStateStatus: status })), slots: [] },
+    const r = await updateBranch(
+      { item: itemWithPr(pr({ mergeStateStatus: status, baseCompare: behind(0) })), slots: [] },
       { run: async () => { ran++; return { code: 0, stdout: '', stderr: '' } } })
     assert.equal(ran, 0, `${status} must not run anything`)
     assert.equal(r.ok, false)
@@ -134,16 +140,60 @@ test('CLEAN, BLOCKED and UNSTABLE all refuse as a no-op: already up to date', as
   }
 })
 
-test('UNKNOWN and a null/undefined mergeStateStatus all refuse, suggesting a retry after the next refresh', async () => {
-  for (const status of ['UNKNOWN', null, undefined]) {
-    let ran = 0
-    const r = await updateBranch({ item: itemWithPr(pr({ mergeStateStatus: status })), slots: [] },
-      { run: async () => { ran++; return { code: 0, stdout: '', stderr: '' } } })
-    assert.equal(ran, 0)
-    assert.equal(r.ok, false)
-    assert.match(r.message, /not known yet|refresh/i)
+// REGRESSION, live bug: #7230 was 24 commits behind master and this action refused it as
+// "already up to date" because its mergeStateStatus was BLOCKED. BLOCKED and DIRTY
+// outrank BEHIND, so every PR in these repos reported one of those and the action refused
+// all of them — the feature never fired once.
+test('BLOCKED/UNSTABLE/CLEAN with a real behind count DO run the remote update', async () => {
+  for (const status of ['BLOCKED', 'UNSTABLE', 'CLEAN', 'UNKNOWN', null]) {
+    const calls = []
+    const r = await updateBranch(
+      { item: itemWithPr(pr({ number: 7230, mergeStateStatus: status, baseCompare: behind(24) })), slots: [] },
+      { run: async (cmd, args) => { calls.push([cmd, ...args].join(' ')); return { code: 0, stdout: '', stderr: '' } } })
+    assert.equal(r.ok, true, `${status}: ${r.message}`)
+    assert.deepEqual(calls, ['gh pr update-branch 7230 --repo O/R'], String(status))
   }
 })
+
+test('an unknown comparison refuses rather than updating a branch of unknown position', async () => {
+  for (const status of ['CLEAN', 'BLOCKED', 'UNSTABLE', 'UNKNOWN', null]) {
+    let ran = 0
+    const r = await updateBranch(
+      { item: itemWithPr(pr({ mergeStateStatus: status, baseCompare: UNKNOWN_COMPARE })), slots: [] },
+      { run: async () => { ran++; return { code: 0, stdout: '', stderr: '' } } })
+    assert.equal(ran, 0, `${status} must not run anything`)
+    assert.equal(r.ok, false)
+    assert.match(r.message, /isn't known yet/)
+  }
+})
+
+test('BEHIND still acts when the comparison itself failed to come back', async () => {
+  const calls = []
+  const r = await updateBranch(
+    { item: itemWithPr(pr({ mergeStateStatus: 'BEHIND', baseCompare: UNKNOWN_COMPARE })), slots: [] },
+    { run: async (cmd, args) => { calls.push([cmd, ...args].join(' ')); return { code: 0, stdout: '', stderr: '' } } })
+  assert.equal(r.ok, true, r.message)
+  assert.deepEqual(calls, ['gh pr update-branch 7110 --repo O/R'])
+})
+
+test('mergeable CONFLICTING refuses locally even when the behind count is large', async () => {
+  // The conflict check must come first: a conflicting branch cannot be updated
+  // server-side however far behind it is, so offering the update would only fail.
+  let ran = 0
+  const r = await updateBranch(
+    { item: itemWithPr(pr({ mergeStateStatus: 'UNKNOWN', mergeable: 'CONFLICTING', baseCompare: behind(24) })), slots: [] },
+    { run: async () => { ran++; return { code: 0, stdout: '', stderr: '' } } })
+  assert.equal(ran, 0)
+  assert.equal(r.ok, false)
+  assert.match(r.message, /conflicts with master/)
+})
+
+// The old test here asserted that an UNKNOWN/absent mergeStateStatus refuses with a
+// retry message. That is behaviour this redesign deliberately drops: an uncomputed merge
+// state is no longer a reason to refuse, because it was never the signal for "behind" in
+// the first place. What must be known is the COMPARISON, and
+// 'an unknown comparison refuses rather than updating a branch of unknown position'
+// above covers exactly that, retry message included.
 
 test('DIRTY refuses, naming the slot that holds the branch — server-side cannot resolve conflicts', async () => {
   let ran = 0

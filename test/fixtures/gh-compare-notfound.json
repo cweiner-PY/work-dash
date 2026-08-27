@@ -1,0 +1,1 @@
+{"data":{"repository":{"ref":{"compare":null}}},"errors":[{"type":"NOT_FOUND","path":["repository","ref","compare"],"locations":[{"line":1,"column":126}],"message":"Could not resolve head ref 'no-such-branch-xyz'."}]}

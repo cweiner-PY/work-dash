@@ -560,7 +560,8 @@
     "title": "Py 12275 parse latency instrumentation",
     "updatedAt": "2026-08-20T18:39:13Z",
     "url": "https://github.com/PerformYard/PerformYard/pull/7306",
-    "reviews": []
+    "reviews": [],
+    "baseRefName": "master"
   },
   {
     "headRefName": "PY-13751-report-subject-scoping-check-never-runs",
@@ -1265,7 +1266,8 @@
         "authorAssociation": "MEMBER",
         "state": "APPROVED"
       }
-    ]
+    ],
+    "baseRefName": "master"
   },
   {
     "headRefName": "PY-12746-competency-management-prototype-competency-catalog",
@@ -1888,6 +1890,7 @@
     "title": "PY-12746 competency management prototype competency catalog",
     "updatedAt": "2026-08-21T15:38:02Z",
     "url": "https://github.com/PerformYard/PerformYard/pull/7110",
-    "reviews": []
+    "reviews": [],
+    "baseRefName": "master"
   }
 ]

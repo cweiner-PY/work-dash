@@ -1,7 +1,7 @@
 // test/render.test.js
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { groupForDisplay, sourceChip, prChecksChip, summarizeSubtasks, updateBranchSpec, hasBranch, needsRepoChoice, repoLabel, refreshLabel } from '../public/app.js'
+import { groupForDisplay, sourceChip, prChecksChip, prBehindChip, summarizeSubtasks, updateBranchSpec, hasBranch, needsRepoChoice, repoLabel, refreshLabel } from '../public/app.js'
 
 const it = (o) => ({ id: o.id, lane: o.lane, statusGroup: o.statusGroup ?? 'no ticket',
   sortIndex: o.sortIndex ?? Infinity, signals: { foreign: false, stale: false, reclaimable: false, ...o.signals },
@@ -194,20 +194,99 @@ test('updateBranchSpec: DIRTY is disabled, labelled to resolve locally, with a r
   assert.match(spec.title, /#42/)
 })
 
-test('updateBranchSpec: CLEAN, BLOCKED and UNSTABLE are all disabled and labelled "up to date"', () => {
-  for (const mergeStateStatus of ['CLEAN', 'BLOCKED', 'UNSTABLE']) {
-    const spec = updateBranchSpec({ slot: null }, { number: 1, mergeStateStatus })
+// REGRESSION, live bug: PerformYard/PerformYard#7230 sat 24 commits behind master while
+// the dashboard showed a disabled "up to date". Its mergeStateStatus was BLOCKED, because
+// a required check was failing, and BLOCKED/DIRTY outrank BEHIND — so no PR in these repos
+// ever reported BEHIND and the button was never once enabled. mergeStateStatus answers
+// "can this merge", never "is this behind".
+test('updateBranchSpec: BLOCKED/UNSTABLE/CLEAN with a real behind count offer the update', () => {
+  for (const mergeStateStatus of ['BLOCKED', 'UNSTABLE', 'CLEAN', 'UNKNOWN', null, undefined]) {
+    const spec = updateBranchSpec({ slot: null }, {
+      number: 7230, mergeStateStatus, baseRefName: 'master',
+      baseCompare: { behind: 24, ahead: 18, status: 'DIVERGED', known: true },
+    })
+    assert.equal(spec.disabled, false, `${mergeStateStatus} must not disable a behind branch`)
+    assert.match(spec.label, /24 behind/, String(mergeStateStatus))
+  }
+})
+
+test('updateBranchSpec: "up to date" requires the comparison to SAY zero, whatever the merge state', () => {
+  for (const mergeStateStatus of ['BLOCKED', 'UNSTABLE', 'CLEAN']) {
+    const spec = updateBranchSpec({ slot: null }, {
+      number: 1, mergeStateStatus, baseRefName: 'master',
+      baseCompare: { behind: 0, ahead: 3, status: 'AHEAD', known: true },
+    })
     assert.equal(spec.disabled, true, mergeStateStatus)
     assert.equal(spec.label, 'up to date', mergeStateStatus)
   }
 })
 
-test('updateBranchSpec: UNKNOWN and a missing mergeStateStatus are disabled and labelled "state unknown"', () => {
-  for (const mergeStateStatus of ['UNKNOWN', null, undefined]) {
-    const spec = updateBranchSpec({ slot: null }, { number: 1, mergeStateStatus })
-    assert.equal(spec.disabled, true)
-    assert.equal(spec.label, 'state unknown')
+test('updateBranchSpec: an unknown comparison never renders as "up to date"', () => {
+  for (const mergeStateStatus of ['BLOCKED', 'UNSTABLE', 'CLEAN', 'UNKNOWN', null]) {
+    const spec = updateBranchSpec({ slot: null }, {
+      number: 1, mergeStateStatus, baseRefName: 'master',
+      baseCompare: { behind: null, ahead: null, status: null, known: false },
+    })
+    assert.equal(spec.disabled, true, mergeStateStatus)
+    assert.equal(spec.label, 'behind state unknown', mergeStateStatus)
+    assert.match(spec.title, /try again after the next refresh/)
   }
+})
+
+test('updateBranchSpec: a missing baseCompare entirely still fails closed', () => {
+  const spec = updateBranchSpec({ slot: null }, { number: 1, mergeStateStatus: 'BLOCKED' })
+  assert.equal(spec.disabled, true)
+  assert.equal(spec.label, 'behind state unknown')
+})
+
+test('updateBranchSpec: BEHIND still acts even when the comparison failed', () => {
+  // BEHIND is only ever reported when the branch really is behind, so it remains a
+  // usable fallback when the comparison call itself did not come back.
+  const spec = updateBranchSpec({ slot: null }, {
+    number: 1, mergeStateStatus: 'BEHIND', baseRefName: 'master',
+    baseCompare: { behind: null, ahead: null, status: null, known: false },
+  })
+  assert.equal(spec.disabled, false)
+  assert.equal(spec.label, 'update branch')
+})
+
+test('updateBranchSpec: conflicts outrank the behind count', () => {
+  // A conflicting branch cannot be updated server-side however far behind it is, so
+  // DIRTY must win over behind:24 rather than offering an update that would fail.
+  for (const pr of [
+    { number: 7110, mergeStateStatus: 'DIRTY', baseRefName: 'master',
+      baseCompare: { behind: 24, ahead: 11, status: 'DIVERGED', known: true } },
+    { number: 7110, mergeStateStatus: 'UNKNOWN', mergeable: 'CONFLICTING', baseRefName: 'master',
+      baseCompare: { behind: 24, ahead: 11, status: 'DIVERGED', known: true } },
+  ]) {
+    const spec = updateBranchSpec({ slot: null }, pr)
+    assert.equal(spec.disabled, true)
+    assert.equal(spec.label, 'resolve conflicts locally')
+    assert.match(spec.title, /master/)
+  }
+})
+
+test('prBehindChip: says nothing when the branch is up to date', () => {
+  assert.equal(prBehindChip({ baseRefName: 'master', baseCompare: { behind: 0, ahead: 2, known: true } }), null)
+})
+
+test('prBehindChip: a behind branch is named on the card, not only on the button', () => {
+  const chip = prBehindChip({ baseRefName: 'master', baseCompare: { behind: 24, ahead: 18, known: true } })
+  assert.equal(chip.cls, 'warn')
+  assert.equal(chip.text, '24 behind master')
+})
+
+test('prBehindChip: an unknown comparison is SHOWN as unknown, never omitted', () => {
+  // Silence is what let the false "up to date" survive; a fact we failed to establish
+  // must look different from a fact we established as fine.
+  const chip = prBehindChip({ baseRefName: 'master', baseCompare: { behind: null, known: false } })
+  assert.equal(chip.cls, 'warn')
+  assert.match(chip.text, /unknown/)
+})
+
+test('prBehindChip: a PR with no baseCompare field at all renders no chip', () => {
+  // A colleague's review-requested PR is never compared, so it has no field to report.
+  assert.equal(prBehindChip({ baseRefName: 'master' }), null)
 })
 
 test('updateBranchSpec: no PR falls back to the local behind count, relabelled as stale', () => {

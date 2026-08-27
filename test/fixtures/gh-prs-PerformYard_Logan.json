@@ -80,6 +80,7 @@
     "title": "Make Salesforce the source of truth for company implementation dates",
     "updatedAt": "2026-08-25T17:06:24Z",
     "url": "https://github.com/PerformYard/Logan/pull/704",
-    "reviews": []
+    "reviews": [],
+    "baseRefName": "master"
   }
 ]

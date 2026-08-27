@@ -1,7 +1,7 @@
 // collect/github.js
 import { run as defaultRun } from '../util/run.js'
 
-const PR_FIELDS = 'number,title,headRefName,reviewDecision,mergeable,isDraft,statusCheckRollup,updatedAt,url,reviews,mergeStateStatus'
+const PR_FIELDS = 'number,title,headRefName,baseRefName,reviewDecision,mergeable,isDraft,statusCheckRollup,updatedAt,url,reviews,mergeStateStatus'
 
 // gh signals "this repo configures no required checks" via a non-zero exit and this
 // message on stderr, NOT via an empty JSON array on stdout.
@@ -36,6 +36,39 @@ export function parseRequiredChecks(arr) {
   }
 }
 
+// mergeStateStatus CANNOT answer "is this branch behind its base". Two reasons, both
+// found the hard way against PerformYard/PerformYard#7230, which sat 24 commits behind
+// master while the dashboard called it up to date:
+//   1. BEHIND is only reported when branch protection requires branches be up to date
+//      before merging. Without that setting a behind branch reports CLEAN.
+//   2. BLOCKED and DIRTY OUTRANK BEHIND. Any PR with a failing required check reports
+//      BLOCKED no matter how far behind it is — and every open PR in these repos is
+//      BLOCKED or DIRTY, so the update-branch button was never once enabled.
+// Ref.compare is the authoritative answer and, unlike the REST compare endpoint, returns
+// only these three numbers instead of every file patch in the diff.
+const BASE_COMPARE_QUERY = `query($owner:String!,$name:String!,$base:String!,$head:String!){
+  repository(owner:$owner,name:$name){
+    ref(qualifiedName:$base){ compare(headRef:$head){ aheadBy behindBy status } }
+  }
+}`
+
+// Same shape and same fail-closed rule as requiredChecks: known:false means "we did not
+// find out", never "zero". A caller must not read behind:null as behind:0.
+const COMPARE_UNKNOWN = { behind: null, ahead: null, status: null, known: false }
+
+// Pure, so the parse is testable without gh. GraphQL answers a failed comparison with
+// compare:null PLUS an errors array and a non-zero gh exit — a deleted head ref, a base
+// branch that does not exist, or a fork PR whose head lives in another repository. All of
+// those land on known:false, which the UI renders as "behind state unknown" rather than
+// as either "up to date" or "behind".
+export function parseBaseCompare(stdout) {
+  let data
+  try { data = JSON.parse(stdout) } catch { return COMPARE_UNKNOWN }
+  const c = data?.data?.repository?.ref?.compare
+  if (!c || typeof c.behindBy !== 'number' || typeof c.aheadBy !== 'number') return COMPARE_UNKNOWN
+  return { behind: c.behindBy, ahead: c.aheadBy, status: c.status ?? null, known: true }
+}
+
 // A PR has review comments worth acting on only when a HUMAN TEAMMATE left
 // feedback. Bots (aws-amplify-us-east-1, cursor, codex connectors) comment
 // constantly and would otherwise light up the resolve-code-review action on
@@ -54,6 +87,7 @@ export function normalizePr(raw, repo, { mine, myLogin }) {
     number: raw.number,
     title: raw.title,
     headRefName: raw.headRefName,
+    baseRefName: raw.baseRefName ?? null,
     reviewDecision: raw.reviewDecision ?? null,
     mergeable: raw.mergeable ?? null,
     isDraft: Boolean(raw.isDraft),
@@ -66,10 +100,12 @@ export function normalizePr(raw, repo, { mine, myLogin }) {
     isMine: mine,
     url: raw.url ?? null,
     updatedAt: raw.updatedAt ?? null,
-    // GitHub's own comparison of this PR's branch against its base — the only correct
-    // source for "is this behind", since collect/slots.js is deliberately read-only and
-    // never fetches, so the local ahead/behind count can be days stale.
+    // Kept for the conflict case only (DIRTY), which GitHub cannot resolve server-side.
+    // It is NOT the source of truth for "behind" — see BASE_COMPARE_QUERY above.
     mergeStateStatus: raw.mergeStateStatus ?? null,
+    // Starts unknown for the same reason requiredChecks does. fetchGithub fills this in
+    // for the user's own PRs, which are the only ones update-branch can act on.
+    baseCompare: { ...COMPARE_UNKNOWN },
   }
 }
 
@@ -123,6 +159,32 @@ export async function fetchGithub(config, { run = defaultRun } = {}) {
         `${r.stderr.trim() || `exit ${r.code}`}`
       )
     }
+  }))
+
+  // How far behind its base each of the user's OWN PRs is — the signal update-branch
+  // actually needs. Own PRs only: a colleague's review-requested PR has no update-branch
+  // button (see myPrOf in lanes.js), so a call for it would be a wasted round trip.
+  await Promise.all(prs.filter((pr) => pr.isMine).map(async (pr) => {
+    const [owner, name] = pr.repo.split('/')
+    if (!owner || !name || !pr.baseRefName || !pr.headRefName) {
+      errors.push(`cannot compare ${pr.repo}#${pr.number} with its base: missing ref names`)
+      return
+    }
+    // -f (raw string), never -F: gh's typed fields coerce values that look like numbers,
+    // booleans or null, and would mangle a branch legitimately named "null" or "123".
+    const r = await run('gh', ['api', 'graphql',
+      '-f', `query=${BASE_COMPARE_QUERY}`,
+      '-f', `owner=${owner}`, '-f', `name=${name}`,
+      '-f', `base=${pr.baseRefName}`, '-f', `head=${pr.headRefName}`])
+    // gh exits non-zero on a GraphQL error but still prints the body, and that body can
+    // carry a usable answer — so parse stdout first and judge on what it contains,
+    // exactly as the required-checks read above does.
+    const parsed = parseBaseCompare(r.stdout)
+    if (parsed.known) { pr.baseCompare = parsed; return }
+    errors.push(
+      `could not compare ${pr.repo}#${pr.number} (${pr.baseRefName}...${pr.headRefName}) : ` +
+      `${r.stderr.trim() || `exit ${r.code}`}`
+    )
   }))
 
   return { prs, errors }
