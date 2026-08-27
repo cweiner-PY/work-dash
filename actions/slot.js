@@ -1,5 +1,6 @@
 // actions/slot.js
 import { myPrOf } from '../lanes.js'
+import { checkoutMode, planWorktree } from './worktree.js'
 
 export function branchFor(item) {
   // Only the user's own PR names a branch to check out — a colleague's review-requested
@@ -41,6 +42,15 @@ export function resolveSlot(
   }
 
   const branch = branchFor(item)
+
+  // Worktree mode resolves a path instead of competing for a pool. Nothing to rank and no
+  // claim check: the path is derived from the branch, so two different items can never
+  // collide, and two launches on the SAME item should reuse one worktree rather than have
+  // the second refused as "recently claimed".
+  if (checkoutMode(config) === 'worktrees') {
+    return planWorktree(item, slots, config, { repo: effectiveRepo, branch })
+  }
+
   const pool = (config.repos[effectiveRepo]?.slots ?? [])
   const mine = slots.filter((s) => pool.includes(s.dir))
 

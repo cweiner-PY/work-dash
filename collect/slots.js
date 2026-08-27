@@ -3,23 +3,30 @@ import { stat as defaultStat } from 'node:fs/promises'
 import { run as defaultRun } from '../util/run.js'
 import { checkoutMode, repoRootFor, parseWorktreeList } from '../actions/worktree.js'
 
-// Which directories to inspect for a repo. In slots mode that is the configured list; in
-// worktree mode it is discovered from git itself, so nothing has to be pre-cloned and the
-// board sees worktrees created by earlier launches. The main clone is included in both
-// modes — it is a real checkout, and the editor link and update-branch work on it.
+// Which directories to inspect for a repo. Slots mode reads the configured list. Worktree
+// mode reads that list AND whatever `git worktree list` reports, deduped.
+//
+// The union matters: worktree mode lists only the worktrees of ONE clone, so without it
+// switching modes would make every other configured clone vanish from the board — a probe
+// against the real config saw 6 checkouts drop to 2. Nothing should disappear because you
+// changed where NEW launches go. Someone who configures no slots at all simply gets the
+// discovered worktrees.
 async function dirsFor(config, repo, cfg, { run, errors }) {
-  if (checkoutMode(config) !== 'worktrees') return cfg.slots ?? []
+  const configured = cfg.slots ?? []
+  if (checkoutMode(config) !== 'worktrees') return configured
+
   const root = repoRootFor(config, repo)
   if (!root) {
     errors.push(`no clone configured for ${repo}: set repos["${repo}"].root to a local clone`)
-    return []
+    return configured
   }
   const r = await run('git', ['-C', root, 'worktree', 'list', '--porcelain'])
   if (r.code !== 0) {
     errors.push(`could not list worktrees for ${repo}: ${r.stderr.trim() || `exit ${r.code}`}`)
-    return []
+    return configured
   }
-  return parseWorktreeList(r.stdout).filter((w) => !w.bare).map((w) => w.dir)
+  const discovered = parseWorktreeList(r.stdout).filter((w) => !w.bare).map((w) => w.dir)
+  return [...new Set([...configured, ...discovered])]
 }
 
 async function git(run, dir, args) {

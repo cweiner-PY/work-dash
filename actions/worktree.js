@@ -8,7 +8,7 @@
 // the Terminal the user is watching — same rule as the conflict merge: this server does not
 // mutate a checkout as an invisible side effect.
 import { homedir } from 'node:os'
-import { join, basename } from 'node:path'
+import { join } from 'node:path'
 
 export const DEFAULT_WORKTREE_ROOT = join(homedir(), '.cache', 'work-dash-worktrees')
 export const DEFAULT_WORKTREE_MAX_AGE_MS = 72 * 60 * 60 * 1000   // 3 days, as greg's does
@@ -45,8 +45,10 @@ export function slugFor(name) {
   return slug ? `${slug}-${suffix}` : suffix
 }
 
+// Grouped by REPO name, not by the basename of whichever clone happens to be the root:
+// changing which clone worktrees are created from must not move every existing worktree.
 export function worktreePathFor(config, repo, name) {
-  return join(worktreeRoot(config), basename(repoRootFor(config, repo) ?? repo), slugFor(name))
+  return join(worktreeRoot(config), String(repo).split('/').pop(), slugFor(name))
 }
 
 // `git worktree list --porcelain` emits blank-line-separated records:
@@ -117,4 +119,19 @@ export function planWorktree(item, slots, config, { repo = null, branch = null }
     base: `origin/${branch ?? defaultBranch}`,
     alreadyOnBranch: false,
   }
+}
+
+// Removes the worktrees prunableWorktrees selected. `git worktree remove` refuses a dirty
+// worktree on its own, which is a second safety net under our own dirty filter — between
+// them, a worktree holding uncommitted work cannot be removed by this tool.
+export async function pruneWorktrees(slots, config, { run, now = Date.now(), maxAgeMs } = {}) {
+  const removed = []
+  for (const dir of prunableWorktrees(slots, { config, now, maxAgeMs })) {
+    const repo = (slots ?? []).find((s) => s.dir === dir)?.repo
+    const root = repoRootFor(config, repo)
+    if (!root) continue
+    const r = await run('git', ['-C', root, 'worktree', 'remove', dir])
+    if (r.code === 0) removed.push(dir)
+  }
+  return removed
 }

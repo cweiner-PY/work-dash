@@ -10,6 +10,7 @@ import { join } from 'node:path'
 import { run } from '../util/run.js'
 import { REQUIRED_LOCAL, SHARED_PATH, resolveDocsDir, ConfigError, loadConfig } from '../config.js'
 import { evalPredicate } from '../util/predicate.js'
+import { checkoutMode, repoRootFor, worktreeRoot } from '../actions/worktree.js'
 import { jiraIdentity, githubIdentity } from './whoami.js'
 
 const ROOT = join(import.meta.dirname, '..')
@@ -108,6 +109,36 @@ export async function checks({ runFn = run } = {}) {
       await isDir(docsDir) ? docsDir : `${docsDir} is not a directory — create it, or point docsDir elsewhere`))
   }
 
+  // --- checkouts ----------------------------------------------------------------------
+  // What "correctly configured" means differs by mode, so the checks do too: slots mode
+  // needs every listed directory to be a clone; worktree mode needs ONE clone per repo to
+  // create worktrees from, and a writable cache root.
+  const mode = checkoutMode(raw)
+  out.push(check(`checkout mode: ${mode}`, mode === 'slots' || mode === 'worktrees',
+    raw.checkoutMode && mode !== raw.checkoutMode
+      ? `"${raw.checkoutMode}" is not a mode — falling back to slots. Use "slots" or "worktrees".`
+      : null))
+
+  if (mode === 'worktrees') {
+    const root = worktreeRoot(raw)
+    out.push(check(`worktree root ${root}`, true,
+      await isDir(root) ? null : 'does not exist yet — it is created on the first launch'))
+    for (const repo of Object.keys(raw.repos ?? {})) {
+      const clone = repoRootFor(raw, repo)
+      if (!clone) {
+        out.push(check(`${repo}: clone to create worktrees from`, false,
+          `set repos["${repo}"].root (or one slots entry) to a local clone of ${repo}`))
+        continue
+      }
+      const r = await runFn('git', ['-C', clone, 'remote', 'get-url', 'origin'])
+      const url = r.stdout.trim()
+      const matches = r.code === 0 && url.toLowerCase().includes(repo.toLowerCase())
+      out.push(check(`${repo}: worktree source ${clone}`, matches,
+        r.code !== 0 ? `not a git repo (${r.stderr.trim() || `exit ${r.code}`})`
+                     : matches ? null : `origin is ${url}, expected a clone of ${repo}`))
+    }
+  }
+
   // --- checkout slots -----------------------------------------------------------------
   // A slot pointing somewhere that is not a clone of the repo it is listed under is the
   // failure that would let an action run git in the wrong place, so the remote is checked
@@ -115,7 +146,10 @@ export async function checks({ runFn = run } = {}) {
   for (const [repo, cfg] of Object.entries(raw.repos ?? {})) {
     const slots = cfg?.slots ?? []
     if (!slots.length) {
-      out.push(check(`${repo}: slots configured`, false, 'no slots listed — add at least one checkout path'))
+      // Only a problem in slots mode; worktree mode needs no pre-cloned pool.
+      if (mode === 'slots') {
+        out.push(check(`${repo}: slots configured`, false, 'no slots listed — add at least one checkout path'))
+      }
       continue
     }
     for (const dir of slots) {

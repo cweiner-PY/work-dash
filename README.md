@@ -91,6 +91,9 @@ can't guess; `doctor` validates the rest.
 | `jiraProject` | | Project key. Default `PY` |
 | `githubLogin` | | Distinguishes your own PR comments from a teammate's review feedback |
 | `port` | | Default 4200 |
+| `checkoutMode` | | `slots` (default) or `worktrees` — see below |
+| `worktreeRoot` | | Where worktrees live. Default `~/.cache/work-dash-worktrees` |
+| `humanGateChecks` | | Required checks that are human gates, not CI — they explain a card but never claim to be your move. Default `["QA Code Review"]` |
 | `editor` | | Any installed app name, resolved by `open -a`. Default `Cursor` |
 | `notifications` | | macOS notification when an item newly needs you. Default `true` |
 | `inFlightStatusOrder` | | Jira statuses in the order their subgroups appear |
@@ -123,6 +126,33 @@ hand-written parser, not `eval`.
 `pr`-gated skill won't fire on someone else's work. A rule that fails to parse
 is skipped with a warning — meaning its button silently never appears, which is
 why `doctor` checks every rule.
+
+### Checkout mode: slots or worktrees
+
+Where an agent session runs. Set `checkoutMode` in `config.json`:
+
+**`slots`** (default) — a fixed pool of pre-cloned directories per repo, listed in
+`repos.*.slots`. A launch picks a free one, preferring a checkout sitting on
+master, and refuses a dirty one. You clone them once, up front; the pool can be
+exhausted if you have more work in flight than directories.
+
+**`worktrees`** — one `git worktree` per branch, created on demand under
+`worktreeRoot` (default `~/.cache/work-dash-worktrees`), grouped by repo name.
+Nothing to pre-clone and no pool to run out of. Needs one clone per repo to
+create worktrees from: `repos.*.root`, falling back to the first `slots` entry so
+a slots config works unchanged.
+
+New worktrees are created **detached** at `origin/<branch>` (or
+`origin/<defaultBranch>` for a ticket with no branch yet). Detached on purpose —
+a branch can only be checked out in one worktree at a time, so a launch can never
+fail because that branch is open somewhere else; the agent makes a local branch if
+it needs to push. Relaunching the same ticket reuses its worktree rather than
+making another. Clean worktrees older than 72h are swept on the next launch;
+a dirty one is never touched, and `git worktree remove` refuses one anyway.
+
+Worktree mode still shows every directory in `repos.*.slots` as well as the
+worktrees it discovers, so switching modes changes where *new* launches go
+without hiding checkouts you already have.
 
 ### Appearance and polling
 

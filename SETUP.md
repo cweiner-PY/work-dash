@@ -82,7 +82,15 @@ Now edit it. The values fall into three groups:
 | `repos.*.slots` | Absolute paths to your local clones. Step 6. |
 
 **Optional:** `port` (default 4200), `editor` (default `Cursor`, any installed
-app name), `notifications` (default `true`), `skills` (see the end of this doc).
+app name), `notifications` (default `true`), `humanGateChecks` (required checks
+that are human gates rather than CI — default `["QA Code Review"]`), `skills`
+(see the end of this doc), and `checkoutMode`:
+
+- `slots` (default) — agents run in the pre-cloned directories you list in
+  `repos.*.slots`. Step 6 sets these up.
+- `worktrees` — agents run in a `git worktree` created per branch under
+  `~/.cache/work-dash-worktrees`. Nothing to pre-clone beyond one clone per repo
+  (`repos.*.root`, or the first `slots` entry), and no pool to exhaust.
 
 ## 4. Jira token — HUMAN REQUIRED
 

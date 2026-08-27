@@ -5,6 +5,7 @@
   "jiraToken": "PASTE_TOKEN_FROM_id.atlassian.com",
   "jiraProject": "PY",
   "docsDir": "/Users/YOU/Work/docs",
+  "checkoutMode": "slots",
   "editor": "Cursor",
   "notifications": true,
   "jiraSprintField": "customfield_10020",

@@ -133,3 +133,97 @@ test('a slot survives stat failing — mtime only gates pruning', async () => {
   assert.equal(slots[0].mtimeMs, null)
   assert.deepEqual(errors, [], 'an unstattable directory is not a collection error')
 })
+
+
+// --- worktree mode: the directory list comes from git, not from config -----------------
+
+test('worktree mode discovers checkouts from git worktree list', async () => {
+  const calls = []
+  const run = async (cmd, args, opts) => {
+    calls.push([cmd, ...args].join(' '))
+    if (args.includes('worktree')) {
+      return { code: 0, stdout: [
+        'worktree /clones/Logan', 'HEAD abc', 'branch refs/heads/master', '',
+        'worktree /wt/Logan/feat-x-1', 'HEAD def', 'detached', '',
+      ].join('\n'), stderr: '' }
+    }
+    if (args[0] === 'branch') return { code: 0, stdout: opts.cwd === '/clones/Logan' ? 'master\n' : '\n', stderr: '' }
+    if (args[0] === 'status') return { code: 0, stdout: '', stderr: '' }
+    return { code: 0, stdout: '0\t0\n', stderr: '' }
+  }
+  const config = {
+    checkoutMode: 'worktrees',
+    repos: { 'PerformYard/Logan': { root: '/clones/Logan' } },
+  }
+  const { slots, errors } = await collectSlots(config, { run, stat: async () => ({ mtimeMs: 5 }) })
+  assert.deepEqual(errors, [])
+  assert.deepEqual(slots.map((s) => s.dir), ['/clones/Logan', '/wt/Logan/feat-x-1'],
+    'the main clone is a real checkout too — the editor link and update-branch work on it')
+  assert.ok(!slots.some((s, i) => slots.findIndex((o) => o.dir === s.dir) !== i), 'deduped')
+  // A detached worktree reports no branch, which is exactly what the porcelain said.
+  assert.equal(slots[1].branch, null)
+  assert.ok(calls.some((c) => c === 'git -C /clones/Logan worktree list --porcelain'))
+})
+
+test('worktree mode with no configured clone reports it instead of silently finding nothing', async () => {
+  const config = { checkoutMode: 'worktrees', repos: { 'O/R': {} } }
+  const { slots, errors } = await collectSlots(config, {
+    run: async () => ({ code: 0, stdout: '', stderr: '' }), stat: async () => ({ mtimeMs: 1 }),
+  })
+  assert.deepEqual(slots, [])
+  assert.match(errors[0], /no clone configured for O\/R/)
+})
+
+test('worktree mode KEEPS the configured slots — switching modes hides nothing', async () => {
+  // A probe against the real config saw 6 checkouts drop to 2 without this: worktree mode
+  // lists the worktrees of one clone, so every other configured clone vanished from the
+  // board. Changing where new launches go must not change what the board can see.
+  const run = async (cmd, args, opts) => {
+    if (args.includes('worktree')) {
+      return { code: 0, stdout: 'worktree /clones/R\nHEAD a\nbranch refs/heads/master\n', stderr: '' }
+    }
+    if (args[0] === 'branch') return { code: 0, stdout: 'b\n', stderr: '' }
+    if (args[0] === 'status') return { code: 0, stdout: '', stderr: '' }
+    return { code: 0, stdout: '0\t0\n', stderr: '' }
+  }
+  const config = { checkoutMode: 'worktrees', repos: { 'O/R': { root: '/clones/R', slots: ['/w/A', '/w/B'] } } }
+  const { slots } = await collectSlots(config, { run, stat: async () => ({ mtimeMs: 1 }) })
+  assert.deepEqual(slots.map((s) => s.dir), ['/w/A', '/w/B', '/clones/R'])
+})
+
+test('a failed worktree list still leaves the configured slots visible', async () => {
+  const run = async (cmd, args) => {
+    if (args.includes('worktree')) return { code: 128, stdout: '', stderr: 'boom' }
+    if (args[0] === 'branch') return { code: 0, stdout: 'b\n', stderr: '' }
+    if (args[0] === 'status') return { code: 0, stdout: '', stderr: '' }
+    return { code: 0, stdout: '0\t0\n', stderr: '' }
+  }
+  const config = { checkoutMode: 'worktrees', repos: { 'O/R': { root: '/clones/R', slots: ['/w/A'] } } }
+  const { slots, errors } = await collectSlots(config, { run, stat: async () => ({ mtimeMs: 1 }) })
+  assert.deepEqual(slots.map((s) => s.dir), ['/w/A'], 'degraded, not blank')
+  assert.match(errors[0], /could not list worktrees/)
+})
+
+test('a failing worktree list is reported, not read as zero checkouts', async () => {
+  const config = { checkoutMode: 'worktrees', repos: { 'O/R': { root: '/nope' } } }
+  const { slots, errors } = await collectSlots(config, {
+    run: async () => ({ code: 128, stdout: '', stderr: 'not a git repository' }),
+    stat: async () => ({ mtimeMs: 1 }),
+  })
+  assert.deepEqual(slots, [])
+  assert.match(errors[0], /could not list worktrees for O\/R/)
+  assert.match(errors[0], /not a git repository/)
+})
+
+test('slots mode never calls git worktree list', async () => {
+  const calls = []
+  const run = async (cmd, args) => {
+    calls.push(args.join(' '))
+    if (args[0] === 'branch') return { code: 0, stdout: 'b\n', stderr: '' }
+    if (args[0] === 'status') return { code: 0, stdout: '', stderr: '' }
+    return { code: 0, stdout: '0\t0\n', stderr: '' }
+  }
+  await collectSlots({ repos: { 'O/R': { slots: ['/w/A'] } } },
+    { run, stat: async () => ({ mtimeMs: 1 }) })
+  assert.ok(!calls.some((c) => c.includes('worktree')))
+})

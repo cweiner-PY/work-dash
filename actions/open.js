@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { run as defaultRun } from '../util/run.js'
 import { resolveSlot, branchFor } from './slot.js'
+import { checkoutMode, pruneWorktrees } from './worktree.js'
 import { myPrOf } from '../lanes.js'
 
 // Single-quote a value for bash: close, escape, reopen.
@@ -14,7 +15,7 @@ const q = (s) => `'${String(s).replaceAll("'", "'\\''")}'`
 // "resolve conflicts" action. The merge runs HERE, in the Terminal the user is watching,
 // rather than server-side: the output is visible, and /api/open never mutates a checkout
 // as an invisible side effect.
-export function buildLauncher({ item, slot, plans, skill, config, mergeBase = null }) {
+export function buildLauncher({ item, slot, plans, skill, config, mergeBase = null, worktree = null }) {
   const branch = branchFor(item)
   const planDirs = [...new Set(plans.map((p) => p.dir))]
   const planFiles = plans.map((p) => `${p.dir}/${p.file}`)
@@ -57,9 +58,24 @@ export function buildLauncher({ item, slot, plans, skill, config, mergeBase = nu
   const lines = [
     '#!/usr/bin/env bash',
     'set -euo pipefail',
-    `cd ${q(slot.dir)}`,
   ]
-  if (branch && slot.branch !== branch) lines.push(`git checkout ${q(branch)}`)
+
+  // Worktree mode, first launch on this branch: create it here, in the Terminal the user is
+  // watching, rather than server-side. Created DETACHED at origin/<ref> on purpose — a
+  // branch can only be checked out in one worktree at a time, and detaching sidesteps that
+  // entirely, so a launch can never fail because the branch is open somewhere else. The
+  // agent creates a local branch if it needs to push.
+  if (worktree?.create) {
+    lines.push(
+      `cd ${q(worktree.root)}`,
+      'git fetch origin',
+      `git worktree add --detach ${q(slot.dir)} ${q(worktree.base)}`,
+      `cd ${q(slot.dir)}`,
+    )
+  } else {
+    lines.push(`cd ${q(slot.dir)}`)
+    if (branch && slot.branch !== branch) lines.push(`git checkout ${q(branch)}`)
+  }
   if (mergeBase) {
     // The merge decides the instruction. GitHub's DIRTY can be stale, and the conflict may
     // already have been resolved elsewhere, so the clean case has to be handled — telling
@@ -93,7 +109,15 @@ export async function openItem(
   { item, slots, plans = [], skill = null, config, chosenSlotDir = null, staleBranches, claimedDirs, repo = null, mergeBase = null },
   { run = defaultRun, writeFile = fsWriteFile, dry = false } = {}
 ) {
+  // Worktree mode accumulates one worktree per branch ever launched on, so old ones are
+  // swept on launch — clean and older than the age limit only, never a dirty one. Never in
+  // dry mode, and a failure here must not stop the launch it was only tidying up for.
+  if (!dry && checkoutMode(config) === 'worktrees') {
+    try { await pruneWorktrees(slots, config, { run }) } catch { /* tidying is best-effort */ }
+  }
+
   let slot
+  let worktree = null
   if (chosenSlotDir) {
     slot = slots.find((s) => s.dir === chosenSlotDir)
     if (!slot) return { ok: false, message: `Unknown slot: ${chosenSlotDir}` }
@@ -112,10 +136,14 @@ export async function openItem(
   } else {
     const r = resolveSlot(item, slots, config, { staleBranches, claimedDirs, repo })
     if (r.needsPicker) return { ok: false, message: r.message, candidates: r.candidates, needsRepo: r.needsRepo }
+    // Worktree mode can fail for a reason no slot picker can fix — no clone to create the
+    // worktree from — so it reports a message rather than a list of candidates.
+    if (r.error) return { ok: false, message: r.error }
     slot = r.slot
+    worktree = r.create ? { create: true, root: r.root, base: r.base } : null
   }
 
-  const script = buildLauncher({ item, slot, plans, skill, config, mergeBase })
+  const script = buildLauncher({ item, slot, plans, skill, config, mergeBase, worktree })
   // A per-invocation suffix: the old deterministic path meant two opens of the SAME ticket
   // (e.g. a double-click, or /open then /run) raced on writing one file.
   const path = join(tmpdir(), `work-dash-${(item.key ?? item.id).replaceAll(/[^\w.-]/g, '_')}-${randomUUID()}.sh`)
