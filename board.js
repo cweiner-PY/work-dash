@@ -1,6 +1,6 @@
 // board.js
 import { join as joinItems } from './join.js'
-import { assignLanes, myPrOf } from './lanes.js'
+import { assignLanes, myPrOf, isMinePr } from './lanes.js'
 import { extractKey } from './util/key.js'
 import { fetchPrimary as jiraPrimary, fetchByKeys as jiraByKeys, fetchSubtasks as jiraSubtasks } from './collect/jira.js'
 import { fetchGithub as ghFetch } from './collect/github.js'
@@ -8,15 +8,21 @@ import { collectSlots as slotsFetch } from './collect/slots.js'
 import { collectPlans as plansFetch } from './collect/plans.js'
 import { evalPredicate } from './util/predicate.js'
 
-export function skillsForItem(item, config) {
+// Which skills apply to ONE branch of an item. Per branch and not per item because the
+// predicate context is singular by design — a config rule says `slot.dirty` or `pr &&
+// !pr.changesRequested`, not `slots[0].dirty` — and on a ticket with two branches an
+// item-wide context had to pick one PR and one checkout to stand for all of them. Evaluating
+// the same rule once per branch keeps every existing rule in config.json working unchanged
+// and answers the question the rule was actually asking.
+export function skillsForBranch(item, branch, config) {
   // The user's own PR, never a colleague's review request — a `pr`-gated skill (e.g.
   // /pr-description, /ticket-finisher) must not appear for a PR the user doesn't own.
-  const pr = myPrOf(item)
+  const pr = branch.pr && isMinePr(branch.pr) ? branch.pr : null
   const ctx = {
     key: item.key,
-    repo: item.repo,
-    slot: item.slot,
-    branch: item.slot?.branch ?? pr?.headRefName ?? null,
+    repo: branch.repo ?? item.repo,
+    slot: branch.slot,
+    branch: branch.name,
     plans: item.plans ?? [],
     jira: item.jira,
     pr: pr && {
@@ -34,6 +40,17 @@ export function skillsForItem(item, config) {
     }
   }
   return out
+}
+
+// DEPRECATED, and deliberately still computed the OLD way — from myPrOf and the scalar slot
+// alias — rather than as a union over branches. A union would be a superset, and routes.js
+// gates a client-supplied skill name on this list; widening it even for one commit would let
+// a skill valid for one branch be launched against another. It is deleted, along with that
+// gate, once the routes validate against the target branch's own skills.
+export function skillsForItem(item, config) {
+  const pr = myPrOf(item)
+  return skillsForBranch(item, { name: item.slot?.branch ?? pr?.headRefName ?? null,
+                                 repo: item.repo, pr, slot: item.slot ?? null }, config)
 }
 
 async function guarded(fn, fallback) {
@@ -113,12 +130,22 @@ export async function buildBoard(config, deps = {}) {
   const items = assignLanes(
     joinItems({ jira, enrichment: enrichR.value, prs, slots, plans, subtasks: subtaskR.value.subtasks, config }),
     config
-  ).map((i) => ({ ...i, skills: skillsForItem(i, config) }))
+  ).map((i) => ({
+    ...i,
+    branches: i.branches.map((b) => ({ ...b, skills: skillsForBranch(i, b, config) })),
+    skills: skillsForItem(i, config),
+  }))
 
   // Every checkout no item claimed: spare capacity, plus any detached one whose HEAD matched
   // no known PR. Reported rather than dropped — a checkout the board cannot explain is
   // exactly the thing a user needs told, not hidden.
-  const claimed = new Set(items.filter((i) => i.slot).map((i) => i.slot.dir))
+  //
+  // Gathered from EVERY branch, not from the scalar `item.slot` this used to read. With two
+  // branches of one ticket checked out, the second was absent from this set and so turned up
+  // under "free checkouts" — spare capacity, according to the board, while holding unpushed
+  // commits.
+  const claimed = new Set(
+    items.flatMap((i) => i.branches ?? []).map((b) => b.slot?.dir).filter(Boolean))
   const idleSlots = slots.filter((s) => !claimed.has(s.dir))
 
   return {

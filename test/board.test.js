@@ -151,3 +151,53 @@ test('when the Jira source itself fails, fetchSubtasks is never called', async (
   assert.equal(called, false)
   assert.deepEqual(b.orphanSubtasks, [])
 })
+
+// --- two branches of one ticket, both checked out --------------------------------------
+
+const twoBranchDeps = () => ({
+  ...okDeps(),
+  fetchPrimary: async () => [{ key: 'PY-12746', summary: 'Competency catalog', status: 'In Progress',
+                              statusCategory: 'In Progress', assignee: 'Colt Weiner', assigneeAccountId: ME,
+                              sprintFieldPresent: true }],
+  fetchGithub: async () => ({ prs: [], errors: [] }),
+  collectSlots: async () => ({
+    slots: [
+      { dir: '/Users/cweiner/Work/PY-1', repo: 'PerformYard/PerformYard', branch: 'PY-12746-catalog',
+        dirty: false, dirtyCount: 0, behind: 0, ahead: 3 },
+      { dir: '/Users/cweiner/Work/PY-2', repo: 'PerformYard/PerformYard',
+        branch: 'PY-12746-catalog-pr2-agent-suggestions', dirty: true, dirtyCount: 3, behind: 4, ahead: 21 },
+      { dir: '/Users/cweiner/Work/PY-3', repo: 'PerformYard/PerformYard', branch: 'master',
+        dirty: false, dirtyCount: 0, behind: 0, ahead: 0 },
+    ], errors: [],
+  }),
+})
+
+// REGRESSION: `claimed` was built from the scalar `item.slot`, so the second of two checkouts
+// holding one ticket was reported as spare capacity — the board offering a directory with 21
+// unpushed commits in it as somewhere to start new work.
+test('neither checkout of a two-branch ticket is offered as spare capacity', async () => {
+  const b = await buildBoard(config, twoBranchDeps())
+  assert.deepEqual(b.idleSlots.map((s) => s.dir), ['/Users/cweiner/Work/PY-3'],
+    'only the checkout on master is free')
+})
+
+test('both checkouts land on the one ticket, each on its own branch', async () => {
+  const b = await buildBoard(config, twoBranchDeps())
+  const it = b.items.find((i) => i.key === 'PY-12746')
+  assert.equal(it.branches.length, 2)
+  assert.deepEqual(it.branches.map((br) => br.slot.dir).sort(),
+    ['/Users/cweiner/Work/PY-1', '/Users/cweiner/Work/PY-2'])
+})
+
+test('skills are evaluated per branch, against that branch\'s own checkout', async () => {
+  // The predicate context is singular by design (`slot`, not `slots[0]`), so on a two-branch
+  // ticket an item-wide context had to pick one checkout to stand for both. Here only PY-2 is
+  // dirty, and only PY-2's branch should offer the skill that asks about it.
+  const cfg = { ...config, skills: [{ name: 'commit-and-push', when: 'slot && slot.dirty' }] }
+  const b = await buildBoard(cfg, twoBranchDeps())
+  const it = b.items.find((i) => i.key === 'PY-12746')
+  const byBranch = new Map(it.branches.map((br) => [br.name, br.skills]))
+  assert.deepEqual(byBranch.get('PY-12746-catalog'), [], 'clean, so the skill does not apply')
+  assert.deepEqual(byBranch.get('PY-12746-catalog-pr2-agent-suggestions'), ['commit-and-push'],
+    'dirty, so it does')
+})
