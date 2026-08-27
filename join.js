@@ -2,12 +2,27 @@
 import { extractKey } from './util/key.js'
 
 function blank(id, key) {
-  return { id, key, title: null, repo: null, jira: null, prs: [], slot: null, plans: [], subtasks: [] }
+  return { id, key, title: null, repo: null, jira: null, prs: [], branches: [], plans: [], subtasks: [] }
 }
 
 // Keyless artifacts are identified by repo + branch so that a PR and a slot
 // sitting on the SAME branch become one item rather than two cards.
 const keylessId = (repo, branch) => `${repo}:${branch}`
+
+// THE BRANCH IS THE UNIT OF WORK. A ticket can carry several — that is how a big feature
+// gets split into separately reviewable pieces — and each one has its own PR, its own
+// checkout, or both. Before this existed the item had a scalar `slot` and consumers took
+// `prs[0]`, so a second branch either overwrote the first or was silently ignored: the
+// card's PR row and its checkout row could describe two different branches with nothing
+// saying so, and a second PR's failing checks produced no text anywhere on the board.
+//
+// Keyed by repo AND name: one Jira key can legitimately have a branch of the same name in
+// two repositories, and those are two different pieces of work.
+const branchOf = (it, repo, name) => {
+  let b = it.branches.find((x) => x.name === name && x.repo === repo)
+  if (!b) { b = { name, repo, pr: null, slot: null, detached: false }; it.branches.push(b) }
+  return b
+}
 
 export function join({ jira = [], enrichment = [], prs = [], slots = [], plans = [], subtasks = [], config }) {
   const byId = new Map()
@@ -29,6 +44,7 @@ export function join({ jira = [], enrichment = [], prs = [], slots = [], plans =
     const key = extractKey(pr.headRefName) ?? extractKey(pr.title)
     const it = key ? get(key, key) : get(keylessId(pr.repo, pr.headRefName))
     it.prs.push(pr)
+    branchOf(it, pr.repo, pr.headRefName).pr = pr
     it.repo ??= pr.repo
     it.title ??= pr.title
   }
@@ -41,7 +57,7 @@ export function join({ jira = [], enrichment = [], prs = [], slots = [], plans =
   //    manufacture an item literally called "Owner/Repo:null" with no key and no title, and
   //    two detached checkouts in one repo collided into the same one. It is identified by
   //    its HEAD sha instead: if that is the head of a known PR, the slot belongs on that
-  //    PR's card, which is how "PY-1 is holding the review of #7353" becomes visible.
+  //    PR's branch, which is how "PY-1 is holding the review of #7353" becomes visible.
   //  - A slot sitting on the repo's DEFAULT BRANCH is spare capacity, not work in flight.
   //    It used to render as a card titled "master".
   //
@@ -57,7 +73,7 @@ export function join({ jira = [], enrichment = [], prs = [], slots = [], plans =
     const key = extractKey(slot.branch)
     if (key) {
       const it = get(key, key)
-      it.slot = slot
+      branchOf(it, slot.repo, slot.branch).slot = slot
       it.repo ??= slot.repo
       it.title ??= slot.branch
       continue
@@ -68,9 +84,13 @@ export function join({ jira = [], enrichment = [], prs = [], slots = [], plans =
       // Same repo required: an identical sha across repos would be a fork, not this PR.
       if (pr && pr.repo === slot.repo) {
         const it = itemForPr(pr)
+        const b = branchOf(it, pr.repo, pr.headRefName)
         // Annotated on the item's COPY, so the slot list board.js hands to slot resolution
         // stays exactly what the collector read.
-        it.slot = { ...slot, holdingPr: pr.number }
+        b.slot = { ...slot, holdingPr: pr.number }
+        // The checkout is on this branch's commit without being ON the branch — which is
+        // what a review leaves behind, and why it must never be offered as "already on it".
+        b.detached = true
         it.repo ??= slot.repo
       }
       continue
@@ -82,7 +102,7 @@ export function join({ jira = [], enrichment = [], prs = [], slots = [], plans =
     if ((slot.branch === defaultBranch || slot.branch === 'main') && !byId.has(id)) continue
 
     const it = get(id)
-    it.slot = slot
+    branchOf(it, slot.repo, slot.branch).slot = slot
     it.repo ??= slot.repo
     it.title ??= slot.branch
   }
@@ -109,6 +129,21 @@ export function join({ jira = [], enrichment = [], prs = [], slots = [], plans =
   }
   for (const it of byId.values()) {
     if (it.key && subtasksByParent.has(it.key)) it.subtasks = subtasksByParent.get(it.key)
+  }
+
+  // 6. `branches` is NEVER empty. A To Do ticket with no PR and no checkout still gets one
+  // entry with a null name, so every consumer — the lane fold, the skill predicates, the
+  // action routes, the card render — has exactly ONE shape to handle instead of a scalar
+  // case and a plural case. It is also what keeps a single-branch item behaving exactly as
+  // it did when `slot` was scalar, which is why converting the consumers stayed safe.
+  for (const it of byId.values()) {
+    if (it.branches.length === 0) it.branches.push({ name: null, repo: it.repo, pr: null, slot: null, detached: false })
+    // DEPRECATED alias, removed once every consumer reads `branches`. Kept only so this
+    // change could land one layer at a time with the suite green at every commit.
+    Object.defineProperty(it, 'slot', {
+      get() { return this.branches.find((b) => b.slot)?.slot ?? null },
+      enumerable: true, configurable: true,
+    })
   }
 
   return [...byId.values()]

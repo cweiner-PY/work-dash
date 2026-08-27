@@ -257,3 +257,92 @@ test('a slot on a live feature branch with no PR is still work', () => {
   assert.equal(items.length, 1)
   assert.equal(items[0].title, 'some-local-experiment')
 })
+
+// --- the branch is the unit of work: one ticket, several branches ----------------------
+//
+// The shape this project actually works in: a big feature gets split into separately
+// reviewable branches that all carry the same Jira key. Before `branches` existed the item
+// had a scalar `slot`, so the second branch's checkout either overwrote the first or was
+// reported under "free checkouts" while holding real commits, and the card's PR row and its
+// slot row could describe two different branches with nothing saying so.
+
+test('two branches on one Jira key become two branch entries, each correctly paired', () => {
+  const items = joinItems({
+    prs: [prAt(7110, 'PY-12746-catalog', 'sha1', { isMine: true })],
+    slots: [slotAt('/w/B', 'PY-12746-catalog-pr2-agent-suggestions', 'sha2')],
+    config: cfg,
+  })
+  assert.equal(items.length, 1, 'still ONE card — the ticket is the card')
+  const [it] = items
+  assert.equal(it.key, 'PY-12746')
+  assert.equal(it.branches.length, 2)
+
+  const withPr = it.branches.find((b) => b.name === 'PY-12746-catalog')
+  assert.equal(withPr.pr.number, 7110)
+  assert.equal(withPr.slot, null, 'the PR branch is not checked out anywhere')
+
+  const withSlot = it.branches.find((b) => b.name === 'PY-12746-catalog-pr2-agent-suggestions')
+  assert.equal(withSlot.pr, null, 'the second branch has no PR yet')
+  assert.equal(withSlot.slot.dir, '/w/B')
+})
+
+test('a PR and a slot on the SAME branch are ONE entry, not two', () => {
+  const items = joinItems({
+    prs: [prAt(7110, 'PY-12746-catalog', 'sha1', { isMine: true })],
+    slots: [slotAt('/w/A', 'PY-12746-catalog', 'sha1')],
+    config: cfg,
+  })
+  assert.equal(items[0].branches.length, 1)
+  assert.equal(items[0].branches[0].pr.number, 7110)
+  assert.equal(items[0].branches[0].slot.dir, '/w/A')
+  assert.equal(items[0].branches[0].detached, false)
+})
+
+test('branches is never empty — a ticket with no PR and no checkout gets one null entry', () => {
+  const items = joinItems({
+    jira: [{ key: 'PY-1', summary: 'plain ticket', assigneeAccountId: 'me' }],
+    config: { myAccountId: 'me', repos: {} },
+  })
+  assert.deepEqual(items[0].branches, [{ name: null, repo: null, pr: null, slot: null, detached: false }])
+})
+
+test('branch entries are keyed by repo as well as name', () => {
+  // The same branch name in two repositories is two different pieces of work, even under
+  // one ticket. Keying on name alone would merge them and lose one PR's state entirely.
+  const items = joinItems({
+    prs: [
+      { number: 1, repo: 'O/R', headRefName: 'PY-9-shared-name', isMine: true, title: 'a' },
+      { number: 2, repo: 'O/Other', headRefName: 'PY-9-shared-name', isMine: true, title: 'b' },
+    ],
+    config: cfg,
+  })
+  assert.equal(items.length, 1)
+  assert.equal(items[0].branches.length, 2)
+  assert.deepEqual(items[0].branches.map((b) => b.repo).sort(), ['O/Other', 'O/R'])
+})
+
+test('a detached slot lands on its PR\'s branch entry and is marked detached', () => {
+  const items = joinItems({
+    prs: [prAt(7353, 'PY-12349-bulk-select', 'abc123')],
+    slots: [slotAt('/w/A', null, 'abc123')],
+    config: cfg,
+  })
+  const [b] = items[0].branches
+  assert.equal(b.name, 'PY-12349-bulk-select', 'named by the PR, not left null')
+  assert.equal(b.slot.dir, '/w/A')
+  assert.equal(b.slot.holdingPr, 7353)
+  assert.equal(b.detached, true, 'on the commit, not on the branch — never "already on it"')
+})
+
+test('a second checked-out branch is no longer lost to the scalar slot', () => {
+  // REGRESSION: `it.slot = slot` was last-writer-wins, so one of two checkouts holding the
+  // same ticket vanished from the item and turned up under "free checkouts".
+  const items = joinItems({
+    slots: [
+      slotAt('/w/A', 'PY-12746-part-one', 'sha1'),
+      slotAt('/w/B', 'PY-12746-part-two', 'sha2'),
+    ],
+    config: cfg,
+  })
+  assert.deepEqual(items[0].branches.map((b) => b.slot.dir).sort(), ['/w/A', '/w/B'])
+})
