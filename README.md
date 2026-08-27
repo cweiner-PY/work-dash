@@ -154,11 +154,24 @@ always counted, e.g. "6 backlog · 3 stale", so nothing disappears silently.
   unknown** and disables the button, rather than guessing zero.
 - **resolve conflicts** — replaces the update button when the PR conflicts
   with its base, which GitHub cannot fix server-side. Opens a Terminal in the
-  checkout, runs the merge so the conflict is materialised in front of you,
-  and starts `claude` with the situation in its system prompt. The merge and
-  fetch are both `|| echo`-guarded so a conflicting merge can't kill the
-  launcher under `set -e`. The base branch is derived server-side from the
-  PR; the client sends only a boolean.
+  checkout, runs `git fetch` and `git merge origin/<base>`, then starts
+  `claude` **with an instruction submitted immediately** — like the run-skill
+  action, not like `open`, which deliberately waits for you to type.
+
+  Which instruction depends on how the merge actually went: the script branches
+  on the merge's exit status, so a merge that stops on conflicts tells Claude to
+  resolve them and commit, while one that merges cleanly tells Claude to confirm
+  and stop. GitHub's `DIRTY` can be stale, so the clean case is real and an
+  unconditional "resolve the conflicts" would send Claude hunting through a
+  clean tree. If a skill is also supplied it takes the prompt slot instead, since
+  a skill is something you asked for by name.
+
+  The merge sits in an `if` rather than being run bare: `set -euo pipefail` is on,
+  and a conflicting merge — the entire point — would otherwise kill the launcher
+  before Claude started. Clicking again on a still-conflicted tree is safe: the
+  slot resolves because it is already on the branch, and git's refusal to merge
+  over unmerged files lands on the same resolve instruction. The base branch is
+  derived server-side from your own PR; the client sends only a boolean.
 - **squash & merge** — `gh pr merge --squash`. The button reflects the merge
   gate (below) but the server re-checks it independently before running
   anything, requires an explicit confirmation, and refuses to merge a PR you

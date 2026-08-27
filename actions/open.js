@@ -33,16 +33,25 @@ export function buildLauncher({ item, slot, plans, skill, config, mergeBase = nu
     myPr ? `PR: #${myPr.number} ${myPr.url}` : null,
     planFiles.length ? `Plan files: ${planFiles.join(', ')}. Read them before acting.` : null,
     mergeBase
-      ? `This branch conflicts with origin/${mergeBase}. The merge has just been started ` +
-        `in this checkout and left conflicted on purpose — resolve the conflicts, then commit.`
+      ? `origin/${mergeBase} has just been merged into this checkout. Your first ` +
+        `instruction states whether that produced conflicts.`
       : null,
   ].filter(Boolean).join('\n')
+
+  // A positional argument is submitted to Claude immediately; without one the session
+  // just opens and waits for the user to type. `open` wants that wait. The conflict path
+  // does NOT — it exists to get the conflicts resolved, so it hands Claude an instruction
+  // the way the run-skill action does. An explicit skill still wins if both are supplied,
+  // since a skill is something the user asked for by name.
+  const firstPrompt = skill
+    ? q(`/${skill} ${item.key ?? ''}`.trim())
+    : (mergeBase ? '"$WD_MERGE_PROMPT"' : null)   // set by the if/else below, so it must expand
 
   const claude = [
     'claude', '-n', q(item.key ?? item.id),
     ...planDirs.flatMap((d) => ['--add-dir', q(d)]),
     '--append-system-prompt', q(context),
-    ...(skill ? [q(`/${skill} ${item.key ?? ''}`.trim())] : []),
+    ...(firstPrompt ? [firstPrompt] : []),
   ].join(' ')
 
   const lines = [
@@ -52,12 +61,28 @@ export function buildLauncher({ item, slot, plans, skill, config, mergeBase = nu
   ]
   if (branch && slot.branch !== branch) lines.push(`git checkout ${q(branch)}`)
   if (mergeBase) {
-    // Both tolerant of failure, and both loud about it. `set -e` is on, so a bare `git
-    // merge` that stops on conflicts — the entire point of this path — would kill the
-    // script before Claude ever launched.
+    // The merge decides the instruction. GitHub's DIRTY can be stale, and the conflict may
+    // already have been resolved elsewhere, so the clean case has to be handled — telling
+    // Claude to resolve conflicts that do not exist sends it hunting through a clean tree.
+    //
+    // `if git merge` rather than `git merge || ...`: `set -e` is on, and a bare merge that
+    // stops on conflicts — the entire point of this path — would kill the script before
+    // Claude ever launched. A command in an `if` condition is exempt from `set -e`.
+    // Both branches assign WD_MERGE_PROMPT, so `set -u` holds either way.
+    const conflicted =
+      `The merge of origin/${mergeBase} into this branch stopped with conflicts. ` +
+      `Run git status to see which files conflicted, resolve every one of them, then ` +
+      `stage and commit the merge.`
+    const clean =
+      `origin/${mergeBase} merged into this branch cleanly — there are no conflicts to ` +
+      `resolve. Confirm with git status and stop; there is nothing else to do here.`
     lines.push(
       `git fetch origin || echo ${q(`>> git fetch failed — origin/${mergeBase} may be stale`)}`,
-      `git merge ${q(`origin/${mergeBase}`)} || echo ${q('>> merge stopped with conflicts — resolve them, then commit')}`,
+      `if git merge ${q(`origin/${mergeBase}`)}; then`,
+      `  WD_MERGE_PROMPT=${q(clean)}`,
+      'else',
+      `  WD_MERGE_PROMPT=${q(conflicted)}`,
+      'fi',
     )
   }
   lines.push(claude, '')
