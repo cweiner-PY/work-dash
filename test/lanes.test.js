@@ -1,7 +1,27 @@
 // test/lanes.test.js
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { assignLanes, mergeGateFor, myPrOf, isMinePr, needsSprintFallback, changesAddressed } from '../lanes.js'
+import { assignLanes as rawAssignLanes, mergeGateFor, myPrOf, isMinePr, needsSprintFallback, changesAddressed, shortBranch } from '../lanes.js'
+
+// assignLanes reads item.branches — join.js builds them by pairing each PR with the checkout
+// on the same branch. These tests describe their inputs in the terms they are ABOUT (a PR, a
+// checkout), so branches are derived here once, the same way join.js derives them. That keeps
+// each test's intent legible while still exercising the real, branch-shaped code path.
+const branchesFrom = ({ prs = [], slot = null, repo = null, branches }) => {
+  if (branches) return branches
+  const out = []
+  const at = (name) => {
+    let b = out.find((x) => x.name === name)
+    if (!b) { b = { name, repo, pr: null, slot: null, detached: false }; out.push(b) }
+    return b
+  }
+  for (const p of prs) at(p.headRefName ?? null).pr = p
+  if (slot) at(slot.branch ?? null).slot = slot
+  if (!out.length) out.push({ name: null, repo, pr: null, slot: null, detached: false })
+  return out
+}
+const withBranches = (o) => ({ ...o, branches: branchesFrom(o) })
+const assignLanes = (items, config) => rawAssignLanes(items.map(withBranches), config)
 
 const config = {
   inFlightStatusOrder: ['In Progress', 'In Code Review', 'Ready To Test', 'In Testing', 'Ready To Merge'],
@@ -529,4 +549,103 @@ test('a missing openThreads field is not a truthy promotion', () => {
     requiredChecks: { total: 0, failing: [], known: true },
   })
   assert.equal(item.lane, 'waiting')
+})
+
+// --- many branches on one ticket -------------------------------------------------------
+//
+// REGRESSION, the whole point of `branches`: every lane decision, every reason line, and the
+// merge gate were computed against `myPrs[0]` — the first PR in an array filled from a GitHub
+// search with no explicit sort. A ticket's second PR contributed NOTHING to the board. Its
+// failing checks, requested changes, open threads and conflicts were all silent, and which of
+// the two got to speak was not even stable between refreshes.
+
+const twoPrs = (a, b) => item({
+  jira: jira(),
+  prs: [pr({ number: 7110, headRefName: 'PY-1-catalog', ...a }),
+        pr({ number: 7200, headRefName: 'PY-1-catalog-pr2-agent-suggestions', ...b })],
+})
+
+test('a second PR failing CI is no longer invisible behind the first', () => {
+  const it = lane(twoPrs({}, { requiredChecks: { total: 6, failing: ['Linting'], known: true } }))
+  assert.equal(it.branches.length, 2)
+  assert.equal(it.lane, 'needs-you', 'the failing branch decides the lane, not whichever PR came first')
+  assert.ok(it.reasons.some((r) => r === '#7200: required check failing: Linting'), it.reasons.join('; '))
+})
+
+test('PR order no longer decides what the board says', () => {
+  // The direct test for the myPrs[0] nondeterminism: the same two PRs in either order must
+  // produce the same lane and the same set of reasons.
+  const forward = lane(twoPrs({}, { reviewDecision: 'CHANGES_REQUESTED' }))
+  const reversed = lane(item({
+    jira: jira(),
+    prs: [pr({ number: 7200, headRefName: 'PY-1-catalog-pr2-agent-suggestions', reviewDecision: 'CHANGES_REQUESTED' }),
+          pr({ number: 7110, headRefName: 'PY-1-catalog' })],
+  }))
+  assert.equal(forward.lane, reversed.lane)
+  assert.deepEqual([...forward.reasons].sort(), [...reversed.reasons].sort())
+})
+
+test('each branch carries its own merge gate', () => {
+  const it = lane(twoPrs({ reviewDecision: 'APPROVED' }, { reviewDecision: 'REVIEW_REQUIRED' }))
+  const byPr = new Map(it.branches.map((b) => [b.pr.number, b]))
+  assert.equal(byPr.get(7110).mergeGate.allowed, true)
+  assert.equal(byPr.get(7200).mergeGate.allowed, false)
+  assert.ok(byPr.get(7200).mergeGate.blockers.some((b) => /not approved/.test(b)))
+})
+
+test('the lane is the most urgent across branches, not the first branch\'s', () => {
+  // #7110 alone is waiting (review required, green, non-draft); #7200 alone is needs-you.
+  const it = lane(twoPrs({}, { mergeable: 'CONFLICTING' }))
+  const lanes = it.branches.map((b) => b.lane)
+  assert.deepEqual(lanes, ['waiting', 'needs-you'])
+  assert.equal(it.lane, 'needs-you')
+})
+
+test('a checkout on a second branch is attributed to THAT branch by name', () => {
+  const it = lane(item({
+    jira: jira(),
+    prs: [pr({ number: 7110, headRefName: 'PY-1-catalog' })],
+    slot: { dir: '/s', branch: 'PY-1-catalog-pr2-agent-suggestions', dirty: true, dirtyCount: 3, behind: 4 },
+  }))
+  assert.equal(it.branches.length, 2)
+  assert.ok(it.reasons.includes('catalog-pr2-agent-suggestions: uncommitted changes (3 files)'), it.reasons.join('; '))
+  assert.ok(it.reasons.includes('catalog-pr2-agent-suggestions: 4 behind master'), it.reasons.join('; '))
+  // and the PR branch's own reason still names the PR rather than being prefixed twice
+  assert.ok(it.reasons.includes('awaiting review on #7110'), it.reasons.join('; '))
+})
+
+test('a single-branch item\'s reason text carries no branch label at all', () => {
+  const it = lane(item({ jira: jira(), prs: [pr({ mergeable: 'CONFLICTING' })] }))
+  assert.ok(it.reasons.includes('conflicts with master'), it.reasons.join('; '))
+  assert.ok(!it.reasons.some((r) => /^#\d+: /.test(r)), 'nothing to disambiguate, so nothing is prefixed')
+})
+
+test('ticket-level reasons are said once, not once per branch', () => {
+  const it = lane(twoPrs({}, {}))
+  assert.equal(it.reasons.filter((r) => r === 'assigned to Colt Weiner').length, 0)
+  const done = lane(item({
+    jira: jira({ status: 'Done', statusCategory: 'Done', isMine: false, assignee: 'Bruce Pereira' }),
+    prs: [pr({ number: 1, headRefName: 'PY-1-a' }), pr({ number: 2, headRefName: 'PY-1-b' })],
+  }))
+  assert.equal(done.reasons.filter((r) => r === 'ticket is Done').length, 1)
+  assert.equal(done.reasons.filter((r) => r === 'assigned to Bruce Pereira').length, 1)
+})
+
+test('shortBranch drops the ticket key the card already shows', () => {
+  assert.equal(shortBranch({ key: 'PY-12746' }, { name: 'PY-12746-catalog-pr2' }), 'catalog-pr2')
+  assert.equal(shortBranch({ key: 'PY-12746' }, { name: 'feat/unrelated' }), 'feat/unrelated')
+  assert.equal(shortBranch({ key: null }, { name: 'feat/x' }), 'feat/x')
+  assert.equal(shortBranch({ key: 'PY-1' }, { name: null }), null)
+})
+
+test('a Done ticket with a sibling PR still open does not offer either checkout as reclaimable', () => {
+  // Item-scoped on purpose: a sibling branch still in review means the work is not finished,
+  // whichever branch the checkout happens to hold.
+  const it = lane(item({
+    jira: jira({ status: 'Done', statusCategory: 'Done' }),
+    prs: [pr({ number: 7110, headRefName: 'PY-1-catalog' })],
+    slot: { dir: '/s', branch: 'PY-1-part-two', dirty: false, behind: 0 },
+  }))
+  assert.equal(it.signals.reclaimable, false)
+  assert.ok(!it.reasons.some((r) => /reclaimable/.test(r)))
 })
