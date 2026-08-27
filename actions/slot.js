@@ -88,13 +88,24 @@ export function resolveSlot(
     if (!blocked) {
       if (s.branch === 'master' || s.branch === 'main') why = `on ${s.branch}`
       else if (staleBranches.has(s.branch)) why = 'holding a finished or reassigned ticket'
+      // A DETACHED checkout is what a finished review leaves behind (see actions/review.js).
+      // Without this it read as "busy with null" and was never eligible again, so every
+      // review permanently consumed a slot and the pool drained one review at a time.
+      // Reclaimable because a detached HEAD holds no branch — but ranked last among the
+      // eligible, so anything genuinely idle is taken first.
+      else if (s.branch === null) why = 'detached (a finished review)'
       else { eligible = false; why = `busy with ${s.branch}` }
     }
     return { dir: s.dir, branch: s.branch, dirty: s.dirty, dirtyCount: s.dirtyCount, eligible, why, slot: s }
   })
 
-  // Prefer master/main, then stale, then anything else eligible.
-  const rank = (c) => (c.branch === 'master' || c.branch === 'main' ? 0 : 1)
+  // Prefer master/main, then a stale branch, then a detached review checkout last: of the
+  // three it is the only one whose commits, if any were made, are not on a branch at all.
+  const rank = (c) => {
+    if (c.branch === 'master' || c.branch === 'main') return 0
+    if (c.branch === null) return 2
+    return 1
+  }
   const free = candidates.filter((c) => c.eligible).sort((a, b) => rank(a) - rank(b))
   if (free.length) return { slot: free[0].slot, alreadyOnBranch: false }
 

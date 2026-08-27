@@ -160,3 +160,51 @@ test('an item that DOES have a branch behaves exactly as before, repo option or 
   assert.equal(r1.slot.dir, '/w/B')
   assert.equal(r2.slot.dir, '/w/B', 'item.repo already being set means the repo option is never consulted')
 })
+
+
+// --- a detached checkout is what a finished review leaves behind -----------------------
+
+const poolConfig = { repos: { 'O/R': { slots: ['/w/A', '/w/B', '/w/C'] } } }
+const bare = { id: 'PY-9', key: 'PY-9', repo: 'O/R', slot: null, plans: [], prs: [] }
+const sl = (dir, branch, o = {}) => ({ dir, repo: 'O/R', branch, dirty: false, dirtyCount: 0, ...o })
+
+// REGRESSION: the review action checks a PR out detached, which read as "busy with null" and
+// was never eligible again — so every review permanently consumed a slot.
+test('a clean DETACHED slot is eligible, not "busy with null"', () => {
+  const r = resolveSlot(bare, [sl('/w/A', null)], poolConfig, { branch: 'feat/x' })
+  assert.equal(r.slot?.dir, '/w/A', 'a finished review must not strand the slot forever')
+  assert.ok(!r.needsPicker)
+})
+
+test('a detached slot is taken LAST, after master and after a stale branch', () => {
+  const slots = [sl('/w/A', null), sl('/w/B', 'old-done'), sl('/w/C', 'master')]
+  const stale = new Set(['old-done'])
+  // master first
+  assert.equal(resolveSlot(bare, slots, poolConfig, { branch: 'feat/x', staleBranches: stale }).slot.dir, '/w/C')
+  // then stale
+  assert.equal(resolveSlot(bare, slots.slice(0, 2), poolConfig, { branch: 'feat/x', staleBranches: stale }).slot.dir, '/w/B')
+  // detached only when nothing better exists
+  assert.equal(resolveSlot(bare, [sl('/w/A', null)], poolConfig, { branch: 'feat/x' }).slot.dir, '/w/A')
+})
+
+test('a DIRTY detached slot is still refused', () => {
+  // A review that left changes behind is exactly the case not to stomp on.
+  const r = resolveSlot(bare, [sl('/w/A', null, { dirty: true, dirtyCount: 3 })], poolConfig, { branch: 'feat/x' })
+  assert.equal(r.needsPicker, true)
+  assert.match(r.candidates[0].why, /uncommitted/)
+})
+
+test('a slot busy with a live branch is still never taken', () => {
+  const r = resolveSlot(bare, [sl('/w/A', 'someone-elses-live-work')], poolConfig, { branch: 'feat/x' })
+  assert.equal(r.needsPicker, true)
+  assert.match(r.candidates[0].why, /busy with someone-elses-live-work/)
+})
+
+test('the picker explains a detached slot in words, not as null', () => {
+  // It only reaches the picker when something else blocks it; the reason still has to read.
+  const slots = [sl('/w/A', null), sl('/w/B', 'live')]
+  const r = resolveSlot(bare, slots, poolConfig, { branch: 'feat/x', claimedDirs: new Set(['/w/A']) })
+  assert.equal(r.needsPicker, true)
+  const a = r.candidates.find((c) => c.dir === '/w/A')
+  assert.match(a.why, /claimed/)
+})
