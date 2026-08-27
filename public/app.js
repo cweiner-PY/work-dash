@@ -528,11 +528,16 @@ if (typeof document !== 'undefined') {
   // about this board. The palette changes when the user clicks a swatch, and not before.
   const DEFAULT_PALETTE = 'ledger'
 
-  function applyPalette(name) {
+  // persist is opt-in so that applying the DEFAULT never writes it down. Storing a value
+  // the user never chose would silently pin the board to whatever the default was on the
+  // day of their first visit, and no later change of default could reach them.
+  function applyPalette(name, { persist = false } = {}) {
     document.documentElement.dataset.palette = name
     // localStorage throws outright in some privacy configurations rather than returning
     // null, and a failed *preference* write must never take the board down with it.
-    try { localStorage.setItem(PALETTE_KEY, name) } catch { /* preference is best-effort */ }
+    if (persist) {
+      try { localStorage.setItem(PALETTE_KEY, name) } catch { /* preference is best-effort */ }
+    }
     for (const b of document.querySelectorAll('#palette button')) {
       b.setAttribute('aria-pressed', String(b.dataset.palette === name))
     }
@@ -546,7 +551,7 @@ if (typeof document !== 'undefined') {
       b.dataset.palette = name
       b.title = `${name} palette`
       b.setAttribute('aria-label', `${name} palette`)
-      b.addEventListener('click', () => applyPalette(name))
+      b.addEventListener('click', () => applyPalette(name, { persist: true }))
       box.append(b)
     }
     let saved = null
