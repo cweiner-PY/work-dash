@@ -464,6 +464,10 @@ button.slot-open {
 button.slot-open:hover { color: var(--signal); border-bottom-color: var(--signal); }
 button.slot-open[disabled] { cursor: progress; opacity: .6; }
 .slot-branch { color: var(--ink); }
+/* A checkout holding someone else's PR for review — its own colour, because "this slot is
+   not yours to work in" is worth seeing at a glance. */
+.slot-reviewing { color: var(--ion); }
+#free-checkouts { color: var(--ink-3); }
 .pr-review, .pr-checks {
   text-transform: uppercase; letter-spacing: .08em; font-size: 10px;
 }

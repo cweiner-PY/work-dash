@@ -198,6 +198,33 @@ export function summarizeSubtasks(subtasks) {
   return { open: openList.length, done: doneList.length, total: subtasks.length, openList, doneList }
 }
 
+// What a checkout is holding, for the slot row. A detached checkout has no branch name, so
+// "detached" was all the board could say — join now identifies it by its HEAD sha, and if
+// that is a known PR's head this reports which one. That is how "PY-1 is holding the review
+// of #7353" becomes visible instead of a card titled null.
+export function slotHolding(slot) {
+  if (!slot) return null
+  if (slot.holdingPr) return { text: `reviewing #${slot.holdingPr}`, cls: 'slot-reviewing' }
+  if (slot.branch) return { text: slot.branch, cls: 'slot-branch' }
+  // Detached and unattributable: say the sha rather than a bare "detached", so it is at
+  // least traceable by hand.
+  return { text: slot.headSha ? `detached at ${slot.headSha.slice(0, 8)}` : 'detached', cls: 'slot-branch' }
+}
+
+// The checkouts no item claimed: spare capacity, and any detached one whose HEAD matched no
+// known PR. Shown as one compact line rather than cards — they used to render as items
+// titled "master", which read as work in flight.
+export function idleSlotsLine(idleSlots, config) {
+  if (!idleSlots?.length) return null
+  const parts = idleSlots.map((s) => {
+    const name = s.dir.split('/').pop()
+    const holding = slotHolding(s)
+    const dirt = s.dirty ? ` · ${s.dirtyCount} uncommitted` : ''
+    return `${name} (${holding?.text ?? '?'}${dirt})`
+  })
+  return `free checkouts: ${parts.join(' · ')}`
+}
+
 // One button per PR awaiting YOUR review. Returns [] for everything else, so the button only
 // appears where the user is the reviewer. The label carries the PR number because an item can
 // legitimately have more than one, and the user picks which.
@@ -472,7 +499,8 @@ if (typeof document !== 'undefined') {
       } else {
         s.append(el('span', 'slot-dir', item.slot.dir.split('/').pop()))
       }
-      s.append(el('span', 'slot-branch', item.slot.branch ?? 'detached'))
+      const holding = slotHolding(item.slot)
+      if (holding) s.append(el('span', holding.cls, holding.text))
       if (item.slot.dirty) s.append(el('span', 'chip bad', `${item.slot.dirtyCount} uncommitted`))
       if (item.slot.behind > 0) s.append(el('span', 'chip warn', `${item.slot.behind} behind (as of last fetch)`))
       if (item.signals.reclaimable) s.append(el('span', 'chip', 'reclaimable'))
@@ -648,6 +676,14 @@ if (typeof document !== 'undefined') {
     $('#hidden').textContent = hidden.total
       ? `${hidden.backlog} backlog · ${hidden.stale} stale — use the toggles above`
       : ''
+    // Capacity, not work: one line, in the masthead, never a card.
+    let free = $('#free-checkouts')
+    if (!free) {
+      free = el('p', 'src-errors')
+      free.id = 'free-checkouts'
+      $('#top').append(free)
+    }
+    free.textContent = idleSlotsLine(b.idleSlots, state.config) ?? ''
   }
 
   // Palette names live here, not in the HTML: the stylesheet defines one token block per

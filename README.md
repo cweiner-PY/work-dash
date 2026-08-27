@@ -48,6 +48,14 @@ base it is, an `idle Nd` chip once a PR has gone a day without activity (amber
 at 3, red at 7), the local checkout, why the item is in its lane, attached plan
 files, and Jira subtasks.
 
+**Checkouts** are matched to cards by branch name, and a **detached** one — which
+is what a review leaves behind — by its HEAD sha against known PR heads, so it
+reads `reviewing #7353` on that PR's card rather than appearing as a blank item.
+Checkouts no card claims are listed as `free checkouts:` in the masthead, with
+their state, so an exhausted pool is visible. A checkout sitting on the default
+branch is capacity and gets no card; it used to render as an item titled
+`master`.
+
 ## Actions
 
 | Action | What it does |

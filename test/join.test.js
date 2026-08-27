@@ -168,3 +168,92 @@ test('the whole fixture set produces the expected board', () => {
   // three of five occupied slots are reclaimable
   assert.equal(laned.filter((i) => i.signals.reclaimable).length, 3)
 })
+
+// --- a detached checkout is identified by its HEAD sha ---------------------------------
+
+const cfg = { repos: { 'O/R': { slots: ['/w/A', '/w/B'], defaultBranch: 'master' } } }
+const slotAt = (dir, branch, headSha, o = {}) =>
+  ({ dir, repo: 'O/R', branch, headSha, dirty: false, dirtyCount: 0, ...o })
+const prAt = (number, headRefName, headSha, o = {}) =>
+  ({ number, repo: 'O/R', headRefName, headSha, isMine: false, title: 't', ...o })
+
+// REGRESSION: a detached slot went through keylessId(repo, null) and manufactured an item
+// literally called "O/R:null" with no key and no title, which rendered as a blank card.
+test('a detached slot whose HEAD is a known PR head lands on THAT PR\'s item', () => {
+  const items = joinItems({
+    prs: [prAt(7353, 'PY-12349-bulk-select', 'abc123')],
+    slots: [slotAt('/w/A', null, 'abc123')],
+    config: cfg,
+  })
+  assert.ok(!items.some((i) => i.id.includes('null')), 'no phantom item')
+  const it = items.find((i) => i.key === 'PY-12349')
+  assert.equal(it.slot.dir, '/w/A')
+  assert.equal(it.slot.holdingPr, 7353, 'and it says which PR it is holding')
+})
+
+test('the annotation is on the item\'s copy, never on the collector\'s slot', () => {
+  // board.js hands the same slot array to slot resolution; it must stay what git reported.
+  const slot = slotAt('/w/A', null, 'abc123')
+  joinItems({ prs: [prAt(7353, 'PY-1-x', 'abc123')], slots: [slot], config: cfg })
+  assert.equal(slot.holdingPr, undefined)
+})
+
+test('a detached slot matching NO known PR creates no item at all', () => {
+  const items = joinItems({ prs: [], slots: [slotAt('/w/A', null, 'unknown-sha')], config: cfg })
+  assert.deepEqual(items, [], 'unattributable, so not work — board.js reports it as idle')
+})
+
+test('an identical sha in a DIFFERENT repo does not attach — that would be a fork', () => {
+  const items = joinItems({
+    prs: [{ ...prAt(1, 'b', 'abc123'), repo: 'Other/Repo' }],
+    slots: [slotAt('/w/A', null, 'abc123')],
+    config: cfg,
+  })
+  assert.ok(!items.some((i) => i.slot))
+})
+
+test('two detached slots no longer collide into one item', () => {
+  // Both used to resolve to the id "O/R:null" and the second silently overwrote the first.
+  const items = joinItems({
+    prs: [prAt(1, 'PY-1-x', 'sha1'), prAt(2, 'PY-2-y', 'sha2')],
+    slots: [slotAt('/w/A', null, 'sha1'), slotAt('/w/B', null, 'sha2')],
+    config: cfg,
+  })
+  assert.deepEqual(items.filter((i) => i.slot).map((i) => i.slot.dir).sort(), ['/w/A', '/w/B'])
+})
+
+test('a detached slot with no sha at all is simply not work', () => {
+  assert.deepEqual(joinItems({ prs: [], slots: [slotAt('/w/A', null, null)], config: cfg }), [])
+})
+
+// --- a checkout sitting on the default branch is capacity, not work ---------------------
+
+test('a slot on the default branch creates no card', () => {
+  // It used to render as an item titled "master" in the in-flight lane.
+  assert.deepEqual(joinItems({ slots: [slotAt('/w/A', 'master', 'x')], config: cfg }), [])
+  assert.deepEqual(joinItems({ slots: [slotAt('/w/A', 'main', 'x')], config: cfg }), [])
+})
+
+test('a repo whose default branch is not master is honoured', () => {
+  const trunk = { repos: { 'O/R': { slots: ['/w/A'], defaultBranch: 'trunk' } } }
+  assert.deepEqual(joinItems({ slots: [slotAt('/w/A', 'trunk', 'x')], config: trunk }), [])
+  // ...and a non-default branch is still work.
+  assert.equal(joinItems({ slots: [slotAt('/w/A', 'master', 'x')], config: trunk }).length, 1)
+})
+
+test('a default-branch slot DOES attach when something else already made that item', () => {
+  // A PR opened from master is unusual but real, and the slot belongs on its card.
+  const items = joinItems({
+    prs: [prAt(9, 'master', 'sha9')],
+    slots: [slotAt('/w/A', 'master', 'sha9')],
+    config: cfg,
+  })
+  assert.equal(items.length, 1)
+  assert.equal(items[0].slot.dir, '/w/A')
+})
+
+test('a slot on a live feature branch with no PR is still work', () => {
+  const items = joinItems({ slots: [slotAt('/w/A', 'some-local-experiment', 'x')], config: cfg })
+  assert.equal(items.length, 1)
+  assert.equal(items[0].title, 'some-local-experiment')
+})

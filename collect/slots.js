@@ -49,6 +49,16 @@ export async function collectSlots(config, { run = defaultRun, stat = defaultSta
       tasks.push(async () => {
       try {
         const branch = (await git(run, dir, ['branch', '--show-current'])).trim() || null
+        // A detached checkout has no branch to identify it by, so the HEAD sha is the only
+        // handle on what it is holding — join matches it against known PR heads.
+        //
+        // Guarded separately, for the same reason ahead/behind is: this is a convenience,
+        // while `dirty` is safety information. An unborn HEAD (a fresh clone with no commits)
+        // fails here, and must not take the whole slot — and its dirty flag — down with it.
+        let headSha = null
+        try {
+          headSha = (await git(run, dir, ['rev-parse', 'HEAD'])).trim() || null
+        } catch { /* unidentifiable, still a slot */ }
         const porcelain = await git(run, dir, ['status', '--porcelain'])
         const dirtyCount = porcelain.split('\n').filter((l) => l.trim() !== '').length
 
@@ -75,7 +85,7 @@ export async function collectSlots(config, { run = defaultRun, stat = defaultSta
         let mtimeMs = null
         try { mtimeMs = (await stat(dir)).mtimeMs } catch { /* not prunable, still a slot */ }
 
-        return { dir, repo, branch, dirty: dirtyCount > 0, dirtyCount, behind, ahead, mtimeMs }
+        return { dir, repo, branch, headSha, dirty: dirtyCount > 0, dirtyCount, behind, ahead, mtimeMs }
       } catch (e) {
         // One unreadable checkout must not cost the others. Reported, and dropped from the
         // slot list rather than half-populated — a slot whose `dirty` is unknown is exactly

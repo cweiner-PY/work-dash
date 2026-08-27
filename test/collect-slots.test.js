@@ -13,6 +13,11 @@ const config = {
 function fakeRun(map) {
   return async (cmd, args, opts) => {
     const key = `${opts.cwd}|${args.join(' ')}`
+    // Every slot read now includes the HEAD sha. Answered by default so each test's map stays
+    // about the thing it is testing; a case that cares overrides it.
+    if (!(key in map) && args.join(' ') === 'rev-parse HEAD') {
+      return { code: 0, stdout: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n', stderr: '' }
+    }
     if (!(key in map)) return { code: 1, stdout: '', stderr: `unexpected: ${key}` }
     return { code: 0, stdout: map[key], stderr: '' }
   }
@@ -35,6 +40,7 @@ test('reads branch, dirty count and ahead/behind', async () => {
     dir: '/Users/cweiner/Work/PY-1', repo: 'PerformYard/PerformYard',
     branch: 'PY-13888-fix-share-report-basic-admin',
     dirty: true, dirtyCount: 2, behind: 13, ahead: 6, mtimeMs: 1000,
+    headSha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
   })
   assert.equal(slots[1].dirty, false)
   assert.equal(slots[1].dirtyCount, 0)
@@ -226,4 +232,22 @@ test('slots mode never calls git worktree list', async () => {
   await collectSlots({ repos: { 'O/R': { slots: ['/w/A'] } } },
     { run, stat: async () => ({ mtimeMs: 1 }) })
   assert.ok(!calls.some((c) => c.includes('worktree')))
+})
+
+
+test('a rev-parse failure costs only the sha, never the slot or its dirty flag', async () => {
+  // An unborn HEAD (a fresh clone with no commits) fails rev-parse. The sha only helps
+  // identify a detached checkout; `dirty` is how the user learns a slot holds their work.
+  const run = async (cmd, args) => {
+    if (args[0] === 'branch') return { code: 0, stdout: 'PY-1-x\n', stderr: '' }
+    if (args[0] === 'status') return { code: 0, stdout: ' M a.ts\n', stderr: '' }
+    if (args[0] === 'rev-parse') return { code: 128, stdout: '', stderr: 'fatal: ambiguous argument HEAD' }
+    return { code: 0, stdout: '0\t0\n', stderr: '' }
+  }
+  const { slots } = await collectSlots({ repos: { 'O/R': { slots: ['/w/A'] } } },
+    { run, stat: async () => ({ mtimeMs: 1 }) })
+  assert.equal(slots.length, 1, 'the slot must survive')
+  assert.equal(slots[0].headSha, null, 'unidentifiable, not invented')
+  assert.equal(slots[0].dirty, true, 'and the safety information is intact')
+  assert.equal(slots[0].dirtyCount, 1)
 })

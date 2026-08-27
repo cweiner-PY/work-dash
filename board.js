@@ -115,10 +115,17 @@ export async function buildBoard(config, deps = {}) {
     config
   ).map((i) => ({ ...i, skills: skillsForItem(i, config) }))
 
+  // Every checkout no item claimed: spare capacity, plus any detached one whose HEAD matched
+  // no known PR. Reported rather than dropped — a checkout the board cannot explain is
+  // exactly the thing a user needs told, not hidden.
+  const claimed = new Set(items.filter((i) => i.slot).map((i) => i.slot.dir))
+  const idleSlots = slots.filter((s) => !claimed.has(s.dir))
+
   return {
     generatedAt: now().toISOString(),
     items,
     slots,
+    idleSlots,
     orphanSubtasks: subtaskR.value.orphans,
     sources: {
       jira: source({

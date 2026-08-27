@@ -16,7 +16,7 @@ const PR_QUERY = `query($mine:String!,$review:String!,$first:Int!){
 }
 fragment pr on PullRequest {
   number title url isDraft mergeable reviewDecision mergeStateStatus updatedAt
-  headRefName baseRefName
+  headRefName headRefOid baseRefName
   repository { nameWithOwner }
   author { login }
   reviews(last:50){ nodes{ state submittedAt author{ login } authorAssociation } }
@@ -135,6 +135,8 @@ export function normalizePr(node, { mine, myLogin }) {
     number: node.number,
     title: node.title,
     headRefName: node.headRefName,
+    // Lets a DETACHED local checkout be identified as holding this PR — see join.js.
+    headSha: node.headRefOid ?? null,
     baseRefName: node.baseRefName ?? null,
     reviewDecision: node.reviewDecision ?? null,
     mergeable: node.mergeable ?? null,

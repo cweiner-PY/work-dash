@@ -1,7 +1,8 @@
 // test/render.test.js
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { groupForDisplay, sourceChip, prChecksChip, prBehindChip, summarizeSubtasks, updateBranchSpec, hasBranch, needsRepoChoice, repoLabel, refreshLabel, editorSpec, idleChip, shouldCollect } from '../public/app.js'
+import { groupForDisplay, sourceChip, prChecksChip, prBehindChip, summarizeSubtasks, updateBranchSpec, hasBranch, needsRepoChoice, repoLabel, refreshLabel, editorSpec, idleChip, shouldCollect,
+         slotHolding, idleSlotsLine } from '../public/app.js'
 
 const it = (o) => ({ id: o.id, lane: o.lane, statusGroup: o.statusGroup ?? 'no ticket',
   sortIndex: o.sortIndex ?? Infinity, signals: { foreign: false, stale: false, reclaimable: false, ...o.signals },
@@ -517,4 +518,45 @@ test('prBehindChip says nothing for a PR we never compared', () => {
   // Our own unread comparison DOES still say unknown, because we did try.
   const mine = { isMine: true, baseRefName: 'master', baseCompare: { behind: null, known: false } }
   assert.match(prBehindChip(mine).text, /unknown/)
+})
+
+
+// --- what a checkout is holding --------------------------------------------------------
+
+test('slotHolding names the PR a detached checkout is reviewing', () => {
+  const h = slotHolding({ dir: '/w/PY-1', branch: null, headSha: 'abc12345def', holdingPr: 7353 })
+  assert.equal(h.text, 'reviewing #7353')
+  assert.equal(h.cls, 'slot-reviewing', 'and is coloured differently — it is not your work')
+})
+
+test('slotHolding shows the branch when there is one', () => {
+  assert.deepEqual(slotHolding({ branch: 'PY-1-x', headSha: 'abc' }),
+    { text: 'PY-1-x', cls: 'slot-branch' })
+})
+
+test('slotHolding falls back to the sha, not a bare "detached"', () => {
+  // Unattributable but at least traceable by hand.
+  assert.equal(slotHolding({ branch: null, headSha: 'abc12345deadbeef' }).text, 'detached at abc12345')
+  assert.equal(slotHolding({ branch: null, headSha: null }).text, 'detached')
+})
+
+test('slotHolding on no slot is null', () => {
+  assert.equal(slotHolding(null), null)
+  assert.equal(slotHolding(undefined), null)
+})
+
+test('idleSlotsLine lists spare checkouts compactly, with their state', () => {
+  const line = idleSlotsLine([
+    { dir: '/w/PY-3', branch: 'master', headSha: 'a', dirty: false, dirtyCount: 0 },
+    { dir: '/w/PY-4', branch: null, headSha: 'deadbeef1234', dirty: true, dirtyCount: 3 },
+  ], null)
+  assert.match(line, /free checkouts:/)
+  assert.match(line, /PY-3 \(master\)/)
+  // A dirty spare is not silently "free" — it holds something.
+  assert.match(line, /PY-4 \(detached at deadbeef · 3 uncommitted\)/)
+})
+
+test('idleSlotsLine says nothing when every checkout is claimed', () => {
+  assert.equal(idleSlotsLine([], null), null)
+  assert.equal(idleSlotsLine(undefined, null), null)
 })
