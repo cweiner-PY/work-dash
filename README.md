@@ -151,9 +151,10 @@ dashboard only submits the slash command.
 ]
 ```
 
-`when` sees `key`, `repo`, `slot`, `branch`, `plans`, `jira` and `pr`, with `!`,
-`&&`, `||`, `==`, `!=`, parentheses, single-quoted strings and dotted paths. A
-hand-written parser, not `eval`.
+`when` sees `key`, `repo`, `slot`, `branch`, `plans`, `jira`, `pr` and `review`,
+with `!`, `&&`, `||`, `==`, `!=`, parentheses, single-quoted strings and dotted
+paths. A hand-written parser, not `eval` — note there are no comparison operators
+beyond `==` / `!=`, so `slot.behind > 0` is not a valid rule.
 
 Rules are evaluated **once per branch**, so `slot` and `pr` are singular for
 real: on a ticket with a PR on one branch and a checkout on another, the
@@ -161,7 +162,15 @@ real: on a ticket with a PR on one branch and a checkout on another, the
 second, each acting on its own branch.
 
 `pr` is deliberately **your own** PR, never a colleague's review request, so a
-`pr`-gated skill won't fire on someone else's work. A rule that fails to parse
+`pr`-gated skill won't fire on someone else's work. `review` is its mirror — that
+branch's PR when it is *somebody else's*, or null. You need it to express "my own
+work on a branch": `branch` alone is true of a colleague's review-requested branch
+too, so `branch && !review` is the gate for anything that writes.
+
+That is what `/pr-description` and `/ticket-finisher` use. Both are **pre-PR**
+tools — `ticket-finisher` is a checklist to run *before* opening the PR, and
+`pr-description` works from `git diff master...HEAD` — so gating them on `pr` made
+them appear only after the PR existed, past the point of use. A rule that fails to parse
 is skipped with a warning — meaning its button silently never appears, which is
 why `doctor` checks every rule.
 

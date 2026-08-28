@@ -18,6 +18,16 @@ export function skillsForBranch(item, branch, config) {
   // The user's own PR, never a colleague's review request — a `pr`-gated skill (e.g.
   // /pr-description, /ticket-finisher) must not appear for a PR the user doesn't own.
   const pr = branch.pr && isMinePr(branch.pr) ? branch.pr : null
+  // Its mirror: the branch's PR when it is SOMEBODY ELSE'S. Without this there was no way to
+  // write a rule meaning "my own work on a branch" — `branch` alone is truthy for a colleague's
+  // review-requested branch too, so gating the pre-PR skills on it would have offered to write
+  // a PR description for someone else's PR.
+  const review = branch.pr && !isMinePr(branch.pr) ? branch.pr : null
+  const decorate = (p) => p && {
+    ...p,
+    changesRequested: p.reviewDecision === 'CHANGES_REQUESTED',
+    hasReviewComments: Boolean(p.hasReviewComments),
+  }
   const ctx = {
     key: item.key,
     repo: branch.repo ?? item.repo,
@@ -25,11 +35,8 @@ export function skillsForBranch(item, branch, config) {
     branch: branch.name,
     plans: item.plans ?? [],
     jira: item.jira,
-    pr: pr && {
-      ...pr,
-      changesRequested: pr.reviewDecision === 'CHANGES_REQUESTED',
-      hasReviewComments: Boolean(pr.hasReviewComments),
-    },
+    pr: decorate(pr),
+    review: decorate(review),
   }
   const out = []
   for (const rule of config.skills ?? []) {

@@ -457,3 +457,62 @@ test('open-editor opens the checkout of the branch it is asked about', async () 
   assert.equal(onSlot.ok, true, onSlot.message)
   assert.equal(onSlot.slot, '/w/A')
 })
+
+// --- `review`: the mirror of `pr`, so a rule can mean "my own work" ---------------------
+//
+// `pr` has always been "your own PR, or null". There was no way to write the opposite, and
+// `branch` alone is truthy for a colleague's review-requested branch too — so gating the
+// pre-PR skills on `branch` would have offered to write a PR description for someone else's
+// PR and to run the pre-PR checklist over their diff.
+
+const REGATED = {
+  skills: [
+    { name: 'ticket-planner', when: '!branch && !pr' },
+    { name: 'pr-description', when: 'branch && !review' },
+    { name: 'ticket-finisher', when: 'branch && !review' },
+    { name: 'critical-review', when: 'slot' },
+  ],
+}
+const forBranch = (o = {}) => skillsForBranch(
+  { key: 'PY-1', repo: 'O/R', plans: [], jira: null },
+  { name: null, repo: 'O/R', pr: null, slot: null, detached: false, ...o },
+  REGATED)
+
+test('a finished branch with NO PR yet offers the pre-PR skills', () => {
+  // The live PY-14173 case, and the whole point: /ticket-finisher is a pre-PR checklist and
+  // /pr-description writes from `git diff master...HEAD`. Gating them on `pr` meant they only
+  // appeared AFTER the PR was open — past the moment either one is useful.
+  const out = forBranch({ name: 'PY-1-mine', slot: { dir: '/w/A', branch: 'PY-1-mine' } })
+  assert.deepEqual(out, ['pr-description', 'ticket-finisher', 'critical-review'])
+})
+
+test('a branch that already has your PR still offers them — no regression', () => {
+  assert.deepEqual(forBranch({ name: 'PY-1-mine', pr: { number: 1, isMine: true } }),
+    ['pr-description', 'ticket-finisher'])
+})
+
+test("a colleague's review-requested branch offers NEITHER", () => {
+  assert.deepEqual(forBranch({ name: 'PY-1-bruce', pr: { number: 2, isMine: false } }), [])
+})
+
+test('a detached review checkout offers the review skill and nothing that writes', () => {
+  const out = forBranch({ name: 'PY-1-bruce', pr: { number: 2, isMine: false },
+                          slot: { dir: '/w/A' }, detached: true })
+  assert.deepEqual(out, ['critical-review'])
+})
+
+test('a To Do ticket with no branch is unaffected', () => {
+  assert.deepEqual(forBranch(), ['ticket-planner'])
+})
+
+test('review carries the same decorated fields pr does, so rules can read them', () => {
+  const cfg = { skills: [{ name: 'nudge-reviewer', when: 'review.changesRequested' }] }
+  const br = (pr) => ({ name: 'b', repo: 'O/R', pr, slot: null, detached: false })
+  const item = { key: 'PY-1', repo: 'O/R', plans: [], jira: null }
+  assert.deepEqual(
+    skillsForBranch(item, br({ number: 2, isMine: false, reviewDecision: 'CHANGES_REQUESTED' }), cfg),
+    ['nudge-reviewer'])
+  // and it is null for the user's own PR, so `review`-gated rules never fire on own work
+  assert.deepEqual(
+    skillsForBranch(item, br({ number: 1, isMine: true, reviewDecision: 'CHANGES_REQUESTED' }), cfg), [])
+})

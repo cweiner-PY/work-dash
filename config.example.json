@@ -59,11 +59,11 @@
     },
     {
       "name": "pr-description",
-      "when": "pr"
+      "when": "branch && !review"
     },
     {
       "name": "ticket-finisher",
-      "when": "pr"
+      "when": "branch && !review"
     },
     {
       "name": "toggle-logan-env",
