@@ -337,6 +337,27 @@ export function editorSpec(branch, config) {
   }
 }
 
+// Everything render() actually draws, and nothing else — so an auto-poll that brings back an
+// identical board can skip the rebuild entirely.
+//
+// `generatedAt` is deliberately EXCLUDED. It moves on every single collection, so including it
+// would make every board look different and defeat the comparison completely. The timestamp is
+// the one thing that legitimately changes when nothing else has, and it is redrawn on its own.
+//
+// A rebuild is not free: it destroys every folded branch, re-checks every plan file the user
+// deselected, wipes the last action's result, and replays the entrance animation on every card.
+// The plan checkbox is the one that matters — silently re-selecting a file the user removed
+// means the next launch hands Claude a file they had excluded.
+export function boardFingerprint(board) {
+  if (!board) return ''
+  return JSON.stringify({
+    items: board.items,
+    idleSlots: board.idleSlots,
+    orphanSubtasks: board.orphanSubtasks,
+    sources: board.sources,
+  })
+}
+
 // Whether to run a collection now. A hidden tab has nobody looking at it, and one
 // collection costs ~10 gh invocations plus the Jira calls; with the server's cache TTL
 // equal to the poll interval, essentially every tick really does re-collect, so a tab
@@ -428,10 +449,18 @@ if (typeof document !== 'undefined') {
     }
 
     try {
-      state.board = force
+      const next = force
         ? await api('/api/refresh', {}, { strict: true })
         : await api('/api/items', undefined, { strict: true })
-      render()
+      const unchanged = boardFingerprint(next) === state.fingerprint
+      state.board = next
+      // A poll that brings back an identical board must not rebuild anything. The rebuild
+      // destroys every folded branch, re-checks every plan file the user deselected, wipes the
+      // last action's result and replays the entrance animation on every card — a visible
+      // flicker once a minute in exchange for redrawing information that did not change.
+      // Only the clock actually moved, so only the clock is redrawn.
+      if (unchanged) renderMeta()
+      else render()
       state.lastLoadedAt = Date.now()
       clearRefreshError()
     } catch (e) {
@@ -469,6 +498,7 @@ if (typeof document !== 'undefined') {
 
   function planPicker(item) {
     const details = el('details', 'plans-fold')
+    details.dataset.fold = `${item.id}::plans`
     const summary = el('summary', null, plansSummary(item.plans))
     const box = el('div', 'plans')
     for (const folder of item.plans) {
@@ -516,6 +546,7 @@ if (typeof document !== 'undefined') {
   function subtasksDetails(item) {
     const { open, done, openList, doneList } = summarizeSubtasks(item.subtasks)
     const details = el('details', 'subtasks')
+    details.dataset.fold = `${item.id}::subtasks`
     details.append(el('summary', null, `subtasks — ${open} open · ${done} done`))
     for (const s of openList) details.append(subtaskRow(s))
     if (doneList.length) {
@@ -625,7 +656,9 @@ if (typeof document !== 'undefined') {
     // Several: each folds, and the ones that are why the card is in its lane start open.
     const many = branchCount > 1
     const body = many ? el('details', 'branch-fold') : box
+    const foldKey = `${item.id}::${branch.name ?? ''}`
     if (many) {
+      body.dataset.fold = foldKey
       body.open = branchExpanded(item, branch, index)
       const summary = el('summary', 'branch-summary')
       if (label) summary.append(el('span', 'branch-label', label))
@@ -637,6 +670,9 @@ if (typeof document !== 'undefined') {
     }
 
     const msg = el('p', 'action-msg')
+    // Keyed so the last action's result survives a re-render. Without it, a poll landing a
+    // second after "Opened PY-2" erases the only confirmation the user ever gets.
+    msg.dataset.msg = foldKey
 
     // refresh:false for actions that change nothing the board reports. A forced refresh is
     // ~6s of live Jira and GitHub calls, so firing one after "open my editor" is pure cost.
@@ -802,22 +838,71 @@ if (typeof document !== 'undefined') {
     return h
   }
 
-  function render() {
+  // The clock and the source bar, redrawn on their own so a poll that changed nothing can
+  // update the time without touching a single card.
+  function renderMeta() {
     const b = state.board
-    const root = $('#board')
-    root.replaceChildren()
     $('#meta').replaceChildren(
       el('span', 'time', `updated ${new Date(b.generatedAt).toLocaleTimeString()}`),
       sourceBar(b.sources)
     )
+  }
+
+  // What the USER has done to the board, as opposed to what the collectors reported. A
+  // re-render throws the DOM away, so this is carried across it. Keyed on item id plus
+  // branch name rather than on position, so it survives a board where something moved.
+  function captureUiState(root) {
+    const folds = new Map()
+    for (const d of root.querySelectorAll('details[data-fold]')) folds.set(d.dataset.fold, d.open)
+    const checks = new Map()
+    for (const cb of root.querySelectorAll('.plans input[type=checkbox]')) checks.set(cb.id, cb.checked)
+    const msgs = new Map()
+    for (const m of root.querySelectorAll('.action-msg[data-msg]')) {
+      if (m.textContent) msgs.set(m.dataset.msg, { text: m.textContent, cls: m.className })
+    }
+    return { folds, checks, msgs }
+  }
+
+  function restoreUiState(root, ui) {
+    for (const d of root.querySelectorAll('details[data-fold]')) {
+      if (ui.folds.has(d.dataset.fold)) d.open = ui.folds.get(d.dataset.fold)
+    }
+    // A deselected plan file is a DECISION, not a display preference: silently re-checking it
+    // would hand Claude a file the user removed on the next launch.
+    for (const cb of root.querySelectorAll('.plans input[type=checkbox]')) {
+      if (ui.checks.has(cb.id)) cb.checked = ui.checks.get(cb.id)
+    }
+    // The fold summary states the selected count, so it has to be recomputed after the boxes
+    // are put back — otherwise a restored deselection hides behind a stale "5 of 5".
+    for (const box of root.querySelectorAll('.plans')) box.dispatchEvent(new Event('change'))
+    for (const m of root.querySelectorAll('.action-msg[data-msg]')) {
+      const prev = ui.msgs.get(m.dataset.msg)
+      if (prev) { m.textContent = prev.text; m.className = prev.cls }
+    }
+  }
+
+  function render() {
+    const b = state.board
+    const root = $('#board')
+    const ui = captureUiState(root)
+    root.replaceChildren()
+    renderMeta()
     const { lanes, hidden } = groupForDisplay(b.items, state)
     // One running index across the whole board (not per lane) so the entrance stagger
     // reads as a single sweep down the page. The CSS caps the delay, so a long board
     // still finishes arriving promptly.
+    //
+    // Only cards that are genuinely NEW get it. Replaying the entrance on a card that was
+    // already sitting there reads as a flicker, not as an arrival — and it fired on every
+    // card on every 60s poll.
+    const seen = state.renderedIds ?? new Set()
+    const next = new Set()
     let seq = 0
     const place = (sec, item) => {
       const c = card(item)
-      c.style.setProperty('--i', seq++)
+      next.add(item.id)
+      if (seen.has(item.id)) c.classList.add('settled')
+      else c.style.setProperty('--i', seq++)
       sec.append(c)
     }
     lanes.forEach((lane, n) => {
@@ -857,6 +942,12 @@ if (typeof document !== 'undefined') {
       $('#top').append(free)
     }
     free.textContent = idleSlotsLine(b.idleSlots, state.config) ?? ''
+
+    state.renderedIds = next
+    restoreUiState(root, ui)
+    // Recorded here rather than in load(), so EVERY path that draws the board — a poll, a
+    // manual refresh, a backlog toggle — leaves a fingerprint matching what is on screen.
+    state.fingerprint = boardFingerprint(b)
   }
 
   // Palette names live here, not in the HTML: the stylesheet defines one token block per

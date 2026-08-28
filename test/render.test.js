@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { groupForDisplay, sourceChip, prChecksChip, prBehindChip, summarizeSubtasks, updateBranchSpec, hasBranch, needsRepoChoice, repoLabel, refreshLabel, editorSpec, idleChip, shouldCollect,
          slotHolding, idleSlotsLine, branchLabel, shortBranchName, checkoutNameOf, ownPrOf, reviewSpecOf,
-         branchExpanded, branchSummary, plansSummary } from '../public/app.js'
+         branchExpanded, branchSummary, plansSummary, boardFingerprint } from '../public/app.js'
 
 const it = (o) => ({ id: o.id, lane: o.lane, statusGroup: o.statusGroup ?? 'no ticket',
   sortIndex: o.sortIndex ?? Infinity, signals: { foreign: false, stale: false, reclaimable: false, ...o.signals },
@@ -680,4 +680,56 @@ test('plansSummary states how many files are SELECTED, not just how many exist',
   assert.equal(plansSummary(plans, 1), 'plans — 1 of 4 files · 2 folders')
   assert.equal(plansSummary([{ folder: 'A', files: ['only.md'] }]), 'plans — 1 of 1 file · 1 folder')
   assert.equal(plansSummary([]), 'plans — 0 of 0 files · 0 folders')
+})
+
+// --- not redrawing a board that did not change ------------------------------------------
+//
+// render() rebuilt every card on every 60s poll whether anything had moved or not. That
+// replays the entrance animation on each card (the visible flicker), and it also throws away
+// what the USER did: folded branches reopen, the plan picker shuts, the last action's result
+// is wiped, and — the one that matters — a plan file the user deselected is silently
+// re-checked, so the next launch hands Claude a file they had removed.
+
+const bd = (o = {}) => ({
+  generatedAt: '2026-08-27T12:00:00Z',
+  items: [{ id: 'PY-1', lane: 'in-flight' }],
+  idleSlots: [{ dir: '/w/A', branch: 'master' }],
+  orphanSubtasks: [],
+  sources: { jira: { ok: true, count: 3, error: null } },
+  ...o,
+})
+
+test('an identical board fingerprints identically', () => {
+  assert.equal(boardFingerprint(bd()), boardFingerprint(bd()))
+})
+
+test('the timestamp alone does NOT count as a change', () => {
+  // It moves on every single collection. Counting it would make every board look different
+  // and defeat the comparison completely.
+  assert.equal(boardFingerprint(bd()), boardFingerprint(bd({ generatedAt: '2026-08-27T12:01:00Z' })))
+})
+
+test('anything render actually draws DOES count as a change', () => {
+  const base = boardFingerprint(bd())
+  assert.notEqual(base, boardFingerprint(bd({ items: [{ id: 'PY-1', lane: 'needs-you' }] })), 'a lane move')
+  assert.notEqual(base, boardFingerprint(bd({ items: [] })), 'an item leaving')
+  assert.notEqual(base, boardFingerprint(bd({ idleSlots: [] })), 'a checkout being claimed')
+  assert.notEqual(base, boardFingerprint(bd({ orphanSubtasks: [{ key: 'PY-9' }] })), 'an orphan subtask')
+  assert.notEqual(base, boardFingerprint(bd({ sources: { jira: { ok: false, count: 0, error: 'x' } } })),
+    'a source going down')
+})
+
+test('a source going DEGRADED is a change, not silence', () => {
+  // ok:true with an error is a distinct state from ok:true without one — the whole reason
+  // sourceChip renders three ways. It must not compare equal to healthy.
+  const healthy = boardFingerprint(bd({ sources: { jira: { ok: true, count: 3, error: null } } }))
+  const degraded = boardFingerprint(bd({ sources: { jira: { ok: true, count: 3, error: 'slots partial' } } }))
+  assert.notEqual(healthy, degraded)
+})
+
+test('boardFingerprint of nothing is a stable empty string, not a throw', () => {
+  assert.equal(boardFingerprint(null), '')
+  assert.equal(boardFingerprint(undefined), '')
+  // and an empty board is distinguishable from no board at all
+  assert.notEqual(boardFingerprint(bd({ items: [] })), '')
 })

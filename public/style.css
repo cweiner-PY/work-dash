@@ -383,6 +383,9 @@ main { padding: 4px 22px 80px; max-width: 1560px; }
   transition: background .12s, border-color .12s, transform .12s;
 }
 @keyframes rise { from { opacity: 0; transform: translateY(7px); } }
+/* A card that was already on screen before this render is not arriving, so it must not play
+   the entrance again. Replayed on every card on every 60s poll, it read as a flicker. */
+.card.settled { animation: none; }
 
 .card:hover { background: var(--paper-3); border-color: var(--rule-2); }
 
