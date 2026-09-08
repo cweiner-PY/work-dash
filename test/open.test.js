@@ -6,7 +6,8 @@ import { existsSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
-import { buildLauncher as rawBuildLauncher, openItem as rawOpenItem, terminalMode, terminalArgs, tabHint } from '../actions/open.js'
+import { buildLauncher as rawBuildLauncher, openItem as rawOpenItem, terminalMode, terminalArgs, tabHint,
+         renderTitle, titleFields, osaString, TITLE_TEMPLATE } from '../actions/open.js'
 import { theBranch } from '../test-support/branches.js'
 
 // Both now act on ONE resolved branch of an item — a ticket can carry several. These tests
@@ -421,4 +422,271 @@ test('both modes fail loudly when Terminal cannot be driven at all', async () =>
     assert.equal(r.ok, false, terminalMode)
     assert.match(r.message, /Could not open Terminal/)
   }
+})
+
+
+// --- naming the window ------------------------------------------------------------------
+//
+// Same rule as the AppleScript above: asserted against the generated strings, never by
+// launching. The one exception is the injection canary, which runs osascript on a script
+// that only returns a string — it names nothing and opens no Terminal window.
+
+test('the default template names the ticket, what it is, and the checkout', () => {
+  const t = renderTitle(TITLE_TEMPLATE, titleFields({ item, slot: slotA }))
+  assert.equal(t, 'PY-12746 — Competency Catalog · A')
+})
+
+test('an empty placeholder takes its separator with it', () => {
+  // "PY-12746 —  · A" is the bug this rule exists to prevent: a ticket with no title must
+  // not leave the punctuation that was there to separate it from something.
+  const untitled = { ...item, title: null }
+  assert.equal(renderTitle(TITLE_TEMPLATE, titleFields({ item: untitled, slot: slotA })),
+    'PY-12746 · A')
+  // Dropped at the FRONT, too — nothing may start with a dangling separator.
+  assert.equal(renderTitle('{title} — {key}', titleFields({ item: untitled, slot: slotA })),
+    'PY-12746')
+  // Everything empty is no title at all, not a string of punctuation.
+  assert.equal(renderTitle('{branch} — {skill}', titleFields({ item: untitled, slot: slotA })), null)
+})
+
+test('a separator INSIDE a value survives — a title is the user\'s own words', () => {
+  const dashed = { ...item, title: 'Catalog – phase two' }
+  assert.match(renderTitle(TITLE_TEMPLATE, titleFields({ item: dashed, slot: slotA })),
+    /Catalog – phase two/)
+})
+
+test('an unknown placeholder is left visible rather than silently blanked', () => {
+  // A typo in a template should show up in the title, where it can be noticed and fixed.
+  assert.equal(renderTitle('{key} {nope}', titleFields({ item, slot: slotA })), 'PY-12746 {nope}')
+})
+
+test('an empty template opts out entirely, and so does a non-string', () => {
+  for (const bad of ['', null, undefined, 5, {}]) assert.equal(renderTitle(bad, {}), null)
+})
+
+test('a very long title is truncated, so the Window menu stays readable', () => {
+  const long = { ...item, title: 'x'.repeat(400) }
+  const t = renderTitle(TITLE_TEMPLATE, titleFields({ item: long, slot: slotA }))
+  assert.ok(t.length <= 120, `${t.length} > 120`)
+  assert.match(t, /…$/)
+  assert.match(t, /^PY-12746 — x+/)
+})
+
+test('a newline in a Jira title becomes a space, not two lines', () => {
+  const multi = { ...item, title: 'Catalog\n\tphase two' }
+  assert.equal(renderTitle('{title}', titleFields({ item: multi, slot: slotA })), 'Catalog phase two')
+})
+
+test('titleFields describes the PR on a review launch, never the ticket', () => {
+  // The window's whole job is a colleague's PR. Naming it after the Jira key would put a
+  // ticket on a window that must never touch that ticket's own branch.
+  const review = { number: 7353, title: 'Fix flaky sprint sync', repo: 'O/R', headRefName: 'bruce-branch' }
+  const f = titleFields({ item, slot: slotA, review })
+  assert.equal(f.key, 'Review #7353')
+  assert.equal(f.title, 'Fix flaky sprint sync')
+  assert.equal(f.branch, 'bruce-branch')
+  assert.equal(renderTitle(TITLE_TEMPLATE, f), 'Review #7353 — Fix flaky sprint sync · A')
+})
+
+test('titleFields exposes repo, branch and skill for anyone who wants them', () => {
+  const f = titleFields({ item, slot: slotA, branch: theBranch(item), skill: 'ticket-finisher' })
+  assert.equal(f.repo, 'O/R')
+  assert.equal(f.branch, 'PY-12746-competency')
+  assert.equal(f.skill, 'ticket-finisher')
+  assert.equal(f.slot, 'A')
+  assert.equal(renderTitle('/{skill} — {key} · {slot}', f), '/ticket-finisher — PY-12746 · A')
+})
+
+test('a named window sets the custom title AND turns the display on', () => {
+  // A profile with "Custom title" unticked accepts the title and never shows it, so the
+  // toggle is not optional.
+  const script = terminalArgs('/tmp/x.sh', 'window', { title: 'PY-1 — Thing' }).join('\n')
+  assert.match(script, /set wdTab to do script "bash \/tmp\/x\.sh"/)
+  assert.match(script, /set custom title of wdTab to "PY-1 — Thing"/)
+  assert.match(script, /set title displays custom title of wdTab to true/)
+})
+
+test('a named window suppresses every segment Terminal exposes per-tab', () => {
+  const script = terminalArgs('/tmp/x.sh', 'window', { title: 'T' }).join('\n')
+  for (const seg of ['window size', 'device name', 'shell path', 'file name']) {
+    assert.match(script, new RegExp(`set title displays ${seg} of wdTab to false`), seg)
+  }
+})
+
+test('terminalTitleOnly: false keeps the title a program sets for itself', () => {
+  // `title displays file name` is what carries an escape-sequence title — where Claude
+  // Code's busy indicator lives. Keeping it is the whole point of the opt-out.
+  const script = terminalArgs('/tmp/x.sh', 'window', { title: 'T', titleOnly: false }).join('\n')
+  assert.ok(!/title displays file name/.test(script))
+  assert.match(script, /set title displays window size of wdTab to false/)
+  assert.match(script, /set custom title of wdTab to "T"/)
+})
+
+test('tab mode names the tab it created, in BOTH branches', () => {
+  // The not-running branch opens a window instead, and it must be named too — otherwise the
+  // first launch after a reboot is the one window that comes out anonymous.
+  const args = terminalArgs('/tmp/x.sh', 'tab', { title: 'T' })
+  const script = args.join('\n')
+  assert.match(script, /set wdTab to do script "bash \/tmp\/x\.sh" in front window/)
+  assert.equal(script.match(/set custom title of wdTab to "T"/g).length, 2)
+  const tail = args.slice(args.indexOf('else')).join('\n')
+  assert.match(tail, /set custom title of wdTab to "T"/)
+  assert.ok(!/keystroke/.test(tail))
+})
+
+test('with no title the AppleScript is byte-identical to what it always was', () => {
+  // Opting out must give back exactly the old behaviour, not a near-miss of it.
+  assert.deepEqual(terminalArgs('/tmp/x.sh', 'window'), [
+    '-e', 'tell application "Terminal" to do script "bash /tmp/x.sh"',
+    '-e', 'tell application "Terminal" to activate',
+  ])
+  assert.deepEqual(terminalArgs('/tmp/x.sh', 'window', { title: null }),
+    terminalArgs('/tmp/x.sh', 'window'))
+})
+
+test('osaString escapes the two characters an AppleScript literal understands', () => {
+  assert.equal(osaString('plain'), '"plain"')
+  assert.equal(osaString('say "hi"'), String.raw`"say \"hi\""`)
+  assert.equal(osaString('back\\slash'), String.raw`"back\\slash"`)
+  // Control characters cannot be escaped inside a literal at all, so they become spaces.
+  assert.equal(osaString('a\nb\tc'), '"a b c"')
+})
+
+test('a title with AppleScript metacharacters cannot become a second statement', async () => {
+  // The analogue of the bash injection canary above, and asserted the same way: by RUNNING
+  // the thing that decides. The payload opens with a quote to close the literal osaString
+  // wraps it in, then concatenates a `do shell script` — the shape that breaks out of a
+  // naive `"${s}"`. Verified to have teeth: with a naive quoter this canary IS created.
+  //
+  // The script evaluated here only RETURNS a string. It names no application and opens no
+  // window, so this stays inside the rule that Terminal is never launched by a test.
+  const canary = join(tmpdir(), `work-dash-osa-canary-${randomUUID()}`)
+  const nasty = `PY-1" & (do shell script "touch ${canary}") & "`
+  const r = await new Promise((resolve, reject) => {
+    const p = spawn('osascript', ['-e', `return ${osaString(nasty)}`])
+    let out = ''
+    p.stdout.on('data', (d) => { out += d })
+    p.on('error', reject)
+    p.on('close', (code) => resolve({ code, out: out.trimEnd() }))
+  })
+  assert.equal(existsSync(canary), false, 'the injected command must never execute')
+  assert.equal(r.code, 0, 'the generated literal must still be valid AppleScript')
+  assert.equal(r.out, nasty, 'and must round-trip the payload as ONE plain string')
+  if (existsSync(canary)) rmSync(canary)
+})
+
+test('openItem names the window from the slot it actually resolved', async () => {
+  let args = null
+  const r = await openItem({ item, slots: [slotA], plans, skill: null, config },
+    { run: async (_cmd, a) => { args = a; return { code: 0, stdout: '', stderr: '' } },
+      writeFile: async () => {} })
+  assert.equal(r.ok, true)
+  assert.match(args.join('\n'), /set custom title of wdTab to "PY-12746 — Competency Catalog · A"/)
+})
+
+test('a tab that falls back to a window does not lose its name on the way', async () => {
+  const seen = []
+  await openItem(
+    { item, slots: [slotA], plans, config: { ...config, terminalMode: 'tab' },
+      staleBranches: new Set(), claimedDirs: new Set() },
+    { run: async (_cmd, a) => {
+        const tab = a.some((x) => /keystroke/.test(String(x)))
+        seen.push([tab ? 'tab' : 'window', a.join('\n')])
+        return tab ? { code: 1, stdout: '', stderr: '1002' } : { code: 0, stdout: '', stderr: '' }
+      },
+      writeFile: async () => {} })
+  assert.equal(seen.length, 2)
+  for (const [mode, script] of seen) {
+    assert.match(script, /set custom title of wdTab to "PY-12746 — Competency Catalog · A"/, mode)
+  }
+})
+
+test('terminalTitle: "" opts out, and the launch still happens', async () => {
+  let args = null
+  const r = await openItem(
+    { item, slots: [slotA], plans, skill: null, config: { ...config, terminalTitle: '' } },
+    { run: async (_cmd, a) => { args = a; return { code: 0, stdout: '', stderr: '' } },
+      writeFile: async () => {} })
+  assert.equal(r.ok, true)
+  assert.ok(!/custom title/.test(args.join('\n')))
+  assert.deepEqual(args, terminalArgs(args[1].match(/bash (\S+)"/)[1], 'window'))
+})
+
+test('a custom template is used verbatim', async () => {
+  let args = null
+  await openItem(
+    { item, slots: [slotA], plans, skill: null,
+      config: { ...config, terminalTitle: '{slot}: {key} [{branch}]' } },
+    { run: async (_cmd, a) => { args = a; return { code: 0, stdout: '', stderr: '' } },
+      writeFile: async () => {} })
+  assert.match(args.join('\n'), /set custom title of wdTab to "A: PY-12746 \[PY-12746-competency\]"/)
+})
+
+
+// --- the agent must not rename the window we just named ---------------------------------
+//
+// The defect these cover shipped and was seen: the title was correct for about a second and
+// then became Claude's own. Terminal keeps an escape-sequence title in the same field as
+// `custom title`, so whoever writes last wins, and the agent writes continuously.
+
+test('a named launch tells the agent not to set the terminal title', () => {
+  const s = buildLauncher({ item, slot: slotA, plans, skill: null, config,
+                            naming: { title: 'PY-12746 — Thing · A', titleOnly: true } })
+  assert.match(s, /^export CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1$/m)
+  // Before the agent starts, or it would already have set one.
+  assert.ok(s.indexOf('CLAUDE_CODE_DISABLE_TERMINAL_TITLE') < s.indexOf('claude -n'))
+})
+
+test('the review launch is named too, so it gets the same line', () => {
+  const review = { number: 7353, title: 'Fix it', repo: 'O/R', headRefName: 'their-branch' }
+  const s = buildLauncher({ item, slot: slotA, plans, skill: null, config, review,
+                            naming: { title: 'Review #7353 — Fix it · A', titleOnly: true } })
+  assert.match(s, /^export CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1$/m)
+  assert.ok(s.indexOf('CLAUDE_CODE_DISABLE_TERMINAL_TITLE') < s.indexOf('claude -n'))
+})
+
+test('an unnamed launch leaves the agent\'s own title alone', () => {
+  // terminalTitle: "" wants Terminal's behaviour back, and that includes Claude's title.
+  for (const naming of [null, { title: null, titleOnly: true }]) {
+    const s = buildLauncher({ item, slot: slotA, plans, skill: null, config, naming })
+    assert.ok(!/CLAUDE_CODE_DISABLE_TERMINAL_TITLE/.test(s), JSON.stringify(naming))
+  }
+})
+
+test('terminalTitleOnly: false keeps the agent\'s ◐ indicator, and lets it win', () => {
+  // The opt-out is coherent both ways: it keeps the segment Terminal would show AND stops
+  // us from silencing the thing that writes into it.
+  const s = buildLauncher({ item, slot: slotA, plans, skill: null, config,
+                            naming: { title: 'T', titleOnly: false } })
+  assert.ok(!/CLAUDE_CODE_DISABLE_TERMINAL_TITLE/.test(s))
+})
+
+test('openItem names the window and silences the agent in the SAME launch', async () => {
+  // The two halves have to agree: naming the window without this line is the bug, and the
+  // line without a name would suppress a title for no reason.
+  let script = null, args = null
+  await openItem({ item, slots: [slotA], plans, skill: null, config },
+    { run: async (_c, a) => { args = a; return { code: 0, stdout: '', stderr: '' } },
+      writeFile: async (_p, c) => { script = c } })
+  assert.match(script, /export CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1/)
+  assert.match(args.join('\n'), /set custom title of wdTab to "PY-12746 — Competency Catalog · A"/)
+})
+
+test('openItem opts out of both halves together', async () => {
+  let script = null, args = null
+  await openItem({ item, slots: [slotA], plans, skill: null, config: { ...config, terminalTitle: '' } },
+    { run: async (_c, a) => { args = a; return { code: 0, stdout: '', stderr: '' } },
+      writeFile: async (_p, c) => { script = c } })
+  assert.ok(!/CLAUDE_CODE_DISABLE_TERMINAL_TITLE/.test(script))
+  assert.ok(!/custom title/.test(args.join('\n')))
+})
+
+test('the launcher still runs correctly with the export in it', async () => {
+  // Executed, not matched: `set -u` plus an export is exactly the shape that has broken this
+  // script before, and the merge path reads a variable the export sits next to.
+  const s = buildLauncher({ item, slot: slotA, plans, skill: null, config, mergeBase: 'master',
+                            naming: { title: 'T', titleOnly: true } })
+  const { code, log } = await runLauncher(s, { mergeExit: 1 })
+  assert.equal(code, 0)
+  assert.match(lastPrompt(log), /stopped with conflicts/)
 })

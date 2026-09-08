@@ -88,6 +88,20 @@ test('report is clean when everything passes, and says what to do next', () => {
   assert.ok(!r.lines.some((l) => l.startsWith('FAIL')))
 })
 
+test('a note is advice, not a failure: it never touches the exit code', () => {
+  // The Terminal-title tip is the first of these. work-dash works without it, so reporting
+  // it as FAIL would make `doctor` loop forever for an agent working through SETUP.md.
+  const r = report([
+    { name: 'a', ok: true },
+    { name: 'b', ok: true, warn: true, detail: 'you could also do this' },
+  ])
+  assert.equal(r.failed, 0)
+  assert.match(r.summary, /all 2 checks passed/)
+  assert.ok(r.lines[1].startsWith('note'))
+  // Four characters wide, like ok/FAIL, so the columns still line up.
+  assert.equal(r.lines[0].indexOf('a'), r.lines[1].indexOf('b'))
+})
+
 test('report indents a multi-line detail so the FAIL lines stay greppable', () => {
   // Leading FAIL/ok is the whole point: an agent scans line starts.
   const r = report([{ name: 'a', ok: false, detail: 'line one\nline two' }])

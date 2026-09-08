@@ -7,6 +7,7 @@
   "docsDir": "/Users/YOU/Work/docs",
   "checkoutMode": "slots",
   "terminalMode": "window",
+  "terminalTitle": "{key} — {title} · {slot}",
   "editor": "Cursor",
   "notifications": true,
   "jiraSprintField": "customfield_10020",

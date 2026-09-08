@@ -11,6 +11,14 @@ const DEFAULTS = {
   // 'window' (default) or 'tab'. Tab needs an Accessibility grant per machine, so it is
   // opt-in — see terminalMode in actions/open.js.
   terminalMode: 'window',
+  // What the launched Terminal window and tab are called. Placeholders: {key} {title}
+  // {slot} {repo} {branch} {skill}; "" leaves Terminal to name its own windows. See
+  // renderTitle in actions/open.js.
+  terminalTitle: '{key} — {title} · {slot}',
+  // Whether a named window shows ONLY that name. False keeps the title a program sets with
+  // an escape sequence, which is where Claude Code's busy indicator lives — see the segment
+  // notes on launchLines in actions/open.js.
+  terminalTitleOnly: true,
   // Required checks that are HUMAN gates rather than CI. These stay FAILURE until a person
   // acts, so they must not be read as "you broke something" — see lanes.js. Set to [] at an
   // organisation that has none.

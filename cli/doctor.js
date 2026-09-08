@@ -19,7 +19,7 @@ const ROOT = join(import.meta.dirname, '..')
 // line-leading so the result greps cleanly.
 export function report(checks) {
   const lines = checks.map((c) =>
-    `${c.ok ? 'ok  ' : 'FAIL'}  ${c.name}${c.detail ? `\n        ${c.detail.replaceAll('\n', '\n        ')}` : ''}`)
+    `${c.ok ? (c.warn ? 'note' : 'ok  ') : 'FAIL'}  ${c.name}${c.detail ? `\n        ${c.detail.replaceAll('\n', '\n        ')}` : ''}`)
   const failed = checks.filter((c) => !c.ok).length
   return {
     lines,
@@ -211,6 +211,30 @@ export async function checks({ runFn = run } = {}) {
   const app = await runFn('osascript', ['-e', `id of app "${editor}"`])
   out.push(check(`editor "${editor}" is installed`, app.code === 0,
     app.code === 0 ? null : `macOS cannot resolve "${editor}" — set "editor" in config.json to an installed app`))
+
+  // A NOTE, never a failure: work-dash names its own windows without this, and what it
+  // covers is a preference in the user's Terminal rather than a precondition of the tool.
+  // Only asked on a machine that has osascript, and only when naming is actually turned on.
+  //
+  // ShowComponentsWhenTabHasCustomTitle is scoped to tabs that HAVE a custom title, which is
+  // exactly work-dash's own — every other Terminal window keeps the title it has today.
+  if (osa.code === 0 && (raw.terminalTitle ?? '{key}') !== '') {
+    const pref = await runFn('defaults',
+      ['read', 'com.apple.Terminal', 'ShowComponentsWhenTabHasCustomTitle'])
+    const suppressed = pref.code === 0 && /^\s*(0|false|NO)\s*$/i.test(pref.stdout)
+    out.push({
+      name: 'Terminal shows only the title work-dash sets',
+      ok: true,
+      warn: !suppressed,
+      detail: suppressed ? null : [
+        'Terminal still appends the running process ("claude \u25c2 -zsh") to the title.',
+        'Everything else is already suppressed per-window. To drop this last part too —',
+        'it applies only to tabs with a custom title, so only work-dash\u2019s windows change:',
+        '  defaults write com.apple.Terminal ShowComponentsWhenTabHasCustomTitle -bool false',
+        'Then quit and reopen Terminal.',
+      ].join('\n'),
+    })
+  }
 
   // --- port ---------------------------------------------------------------------------
   // "Already running" is a HEALTHY state, and must not be reported as a failure — an agent

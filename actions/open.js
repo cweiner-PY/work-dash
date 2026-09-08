@@ -14,11 +14,21 @@ const q = (s) => `'${String(s).replaceAll("'", "'\\''")}'`
 // "resolve conflicts" action. The merge runs HERE, in the Terminal the user is watching,
 // rather than server-side: the output is visible, and /api/open never mutates a checkout
 // as an invisible side effect.
-export function buildLauncher({ item, branch: target = null, slot, plans, skill, config, mergeBase = null, worktree = null, review = null }) {
+export function buildLauncher({ item, branch: target = null, slot, plans, skill, config, mergeBase = null, worktree = null, review = null, naming = null }) {
   // ONE branch of the item — the one the caller resolved. A ticket can carry several, and
   // launching Claude with the wrong one's context is how a session got told it was on the PR's
   // branch while the checkout actually held a different one.
   const branch = checkoutBranchOf(target)
+
+  // Terminal keeps an escape-sequence title in the SAME field as `custom title`, so an agent
+  // that names its own window overwrites the name we just gave it — a second or two after the
+  // window opens, which is why the title looked right and then changed. Naming a window
+  // therefore means asking the agent not to name it. terminalTitleOnly: false is the opt-out,
+  // and there it is Claude's ◐ indicator that wins, deliberately.
+  const quiet = naming?.title && naming.titleOnly
+    ? ['export CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1']
+    : []
+
   const planDirs = [...new Set(plans.map((p) => p.dir))]
   const planFiles = plans.map((p) => `${p.dir}/${p.file}`)
   // Only the user's own PR belongs in the launch context — a colleague's review-requested
@@ -55,6 +65,7 @@ export function buildLauncher({ item, branch: target = null, slot, plans, skill,
     return [
       '#!/usr/bin/env bash',
       'set -euo pipefail',
+      ...quiet,
       `cd ${q(slot.dir)}`,
       `git fetch origin ${q(review.headRefName)}`,
       `git checkout --detach ${q(`origin/${review.headRefName}`)}`,
@@ -98,6 +109,7 @@ export function buildLauncher({ item, branch: target = null, slot, plans, skill,
   const lines = [
     '#!/usr/bin/env bash',
     'set -euo pipefail',
+    ...quiet,
   ]
 
   // Worktree mode, first launch on this branch: create it here, in the Terminal the user is
@@ -152,6 +164,111 @@ export function terminalMode(config) {
   return config?.terminalMode === 'tab' ? 'tab' : 'window'
 }
 
+// --- naming the window ------------------------------------------------------------------
+
+// Which window is which, answered the way the board answers it: the ticket, what it is, and
+// the checkout it landed in. Set terminalTitle to "" to opt out and let Terminal name its
+// own windows, as it did before.
+export const TITLE_TEMPLATE = '{key} — {title} · {slot}'
+
+// Long enough for a ticket key, a real Jira title and a slot; short enough that the Window
+// menu stays readable. Terminal truncates the bar itself, but the menu shows the whole thing.
+const MAX_TITLE = 120
+
+// The values a template may name. A review launch describes the PR rather than the ticket:
+// that window's whole job IS the PR, and naming it after the Jira key would put a colleague's
+// ticket on a window that must never touch the ticket's own branch.
+export function titleFields({ item, slot, branch = null, skill = null, review = null }) {
+  const folder = slot?.dir ? slot.dir.split('/').pop() : ''
+  if (review) {
+    return {
+      key: `Review #${review.number}`,
+      title: review.title ?? '',
+      slot: folder,
+      repo: review.repo ?? '',
+      branch: review.headRefName ?? '',
+      skill: skill ?? '',
+    }
+  }
+  return {
+    key: item?.key ?? item?.id ?? '',
+    title: item?.title ?? '',
+    slot: folder,
+    repo: item?.repo ?? slot?.repo ?? '',
+    branch: checkoutBranchOf(branch) ?? '',
+    skill: skill ?? '',
+  }
+}
+
+// A placeholder owns the literal text in front of it, so resolving to nothing takes that
+// text along: "{key} — {title}" on a ticket with no title reads "PY-1", never "PY-1 —".
+//
+// An unknown {foo} is left in the output verbatim rather than blanked — a typo in a template
+// should be visible in the title, not silently eat the separator next to it.
+export function renderTitle(template, fields) {
+  if (typeof template !== 'string' || template === '') return null
+  let out = ''
+  let last = 0
+  const re = /\{(\w+)\}/g
+  let m
+  while ((m = re.exec(template)) !== null) {
+    const literal = template.slice(last, m.index)
+    last = re.lastIndex
+    if (!(m[1] in fields)) { out += literal + m[0]; continue }
+    const value = String(fields[m[1]] ?? '').replaceAll(/\s+/g, ' ').trim()
+    if (value) out += literal + value
+  }
+  out += template.slice(last)
+  // Only the EDGES are stripped of separators. A dash inside a Jira title is part of the
+  // title, and collapsing those would rewrite the user's own words back at them.
+  out = out.replaceAll(/\s+/g, ' ').replace(/^[\s—–·|,:-]+/, '').replace(/[\s—–·|,:-]+$/, '')
+  if (!out) return null
+  return out.length > MAX_TITLE ? `${out.slice(0, MAX_TITLE - 1).trimEnd()}…` : out
+}
+
+// An AppleScript string literal understands \" and \\ and nothing else — a raw newline in
+// one is a syntax error, not an escape — so control characters become spaces rather than
+// being escaped. Backslash first: escaping the quotes first would then double their escapes.
+export function osaString(s) {
+  return `"${String(s)
+    .replaceAll(/[\u0000-\u001f\u007f]/g, ' ')
+    .replaceAll('\\', '\\\\')
+    .replaceAll('"', '\\"')}"`
+}
+
+// Terminal composes a title out of several segments, and the default set buries the name we
+// chose under a launcher filename and a window size:
+//
+//   work-dash — ◐ review-7353 — caffeinate • work-dash-PY-12349-cfd02880-…sh — 201×59
+//
+// Four of them are per-TAB properties, so they are turned off on our own tab and nowhere
+// else — the user's profile is never written to, and every other Terminal window they have
+// open keeps the title it had. The fifth, the active process name, is not in Terminal's
+// AppleScript dictionary at all; `work-dash doctor` names the one-time preference for it.
+//
+// `title displays file name` is also what carries a title set by an escape sequence, which
+// is where Claude Code's ◐ busy indicator lives. Dropping it is the point — it is the noise
+// being removed — and terminalTitleOnly: false keeps it for anyone who wants the spinner.
+//
+// `do script` RETURNS the tab it started in, which is what makes this reliable. Reaching for
+// `window 1` instead would be a guess: it is not necessarily the window just created.
+function launchLines(path, { title, titleOnly, front = false }) {
+  const target = front ? ' in front window' : ''
+  if (!title) return [`tell application "Terminal" to do script "bash ${path}"${target}`]
+  return [
+    'tell application "Terminal"',
+    `set wdTab to do script "bash ${path}"${target}`,
+    `set custom title of wdTab to ${osaString(title)}`,
+    // Without this a profile with "Custom title" unticked accepts the title and never shows it.
+    'set title displays custom title of wdTab to true',
+    'set title displays window size of wdTab to false',
+    'set title displays device name of wdTab to false',
+    'set title displays shell path of wdTab to false',
+    ...(titleOnly ? ['set title displays file name of wdTab to false'] : []),
+    'end tell',
+  ]
+}
+
 const launchedMessage = (skill, slot) =>
   skill ? `Running /${skill} in ${slot.dir.split('/').pop()}` : `Opened ${slot.dir.split('/').pop()}`
 
@@ -173,21 +290,29 @@ export function tabHint(stderr) {
 //
 // `is running` guards it because Cmd+T against a Terminal that is not running would produce
 // an empty window plus a tab. That query does not launch the app.
-export function terminalArgs(path, mode) {
+//
+// With no title this returns exactly what it always returned, byte for byte, so a config
+// that opts out of naming gets the behaviour it had before naming existed.
+export function terminalArgs(path, mode, { title = null, titleOnly = true } = {}) {
+  const flags = (lines) => lines.flatMap((line) => ['-e', line])
   if (mode !== 'tab') {
-    return ['-e', `tell application "Terminal" to do script "bash ${path}"`,
-            '-e', 'tell application "Terminal" to activate']
+    return flags([
+      ...launchLines(path, { title, titleOnly }),
+      'tell application "Terminal" to activate',
+    ])
   }
-  return ['-e', 'if application "Terminal" is running then',
-          '-e', 'tell application "Terminal" to activate',
-          '-e', 'delay 0.2',
-          '-e', 'tell application "System Events" to keystroke "t" using command down',
-          '-e', 'delay 0.4',
-          '-e', `tell application "Terminal" to do script "bash ${path}" in front window`,
-          '-e', 'else',
-          '-e', `tell application "Terminal" to do script "bash ${path}"`,
-          '-e', 'tell application "Terminal" to activate',
-          '-e', 'end if']
+  return flags([
+    'if application "Terminal" is running then',
+    'tell application "Terminal" to activate',
+    'delay 0.2',
+    'tell application "System Events" to keystroke "t" using command down',
+    'delay 0.4',
+    ...launchLines(path, { title, titleOnly, front: true }),
+    'else',
+    ...launchLines(path, { title, titleOnly }),
+    'tell application "Terminal" to activate',
+    'end if',
+  ])
 }
 
 export async function openItem(
@@ -234,7 +359,15 @@ export async function openItem(
     worktree = r.create ? { create: true, root: r.root, base: r.base } : null
   }
 
-  const script = buildLauncher({ item, branch, slot, plans, skill, config, mergeBase, worktree, review })
+  // Resolved before the script is built, because the script depends on it: a named window
+  // has to tell the agent inside it not to rename it out from under us.
+  const naming = {
+    title: renderTitle(config?.terminalTitle ?? TITLE_TEMPLATE,
+                       titleFields({ item, slot, branch, skill, review })),
+    titleOnly: config?.terminalTitleOnly !== false,
+  }
+
+  const script = buildLauncher({ item, branch, slot, plans, skill, config, mergeBase, worktree, review, naming })
   // A per-invocation suffix: the old deterministic path meant two opens of the SAME ticket
   // (e.g. a double-click, or /open then /run) raced on writing one file.
   const path = join(tmpdir(), `work-dash-${(item.key ?? item.id).replaceAll(/[^\w.-]/g, '_')}-${randomUUID()}.sh`)
@@ -257,12 +390,12 @@ export async function openItem(
   // honest test, and the fallback is exactly today's behaviour.
   let r = null
   if (terminalMode(config) === 'tab') {
-    r = await run('osascript', terminalArgs(path, 'tab'))
+    r = await run('osascript', terminalArgs(path, 'tab', naming))
     if (r.code !== 0) {
       // Nothing has launched at this point: both the keystroke and the `do script` come
       // before anything runs, so retrying as a window cannot double-launch.
       const why = r.stderr.trim()
-      r = await run('osascript', terminalArgs(path, 'window'))
+      r = await run('osascript', terminalArgs(path, 'window', naming))
       if (r.code === 0) {
         return {
           ok: true,
@@ -272,7 +405,7 @@ export async function openItem(
       }
     }
   } else {
-    r = await run('osascript', terminalArgs(path, 'window'))
+    r = await run('osascript', terminalArgs(path, 'window', naming))
   }
   if (r.code !== 0) return { ok: false, message: `Could not open Terminal: ${r.stderr.trim()}` }
   return { ok: true, message: launchedMessage(skill, slot), detail: script, slot: slot.dir }

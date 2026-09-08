@@ -125,6 +125,8 @@ can't guess; `doctor` validates the rest.
 | `checkoutMode` | | `slots` (default) or `worktrees` — see below |
 | `reviewSkill` | | The skill a **review #N** launch submits. Default `critical-review`. Read from config, never from the request — which is why that route needs no applicability gate |
 | `terminalMode` | | `window` (default) or `tab`. Tab opens the session as a tab of the front Terminal window — it needs Accessibility granted to Terminal, and falls back to a window (saying so) if refused |
+| `terminalTitle` | | What the launched window and tab are called. Default `{key} — {title} · {slot}`; `""` leaves Terminal to name its own windows. Placeholders below |
+| `terminalTitleOnly` | | Default `true` — a named window shows only that name. `false` keeps the title a program sets for itself, which is where Claude Code's `◐` busy indicator lives |
 | `worktreeRoot` | | Where worktrees live. Default `~/.cache/work-dash-worktrees` |
 | `humanGateChecks` | | Required checks that are human gates, not CI — they explain a card but never claim to be your move. Default `["QA Code Review"]` |
 | `editor` | | Any installed app name, resolved by `open -a`. Default `Cursor` |
@@ -134,6 +136,45 @@ can't guess; `doctor` validates the rest.
 
 A missing required key stops the server naming that key, rather than starting
 half-configured.
+
+### Naming the windows
+
+Terminal names a window after whatever is running in it, which for work-dash meant a
+launcher path:
+
+```
+work-dash — ◐ review-7353 — caffeinate • work-dash-PY-12349-cfd02880-0ad5-…sh — 201×59
+```
+
+`terminalTitle` replaces that with something you can pick out of a Window menu. The
+placeholders are `{key}` `{title}` `{slot}` `{repo}` `{branch}` `{skill}`, and a
+placeholder that resolves to nothing takes its separator with it — a ticket with no title
+renders `PY-12746 · PY-3`, not `PY-12746 —  · PY-3`. An unknown `{placeholder}` is left in
+the title verbatim, so a typo shows up rather than silently eating a separator.
+
+A **review #N** launch is named after the PR instead of the ticket, since that is what the
+window is for: `{key}` becomes `Review #7353` and `{title}` the PR's title.
+
+work-dash switches off every title segment Terminal exposes per tab — dimensions, TTY name,
+shell command, and the working directory — on **its own tab only**. Your Terminal profile is
+never written to, and every other window you have open is untouched.
+
+Terminal keeps a title set by an escape sequence in the **same field** as the custom title,
+so an agent that names its own window overwrites the name work-dash gave it a second or two
+after the window opens. Naming a window therefore means asking the agent not to name it, and
+the generated launcher exports `CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1` to do exactly that.
+`terminalTitleOnly: false` skips both halves and lets Claude's `◐` indicator win instead.
+
+One segment, the active process name, is not in Terminal's AppleScript dictionary, so
+`PY-12746 — Competency Catalog · PY-3 — claude ◂ -zsh` is as far as config alone gets. To
+drop that too — it applies only to tabs that have a custom title, so only work-dash's
+windows change:
+
+```bash
+defaults write com.apple.Terminal ShowComponentsWhenTabHasCustomTitle -bool false
+```
+
+Quit and reopen Terminal afterwards. `doctor` reports this as a `note`, never a failure.
 
 ### Your own skills
 
