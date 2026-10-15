@@ -983,7 +983,6 @@ if (typeof document !== 'undefined') {
       const b = el('button')
       b.type = 'button'
       b.dataset.palette = name
-      b.title = `${name} palette`
       b.setAttribute('aria-label', `${name} palette`)
       b.addEventListener('click', () => applyPalette(name, { persist: true }))
       box.append(b)

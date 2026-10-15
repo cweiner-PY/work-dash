@@ -325,6 +325,18 @@ body:has(#refresh[disabled]) .rule-ticks::after {
 .palette button[aria-pressed='true'] {
   border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink);
 }
+.palette button { position: relative; }
+.palette button::after {
+  content: attr(data-palette);
+  position: absolute; top: calc(100% + 6px); left: 50%; z-index: 5;
+  transform: translateX(-50%);
+  padding: 3px 6px;
+  font: 400 10px/1 var(--mono); letter-spacing: .06em; white-space: nowrap;
+  color: var(--paper); background: var(--ink);
+  pointer-events: none; visibility: hidden;
+}
+.palette button:hover::after, .palette button:focus-visible::after { visibility: visible; }
+:root[data-palette='win95'] .palette button::after { top: auto; bottom: calc(100% + 6px); }
 .palette button[data-palette='ledger'] {
   background: linear-gradient(90deg, #e8e0cd 0 40%, #bf3a0c 40% 74%, #0e6d57 74%);
 }
