@@ -8,6 +8,9 @@ const DEFAULTS = {
   port: 4200,
   // The skill a review launch submits. Read from config, never from the request.
   reviewSkill: 'critical-review',
+  // 'terminal' (default) or 'warp' — which app the open action launches in. See
+  // terminalApp in actions/open.js.
+  terminalApp: 'terminal',
   // 'window' (default) or 'tab'. Tab needs an Accessibility grant per machine, so it is
   // opt-in — see terminalMode in actions/open.js.
   terminalMode: 'window',

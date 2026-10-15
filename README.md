@@ -124,6 +124,7 @@ can't guess; `doctor` validates the rest.
 | `port` | | Default 4200 |
 | `checkoutMode` | | `slots` (default) or `worktrees` — see below |
 | `reviewSkill` | | The skill a **review #N** launch submits. Default `critical-review`. Read from config, never from the request — which is why that route needs no applicability gate |
+| `terminalApp` | | `terminal` (default) or `warp`. Warp is launched through a one-shot [Launch Configuration](https://docs.warp.dev/terminal/sessions/launch-configurations) written to `~/.warp/launch_configurations/`, which deletes itself when it runs. It always opens a new window, so `terminalMode: tab` is ignored there |
 | `terminalMode` | | `window` (default) or `tab`. Tab opens the session as a tab of the front Terminal window — it needs Accessibility granted to Terminal, and falls back to a window (saying so) if refused |
 | `terminalTitle` | | What the launched window and tab are called. Default `{key} — {title} · {slot}`; `""` leaves Terminal to name its own windows. Placeholders below |
 | `terminalTitleOnly` | | Default `true` — a named window shows only that name. `false` keeps the title a program sets for itself, which is where Claude Code's `◐` busy indicator lives |

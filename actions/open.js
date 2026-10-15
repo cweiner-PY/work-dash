@@ -1,6 +1,6 @@
 // actions/open.js
-import { writeFile as fsWriteFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { mkdir, writeFile as fsWriteFile } from 'node:fs/promises'
+import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { run as defaultRun } from '../util/run.js'
@@ -315,9 +315,52 @@ export function terminalArgs(path, mode, { title = null, titleOnly = true } = {}
   ])
 }
 
+// 'warp' launches in Warp; anything else keeps Terminal.app, which is the only app the
+// AppleScript below knows how to drive.
+export function terminalApp(config) {
+  return config?.terminalApp === 'warp' ? 'warp' : 'terminal'
+}
+
+// Warp has no AppleScript `do script`, so it is driven through a Launch Configuration: a
+// YAML file in its config directory, opened by name with warp://launch/<file>. Each launch
+// writes its own, and the command it runs deletes that file first — Warp has read it by
+// then — so they do not pile up. Strings go through JSON.stringify, which is a valid YAML
+// double-quoted scalar, so a ticket title cannot break out of the document.
+//
+// cwd is the temp dir rather than the checkout: in worktree mode the checkout does not exist
+// until the launcher creates it, and the launcher does its own cd either way.
+export function warpLaunchConfig({ name, launcher, self, title = null }) {
+  return [
+    '---',
+    `name: ${JSON.stringify(name)}`,
+    'windows:',
+    '  - tabs:',
+    ...(title ? [`      - title: ${JSON.stringify(title)}`, '        layout:'] : ['      - layout:']),
+    `          cwd: ${JSON.stringify(tmpdir())}`,
+    '          commands:',
+    `            - exec: ${JSON.stringify(`rm -f ${q(self)}; bash ${q(launcher)}`)}`,
+    '',
+  ].join('\n')
+}
+
+export const WARP_LAUNCH_DIR = join(homedir(), '.warp', 'launch_configurations')
+
+async function launchInWarp({ path, naming, config, skill, slot, script }, { run, writeFile, warpDir }) {
+  const file = path.split('/').pop().replace(/\.sh$/, '.yaml')
+  const self = join(warpDir, file)
+  await mkdir(warpDir, { recursive: true })
+  await writeFile(self, warpLaunchConfig({ name: file.replace(/\.yaml$/, ''), launcher: path, self, title: naming.title || null }))
+  const r = await run('open', [`warp://launch/${encodeURIComponent(file)}`])
+  if (r.code !== 0) return { ok: false, message: `Could not open Warp: ${r.stderr.trim()}` }
+  // A launch configuration always opens its own window; there is no way to aim it at an
+  // existing one, so tab mode is a Terminal-only setting and says so rather than vanishing.
+  const note = terminalMode(config) === 'tab' ? ' — in a new Warp window (terminalMode "tab" applies to Terminal only)' : ''
+  return { ok: true, message: `${launchedMessage(skill, slot)}${note}`, detail: script, slot: slot.dir }
+}
+
 export async function openItem(
   { item, branch = null, slots, plans = [], skill = null, config, chosenSlotDir = null, staleBranches, claimedDirs, repo = null, mergeBase = null, review = null },
-  { run = defaultRun, writeFile = fsWriteFile, dry = false } = {}
+  { run = defaultRun, writeFile = fsWriteFile, dry = false, warpDir = WARP_LAUNCH_DIR } = {}
 ) {
   // Worktree mode accumulates one worktree per branch ever launched on, so old ones are
   // swept on launch — clean and older than the age limit only, never a dirty one. Never in
@@ -382,6 +425,10 @@ export async function openItem(
     return { ok: false, message: `Refusing to launch: unsafe launcher path ${path}` }
   }
   await writeFile(path, script, { mode: 0o700 })
+
+  if (terminalApp(config) === 'warp') {
+    return launchInWarp({ path, naming, config, skill, slot, script }, { run, writeFile, warpDir })
+  }
 
   // Tab mode first when configured, falling back to a new window. Ordered this way, not
   // guarded by a permission check, because there is no reliable way to ask: reading process

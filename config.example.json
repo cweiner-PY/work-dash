@@ -6,6 +6,7 @@
   "jiraProject": "PY",
   "docsDir": "/Users/YOU/Work/docs",
   "checkoutMode": "slots",
+  "terminalApp": "terminal",
   "terminalMode": "window",
   "terminalTitle": "{key} — {title} · {slot}",
   "editor": "Cursor",

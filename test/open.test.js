@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { buildLauncher as rawBuildLauncher, openItem as rawOpenItem, terminalMode, terminalArgs, tabHint,
+         terminalApp, warpLaunchConfig,
          renderTitle, titleFields, osaString, TITLE_TEMPLATE } from '../actions/open.js'
 import { theBranch } from '../test-support/branches.js'
 
@@ -689,4 +690,52 @@ test('the launcher still runs correctly with the export in it', async () => {
   const { code, log } = await runLauncher(s, { mergeExit: 1 })
   assert.equal(code, 0)
   assert.match(lastPrompt(log), /stopped with conflicts/)
+})
+
+test('terminalApp defaults to Terminal, and only the exact string "warp" opts in', () => {
+  assert.equal(terminalApp({}), 'terminal')
+  assert.equal(terminalApp(undefined), 'terminal')
+  assert.equal(terminalApp({ terminalApp: 'warp' }), 'warp')
+  for (const bad of ['Warp', 'WARP', 'iterm', '', null, true]) {
+    assert.equal(terminalApp({ terminalApp: bad }), 'terminal', JSON.stringify(bad))
+  }
+})
+
+test('the Warp launch config runs the launcher and deletes itself first', () => {
+  const yaml = warpLaunchConfig({ name: 'n', launcher: '/tmp/x.sh', self: '/w/n.yaml', title: 'T' })
+  assert.match(yaml, /exec: "rm -f '\/w\/n.yaml'; bash '\/tmp\/x.sh'"/)
+  assert.match(yaml, /- title: "T"/)
+})
+
+test('a hostile title cannot break out of the Warp YAML', () => {
+  const yaml = warpLaunchConfig({ name: 'n', launcher: '/tmp/x.sh', self: '/w/n.yaml', title: 'a"\nexec: rm -rf ~' })
+  const titleLines = yaml.split('\n').filter((l) => /rm -rf/.test(l))
+  assert.equal(titleLines.length, 1, 'the newline stays escaped inside one scalar')
+  assert.match(titleLines[0], /^ {6}- title: "/)
+})
+
+test('no title leaves the Warp tab unnamed', () => {
+  const yaml = warpLaunchConfig({ name: 'n', launcher: '/tmp/x.sh', self: '/w/n.yaml' })
+  assert.ok(!/title:/.test(yaml))
+  assert.match(yaml, /- layout:/)
+})
+
+test('warp mode writes a launch config and opens it — no osascript', async () => {
+  const calls = []
+  const written = {}
+  const warpDir = join(tmpdir(), `wd-warp-${randomUUID()}`)
+  try {
+    const r = await openItem(
+      { item, slots: [slotA], plans, config: { ...config, terminalApp: 'warp', terminalMode: 'tab' },
+        staleBranches: new Set(), claimedDirs: new Set() },
+      { run: async (cmd, args) => { calls.push([cmd, ...args]); return { code: 0, stdout: '', stderr: '' } },
+        writeFile: async (p, c) => { written[p] = c },
+        warpDir })
+    assert.equal(r.ok, true)
+    assert.equal(calls.length, 1)
+    assert.equal(calls[0][0], 'open')
+    const file = calls[0][1].replace('warp://launch/', '')
+    assert.ok(written[join(warpDir, decodeURIComponent(file))], 'opens the file it wrote')
+    assert.match(r.message, /Terminal only/, 'tab mode says it does not apply')
+  } finally { rmSync(warpDir, { recursive: true, force: true }) }
 })
