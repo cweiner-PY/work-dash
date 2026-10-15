@@ -955,7 +955,7 @@ if (typeof document !== 'undefined') {
   // a fifth palette is a CSS block plus one string.
   // Each name has one complete token block in style.css. Lights first, since a palette
   // is now an explicit choice rather than something the OS decides.
-  const PALETTES = ['ledger', 'clay', 'linen', 'sage', 'manifest', 'phosphor']
+  const PALETTES = ['ledger', 'clay', 'linen', 'sage', 'manifest', 'phosphor', 'cyber', 'arcade', 'win95', 'terminal']
   const PALETTE_KEY = 'work-dash:palette'
   // Fixed, not derived from prefers-color-scheme: that signal moves with the macOS
   // appearance schedule AND Chrome's own theme setting, neither of which is a statement
