@@ -186,13 +186,20 @@ dashboard only submits the slash command.
 
 ```json
 "skills": [
-  { "name": "ticket-planner",      "when": "!branch && !pr" },
+  { "name": "ticket-planner",      "when": "!branch && !pr && jira.issuetype != 'Bug'" },
+  { "name": "bug-triage",          "when": "!branch && !pr && jira.issuetype == 'Bug'" },
   { "name": "critical-review",     "when": "slot" },
   { "name": "resolve-code-review", "when": "pr.hasReviewComments || pr.changesRequested" },
   { "name": "design-qa",           "when": "uiSubtasks && !review" },
+  { "name": "ship",                "when": "branch && !review && !pr" },
+  { "name": "ship ready",          "when": "pr.isDraft" },
+  { "name": "ci-fix",              "when": "pr.requiredChecks.failing" },
   { "name": "toggle-logan-env",    "when": "repo == 'PerformYard/Logan'" }
 ]
 ```
+
+A name can carry arguments: the button submits `/<name> <KEY>`, so `ship ready` runs `/ship ready PY-123`.
+Arrays count as false when empty, so `pr.requiredChecks.failing` holds only when a required check is failing.
 
 `when` sees `key`, `repo`, `slot`, `branch`, `plans`, `jira`, `uiSubtasks`, `pr` and `review`,
 with `!`, `&&`, `||`, `==`, `!=`, parentheses, single-quoted strings and dotted

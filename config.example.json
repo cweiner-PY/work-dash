@@ -41,7 +41,11 @@
   "skills": [
     {
       "name": "ticket-planner",
-      "when": "!branch && !pr"
+      "when": "!branch && !pr && jira.issuetype != 'Bug' && jira.issuetype != 'Bug Sub-task'"
+    },
+    {
+      "name": "bug-triage",
+      "when": "!branch && !pr && (jira.issuetype == 'Bug' || jira.issuetype == 'Bug Sub-task')"
     },
     {
       "name": "engineering-subtasking",
@@ -70,6 +74,22 @@
     {
       "name": "design-qa",
       "when": "uiSubtasks && !review"
+    },
+    {
+      "name": "ship",
+      "when": "branch && !review && !pr"
+    },
+    {
+      "name": "ship ready",
+      "when": "pr.isDraft"
+    },
+    {
+      "name": "close-bug",
+      "when": "pr && (jira.issuetype == 'Bug' || jira.issuetype == 'Bug Sub-task')"
+    },
+    {
+      "name": "ci-fix",
+      "when": "pr.requiredChecks.failing"
     },
     {
       "name": "toggle-logan-env",
