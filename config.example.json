@@ -68,6 +68,10 @@
       "when": "branch && !review"
     },
     {
+      "name": "design-qa",
+      "when": "uiSubtasks && !review"
+    },
+    {
       "name": "toggle-logan-env",
       "when": "repo == 'PerformYard/Logan'"
     }

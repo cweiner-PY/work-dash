@@ -189,11 +189,12 @@ dashboard only submits the slash command.
   { "name": "ticket-planner",      "when": "!branch && !pr" },
   { "name": "critical-review",     "when": "slot" },
   { "name": "resolve-code-review", "when": "pr.hasReviewComments || pr.changesRequested" },
+  { "name": "design-qa",           "when": "uiSubtasks && !review" },
   { "name": "toggle-logan-env",    "when": "repo == 'PerformYard/Logan'" }
 ]
 ```
 
-`when` sees `key`, `repo`, `slot`, `branch`, `plans`, `jira`, `pr` and `review`,
+`when` sees `key`, `repo`, `slot`, `branch`, `plans`, `jira`, `uiSubtasks`, `pr` and `review`,
 with `!`, `&&`, `||`, `==`, `!=`, parentheses, single-quoted strings and dotted
 paths. A hand-written parser, not `eval` — note there are no comparison operators
 beyond `==` / `!=`, so `slot.behind > 0` is not a valid rule.
@@ -202,6 +203,8 @@ Rules are evaluated **once per branch**, so `slot` and `pr` are singular for
 real: on a ticket with a PR on one branch and a checkout on another, the
 `pr`-gated skills appear on the first block and the `slot`-gated ones on the
 second, each acting on its own branch.
+
+`uiSubtasks` is the ticket's UI/UX subtasks that are still To Do or In Progress, so `/design-qa` disappears once they move to Ready To Test.
 
 `pr` is deliberately **your own** PR, never a colleague's review request, so a
 `pr`-gated skill won't fire on someone else's work. `review` is its mirror — that

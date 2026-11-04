@@ -8,6 +8,10 @@ import { collectSlots as slotsFetch } from './collect/slots.js'
 import { collectPlans as plansFetch } from './collect/plans.js'
 import { evalPredicate } from './util/predicate.js'
 
+const isUnworkedUiSubtask = (subtask) =>
+  /^UI\/UX/i.test(subtask.issuetype ?? '') &&
+  (subtask.statusCategory === 'To Do' || subtask.status === 'In Progress')
+
 // Which skills apply to ONE branch of an item. Per branch and not per item because the
 // predicate context is singular by design — a config rule says `slot.dirty` or `pr &&
 // !pr.changesRequested`, not `slots[0].dirty` — and on a ticket with two branches an
@@ -35,6 +39,7 @@ export function skillsForBranch(item, branch, config) {
     branch: branch.name,
     plans: item.plans ?? [],
     jira: item.jira,
+    uiSubtasks: (item.subtasks ?? []).filter(isUnworkedUiSubtask),
     pr: decorate(pr),
     review: decorate(review),
   }

@@ -516,3 +516,17 @@ test('review carries the same decorated fields pr does, so rules can read them',
   assert.deepEqual(
     skillsForBranch(item, br({ number: 1, isMine: true, reviewDecision: 'CHANGES_REQUESTED' }), cfg), [])
 })
+
+test('a branch whose ticket has unworked UI/UX subtasks offers the design-qa skill', () => {
+  const cfg = { skills: [{ name: 'design-qa', when: 'uiSubtasks && !review' }] }
+  const sub = (o) => ({ key: 'PY-1-1', issuetype: 'UI/UX Sub-Task', status: 'TO DO', statusCategory: 'To Do', ...o })
+  const br = (o = {}) => ({ name: 'PY-1-x', repo: 'O/R', pr: null, slot: null, detached: false, ...o })
+  const item = (subtasks) => ({ key: 'PY-1', repo: 'O/R', plans: [], jira: null, subtasks })
+  assert.deepEqual(skillsForBranch(item([sub()]), br(), cfg), ['design-qa'])
+  assert.deepEqual(skillsForBranch(item([sub({ status: 'In Progress', statusCategory: 'In Progress' })]), br(), cfg), ['design-qa'])
+  assert.deepEqual(skillsForBranch(item([sub({ status: 'Ready To Test', statusCategory: 'In Progress' })]), br(), cfg), [])
+  assert.deepEqual(skillsForBranch(item([sub({ issuetype: 'Bug Sub-task' })]), br(), cfg), [])
+  assert.deepEqual(skillsForBranch(item([]), br(), cfg), [])
+  assert.deepEqual(skillsForBranch({ key: 'PY-1', repo: 'O/R', plans: [], jira: null }, br(), cfg), [])
+  assert.deepEqual(skillsForBranch(item([sub()]), br({ pr: { number: 2, isMine: false } }), cfg), [])
+})
